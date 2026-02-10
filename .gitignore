@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Environment files (contain secrets)
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# Legacy marketing site (merged into application)
+marketing_site/
+
+# Pitch deck assets (not part of the application)
+pitch_deck/
+
+# Misc
+*.pptx
+medium_logo_mark.png

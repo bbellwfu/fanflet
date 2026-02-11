@@ -41,6 +41,7 @@ export default async function FanfletQRPageRoute({
       fanfletId={fanflet.id}
       fanfletTitle={fanflet.title}
       publicUrl={publicUrl}
+      slug={fanflet.slug}
     />
   );
 }

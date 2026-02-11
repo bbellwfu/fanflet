@@ -11,19 +11,22 @@ interface QRDownloadProps {
   fanfletId: string;
   fanfletTitle: string;
   publicUrl: string | null;
+  slug?: string;
 }
 
 export function QRDownload({
   fanfletId,
   fanfletTitle,
   publicUrl,
+  slug,
 }: QRDownloadProps) {
   const [copied, setCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
 
   const handleCopyQR = async () => {
     try {
-      const res = await fetch(`/api/qr/${fanfletId}?format=png&size=1200`);
+      const copyBuster = slug ? `&v=${encodeURIComponent(slug)}` : '';
+      const res = await fetch(`/api/qr/${fanfletId}?format=png&size=1200${copyBuster}`);
       const blob = await res.blob();
       await navigator.clipboard.write([
         new ClipboardItem({ "image/png": blob }),
@@ -69,9 +72,11 @@ export function QRDownload({
     );
   }
 
-  const qrPreviewUrl = `/api/qr/${fanfletId}?format=png&size=600`;
-  const pngDownloadUrl = `/api/qr/${fanfletId}?format=png&size=1200`;
-  const svgDownloadUrl = `/api/qr/${fanfletId}?format=svg&size=1200`;
+  // Append slug as a cache-buster so the browser fetches a fresh QR after slug changes
+  const cacheBuster = slug ? `&v=${encodeURIComponent(slug)}` : '';
+  const qrPreviewUrl = `/api/qr/${fanfletId}?format=png&size=600${cacheBuster}`;
+  const pngDownloadUrl = `/api/qr/${fanfletId}?format=png&size=1200${cacheBuster}`;
+  const svgDownloadUrl = `/api/qr/${fanfletId}?format=svg&size=1200${cacheBuster}`;
 
   return (
     <div className="space-y-8 max-w-lg mx-auto">

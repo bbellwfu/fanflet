@@ -80,7 +80,7 @@ export async function GET(
       headers: {
         'Content-Type': 'image/svg+xml',
         'Content-Disposition': `attachment; filename="fanflet-qr-${fanflet.slug}.svg"`,
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-store, must-revalidate',
       },
     })
   }
@@ -128,7 +128,7 @@ export async function GET(
       headers: {
         'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="fanflet-qr-${fanflet.slug}.png"`,
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-store, must-revalidate',
       },
     })
   } catch {
@@ -137,7 +137,7 @@ export async function GET(
       headers: {
         'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="fanflet-qr-${fanflet.slug}.png"`,
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'no-store, must-revalidate',
       },
     })
   }

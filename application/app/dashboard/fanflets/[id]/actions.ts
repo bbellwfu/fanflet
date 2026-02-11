@@ -70,6 +70,7 @@ export async function updateFanfletDetails(
   if (error) return { error: error.message }
 
   revalidatePath(`/dashboard/fanflets/${id}`)
+  revalidatePath(`/dashboard/fanflets/${id}/qr`)
   revalidatePath('/dashboard/fanflets')
   return { success: true }
 }

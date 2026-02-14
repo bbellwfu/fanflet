@@ -31,21 +31,16 @@ function getInitials(name: string | null, email: string): string {
   return "??";
 }
 
-interface SidebarProps {
-  user: { email?: string; user_metadata?: { full_name?: string } };
-  speaker: { name?: string; email?: string; photo_url?: string } | null;
-  children: React.ReactNode;
+interface SidebarContentProps {
+  pathname: string;
+  displayName: string;
+  displayEmail: string;
+  photoUrl?: string;
+  initials: string;
 }
 
-export function Sidebar({ user, speaker, children }: SidebarProps) {
-  const pathname = usePathname();
-
-  const displayName = speaker?.name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
-  const displayEmail = speaker?.email ?? user.email ?? "";
-  const photoUrl = speaker?.photo_url ?? undefined;
-  const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
-
-  const SidebarContent = () => (
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, initials }: SidebarContentProps) {
+  return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
         <Image src="/logo.png" alt="Fanflet Logo" width={32} height={32} className="w-8 h-8" />
@@ -95,12 +90,27 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
       </div>
     </div>
   );
+}
+
+interface SidebarProps {
+  user: { email?: string; user_metadata?: { full_name?: string } };
+  speaker: { name?: string; email?: string; photo_url?: string } | null;
+  children: React.ReactNode;
+}
+
+export function Sidebar({ user, speaker, children }: SidebarProps) {
+  const pathname = usePathname();
+
+  const displayName = speaker?.name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
+  const displayEmail = speaker?.email ?? user.email ?? "";
+  const photoUrl = speaker?.photo_url ?? undefined;
+  const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
-        <SidebarContent />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} initials={initials} />
       </aside>
 
       {/* Main Content */}
@@ -118,7 +128,7 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} initials={initials} />
             </SheetContent>
           </Sheet>
         </header>

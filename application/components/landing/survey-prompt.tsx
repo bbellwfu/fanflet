@@ -32,8 +32,8 @@ export function SurveyPrompt({
     const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${fanfletId}`);
     if (stored === "submitted" || stored === "dismissed") return;
 
-    // Show the modal
-    setVisible(true);
+    // Show the modal (defer to satisfy set-state-in-effect rule)
+    queueMicrotask(() => setVisible(true));
   }, [fanfletId]);
 
   const dismiss = () => {

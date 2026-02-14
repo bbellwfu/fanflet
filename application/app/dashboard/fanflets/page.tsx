@@ -32,8 +32,8 @@ export default async function FanfletsPage() {
   const fanfletIds = fanflets?.map((f) => f.id) ?? [];
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3002";
 
-  let pageViewsMap: Record<string, number> = {};
-  let subscribersMap: Record<string, number> = {};
+  const pageViewsMap: Record<string, number> = {};
+  const subscribersMap: Record<string, number> = {};
 
   if (fanfletIds.length > 0) {
     const [viewsRes, subsRes] = await Promise.all([

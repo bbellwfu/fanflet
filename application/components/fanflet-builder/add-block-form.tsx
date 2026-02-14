@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, FileDown, Type, Building2, Plus, X, ImageIcon, Upload, BookOpen, Copy, Link as LinkIcon, ArrowLeft } from "lucide-react";
+import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft } from "lucide-react";
 import { addResourceBlock, addLibraryBlockToFanflet } from "@/app/dashboard/fanflets/[id]/actions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";

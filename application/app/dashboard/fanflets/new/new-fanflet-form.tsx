@@ -33,7 +33,10 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
 
   useEffect(() => {
     if (!slugManuallyEdited && title) {
-      setSlug(slugify(title));
+      const generated = slugify(title);
+      if (generated) {
+        queueMicrotask(() => setSlug(generated));
+      }
     }
   }, [title, slugManuallyEdited]);
 

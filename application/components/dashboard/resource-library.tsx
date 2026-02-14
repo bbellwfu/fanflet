@@ -27,6 +27,10 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
+function generateSafeFileName(ext: string): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+}
+
 type LibraryResource = {
   id: string;
   type: string;
@@ -112,8 +116,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    setUrlFn: (url: string) => void,
-    inputRef: React.RefObject<HTMLInputElement | null>
+    setUrlFn: (url: string) => void
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -125,7 +128,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
     try {
       const supabase = createClient();
       const ext = file.name.split(".").pop() || "png";
-      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+      const safeName = generateSafeFileName(ext);
       const path = `${authUserId}/library/images/${safeName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -425,7 +428,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
                       ref={imageInputRef}
                       type="file"
                       accept="image/*"
-                      onChange={(e) => handleImageUpload(e, setImageUrl, imageInputRef)}
+                      onChange={(e) => handleImageUpload(e, setImageUrl)}
                       disabled={imageUploading}
                       className="bg-white border-white/20"
                     />
@@ -634,7 +637,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
                       <Input
                         type="file"
                         accept="image/*"
-                        onChange={(e) => handleImageUpload(e, setEditImageUrl, imageInputRef)}
+                        onChange={(e) => handleImageUpload(e, setEditImageUrl)}
                         disabled={imageUploading}
                         className="border-[#e2e8f0]"
                       />

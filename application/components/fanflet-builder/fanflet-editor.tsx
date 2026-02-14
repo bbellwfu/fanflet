@@ -194,27 +194,20 @@ export function FanfletEditor({
     }
   };
 
-  const StatusBadge = () => {
-    if (fanflet.status === "published") {
-      return (
-        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
-          Live
-        </span>
-      );
-    }
-    if (fanflet.status === "archived") {
-      return (
-        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
-          Archived
-        </span>
-      );
-    }
-    return (
+  const statusBadge =
+    fanflet.status === "published" ? (
+      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
+        Live
+      </span>
+    ) : fanflet.status === "archived" ? (
+      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
+        Archived
+      </span>
+    ) : (
       <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600">
         Draft
       </span>
     );
-  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -235,7 +228,7 @@ export function FanfletEditor({
                 {fanflet.event_name}
               </p>
             </div>
-            <StatusBadge />
+            {statusBadge}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-3">

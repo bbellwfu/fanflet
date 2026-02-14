@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, FileDown, Type, Building2, Plus, X, ImageIcon, Upload } from "lucide-react";
-import { addResourceBlock } from "@/app/dashboard/fanflets/[id]/actions";
+import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft } from "lucide-react";
+import { addResourceBlock, addLibraryBlockToFanflet } from "@/app/dashboard/fanflets/[id]/actions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -19,19 +19,49 @@ const blockTypes = [
   { type: "sponsor", label: "Sponsor", icon: Building2 },
 ] as const;
 
+export type LibraryItem = {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  file_path: string | null;
+  image_url: string | null;
+  section_name: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+const libraryTypeIcons: Record<string, typeof Link2> = {
+  link: Link2,
+  file: FileDown,
+  text: Type,
+  sponsor: Building2,
+};
+
+const libraryTypeLabels: Record<string, string> = {
+  link: "Link",
+  file: "File",
+  text: "Text",
+  sponsor: "Sponsor",
+};
+
 interface AddBlockFormProps {
   fanfletId: string;
   authUserId: string;
   onAdded: () => void;
+  libraryItems?: LibraryItem[];
 }
 
 export function AddBlockForm({
   fanfletId,
   authUserId,
   onAdded,
+  libraryItems = [],
 }: AddBlockFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [addingFromLibrary, setAddingFromLibrary] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -56,6 +86,22 @@ export function AddBlockForm({
     setSponsorCta("Learn More");
     setImageUrl("");
     setOpen(false);
+    setShowLibraryPicker(false);
+    setAddingFromLibrary(null);
+  };
+
+  const handleAddFromLibrary = async (libraryItemId: string, mode: 'static' | 'dynamic') => {
+    setAddingFromLibrary(libraryItemId);
+    const result = await addLibraryBlockToFanflet(fanfletId, libraryItemId, mode);
+    setAddingFromLibrary(null);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(mode === 'static' ? "Resource copied to fanflet" : "Resource linked to fanflet");
+    reset();
+    router.refresh();
+    onAdded();
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,14 +236,114 @@ export function AddBlockForm({
 
   if (!open) {
     return (
-      <Button
-        variant="outline"
-        className="border-dashed border-2 border-slate-200 hover:border-[#3BA5D9] hover:bg-[#3BA5D9]/5 gap-2 w-full"
-        onClick={() => setOpen(true)}
-      >
-        <Plus className="w-4 h-4" />
-        Add Resource
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          className="border-dashed border-2 border-slate-200 hover:border-[#3BA5D9] hover:bg-[#3BA5D9]/5 gap-2 flex-1"
+          onClick={() => setOpen(true)}
+        >
+          <Plus className="w-4 h-4" />
+          Add Resource
+        </Button>
+        {libraryItems.length > 0 && (
+          <Button
+            variant="outline"
+            className="border-dashed border-2 border-slate-200 hover:border-[#3BA5D9] hover:bg-[#3BA5D9]/5 gap-2 flex-1"
+            onClick={() => { setOpen(true); setShowLibraryPicker(true); }}
+          >
+            <BookOpen className="w-4 h-4" />
+            Add from Library
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  // Library picker view
+  if (showLibraryPicker) {
+    return (
+      <div className="rounded-lg border-2 border-[#3BA5D9]/30 p-5 bg-[#1B365D] space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-white/15">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[#3BA5D9]" />
+            <h3 className="text-sm font-semibold text-white">Add from Library</h3>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={reset}
+            className="h-8 text-white/70 hover:text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+            Back
+          </Button>
+        </div>
+        <p className="text-xs text-white/60">
+          Choose a resource from your library. <strong className="text-white/80">Static Copy</strong> is independent after adding.{" "}
+          <strong className="text-white/80">Dynamic Link</strong> stays synced with your library.
+        </p>
+        <div className="space-y-2">
+          {libraryItems.map((item) => {
+            const Icon = libraryTypeIcons[item.type] ?? Link2;
+            const isAdding = addingFromLibrary === item.id;
+            const preview = item.description ?? item.url ?? item.file_path ?? "";
+            return (
+              <div
+                key={item.id}
+                className="flex items-start gap-3 p-3 bg-white/10 rounded-md border border-white/15"
+              >
+                {item.image_url ? (
+                  <div className="w-10 h-10 rounded-lg border border-white/20 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.image_url}
+                      alt={item.title || "Resource"}
+                      className="w-full h-full object-contain p-0.5"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-white/70">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold text-white/50 uppercase">
+                      {libraryTypeLabels[item.type] ?? item.type}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-white truncate">{item.title || "Untitled"}</p>
+                  {preview && (
+                    <p className="text-xs text-white/50 truncate mt-0.5">{preview}</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Button
+                    size="sm"
+                    disabled={isAdding}
+                    onClick={() => handleAddFromLibrary(item.id, 'static')}
+                    className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0 gap-1"
+                    title="Copies this resource -- edits to the library won't affect this fanflet"
+                  >
+                    {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                    Static
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={isAdding}
+                    onClick={() => handleAddFromLibrary(item.id, 'dynamic')}
+                    className="h-7 text-xs bg-[#3BA5D9]/80 hover:bg-[#3BA5D9] text-white border-0 gap-1"
+                    title="Links this resource -- changes in your library will update this fanflet"
+                  >
+                    {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <LinkIcon className="w-3 h-3" />}
+                    Dynamic
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
   }
 
@@ -223,14 +369,26 @@ export function AddBlockForm({
             </button>
           ))}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-4"
-          onClick={() => setOpen(false)}
-        >
-          Cancel
-        </Button>
+        <div className="flex items-center gap-2 mt-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+          {libraryItems.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowLibraryPicker(true)}
+              className="text-[#3BA5D9]"
+            >
+              <BookOpen className="w-4 h-4 mr-1" />
+              or choose from Library
+            </Button>
+          )}
+        </div>
       </div>
     );
   }

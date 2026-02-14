@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { SubscribeForm } from "./subscribe-form";
 import { trackResourceClick } from "./analytics-script";
+import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 
 type Speaker = {
   id: string;
@@ -58,6 +59,7 @@ type Fanflet = {
   event_name: string;
   event_date: string | null;
   resource_blocks: ResourceBlock[];
+  theme_config?: Record<string, unknown> | null;
 };
 
 type LandingPageProps = {
@@ -85,6 +87,9 @@ export function LandingPage({
   fanflet,
   subscriberCount,
 }: LandingPageProps) {
+  const themeId = resolveThemeId(fanflet.theme_config);
+  const themeVars = getThemeCSSVariables(themeId);
+
   const nonSponsorBlocks = fanflet.resource_blocks.filter(
     (b) => b.type !== "sponsor"
   );
@@ -105,18 +110,30 @@ export function LandingPage({
   const socialLinks = speaker.social_links ?? {};
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50" style={themeVars}>
       {/* Hero */}
       <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#1B365D] via-[#1e3f6e] to-[#0f2440]" />
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[#3BA5D9]/15 rounded-full blur-3xl -mr-20 -mt-20" />
-        <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#3BA5D9]/10 rounded-full blur-3xl -ml-16 -mb-16" />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to bottom right, var(--theme-primary), var(--theme-primary-mid), var(--theme-primary-dark))",
+          }}
+        />
+        <div
+          className="absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl -mr-20 -mt-20"
+          style={{ backgroundColor: "var(--theme-accent)", opacity: 0.15 }}
+        />
+        <div
+          className="absolute bottom-0 left-0 w-60 h-60 rounded-full blur-3xl -ml-16 -mb-16"
+          style={{ backgroundColor: "var(--theme-accent)", opacity: 0.1 }}
+        />
 
         <div className="relative z-10 px-5 sm:px-8 pt-10 sm:pt-12 pb-16 max-w-lg md:max-w-2xl mx-auto">
           {/* Event badge */}
           {fanflet.event_name && (
             <div className="flex justify-center mb-6">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-sm font-semibold text-blue-200 border border-white/15">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-sm font-semibold text-[var(--theme-hero-text)] border border-white/15">
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
                 {fanflet.event_name}
               </div>
@@ -140,7 +157,7 @@ export function LandingPage({
                 {speaker.name}
               </h1>
               {speaker.bio && (
-                <p className="text-blue-200/90 text-sm sm:text-base font-medium mt-1 leading-relaxed">
+                <p className="text-sm sm:text-base font-medium mt-1 leading-relaxed text-[var(--theme-hero-text)]">
                   {speaker.bio}
                 </p>
               )}
@@ -150,7 +167,7 @@ export function LandingPage({
                     href={socialLinks.linkedin}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-blue-200 hover:text-white transition-colors"
+                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
                     aria-label="LinkedIn"
                   >
                     <Linkedin className="w-4 h-4" />
@@ -161,7 +178,7 @@ export function LandingPage({
                     href={socialLinks.twitter}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-blue-200 hover:text-white transition-colors"
+                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
                     aria-label="Twitter"
                   >
                     <Twitter className="w-4 h-4" />
@@ -172,7 +189,7 @@ export function LandingPage({
                     href={socialLinks.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-blue-200 hover:text-white transition-colors"
+                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
                     aria-label="Website"
                   >
                     <Globe className="w-4 h-4" />
@@ -184,14 +201,14 @@ export function LandingPage({
 
           {/* Talk title + description */}
           <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl px-5 sm:px-6 py-5">
-            <p className="text-xs uppercase tracking-widest text-blue-300/70 font-semibold mb-2">
+            <p className="text-xs uppercase tracking-widest font-semibold mb-2 text-[var(--theme-hero-text-muted)]">
               Presentation
             </p>
             <h2 className="text-xl sm:text-2xl font-semibold text-white leading-snug">
               {fanflet.title}
             </h2>
             {fanflet.description && (
-              <p className="text-sm sm:text-base text-blue-200/80 mt-2 leading-relaxed">
+              <p className="text-sm sm:text-base mt-2 leading-relaxed text-[var(--theme-hero-text)]">
                 {fanflet.description}
               </p>
             )}
@@ -204,7 +221,13 @@ export function LandingPage({
         <Card className="shadow-xl border-0 bg-white">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#3BA5D9] to-[#1B365D] flex items-center justify-center">
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center"
+                style={{
+                  background:
+                    "linear-gradient(to bottom right, var(--theme-accent), var(--theme-primary))",
+                }}
+              >
                 <Mail className="h-4 w-4 text-white" />
               </div>
               Stay Connected
@@ -325,9 +348,9 @@ export function LandingPage({
                     className="block"
                     onClick={() => trackResourceClick(fanflet.id, block.id)}
                   >
-                    <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group border-slate-200/80 hover:border-[#3BA5D9]/30">
+                    <Card className="overflow-hidden hover:shadow-lg transition-all cursor-pointer group border-slate-200/80 hover:border-slate-300">
                       <div className="p-4 sm:p-5 flex items-center gap-4">
-                        <div className="h-12 w-12 bg-blue-50 rounded-xl flex items-center justify-center text-[#1B365D] group-hover:bg-[#1B365D] group-hover:text-white transition-colors shrink-0">
+                        <div className="h-12 w-12 rounded-xl flex items-center justify-center transition-colors shrink-0 bg-[var(--theme-primary-light)] text-[var(--theme-primary)] group-hover:bg-[var(--theme-primary)] group-hover:text-white">
                           <Download className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -336,7 +359,7 @@ export function LandingPage({
                           </h4>
                           <p className="text-sm text-slate-400">{fileInfo}</p>
                         </div>
-                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[#3BA5D9] transition-colors" />
+                        <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-[var(--theme-accent)] transition-colors" />
                       </div>
                     </Card>
                   </a>
@@ -424,7 +447,9 @@ export function LandingPage({
                       className="block"
                       onClick={() => trackResourceClick(fanflet.id, block.id)}
                     >
-                      <span className="inline-flex items-center justify-center w-full bg-[#3BA5D9] hover:bg-[#2d8fbd] text-white font-semibold text-base h-11 rounded-md transition-colors">
+                      <span
+                        className="inline-flex items-center justify-center w-full text-white font-semibold text-base h-11 rounded-md transition-colors bg-[var(--theme-accent)] hover:bg-[var(--theme-accent-hover)]"
+                      >
                         {block.metadata?.cta_text ?? "Learn More"}
                       </span>
                     </a>
@@ -440,7 +465,7 @@ export function LandingPage({
       <div className="text-center pb-8 px-4 border-t border-slate-200/60 pt-6">
         <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5">
           Powered by{" "}
-          <span className="font-bold text-[#1B365D] flex items-center gap-1">
+          <span className="font-bold text-[var(--theme-primary)] flex items-center gap-1">
             <Image
               src="/logo.png"
               alt="Fanflet Logo"
@@ -454,14 +479,14 @@ export function LandingPage({
         <div className="flex justify-center gap-4 mt-3 text-xs text-slate-400">
           <Link
             href="/signup"
-            className="hover:text-[#1B365D] transition-colors"
+            className="hover:text-[var(--theme-primary)] transition-colors"
           >
             Create your own
           </Link>
-          <Link href="#" className="hover:text-[#1B365D] transition-colors">
+          <Link href="#" className="hover:text-[var(--theme-primary)] transition-colors">
             Privacy
           </Link>
-          <Link href="#" className="hover:text-[#1B365D] transition-colors">
+          <Link href="#" className="hover:text-[var(--theme-primary)] transition-colors">
             Terms
           </Link>
         </div>

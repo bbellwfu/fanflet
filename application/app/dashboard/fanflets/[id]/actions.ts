@@ -41,6 +41,15 @@ export async function updateFanfletDetails(
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
   const survey_question_id = formData.get('survey_question_id') as string || null
+  const theme_config_raw = formData.get('theme_config') as string || null
+  let theme_config: Record<string, unknown> = {}
+  if (theme_config_raw) {
+    try {
+      theme_config = JSON.parse(theme_config_raw)
+    } catch {
+      // Keep default empty object
+    }
+  }
 
   const { data: existing } = await supabase
     .from('fanflets')
@@ -63,6 +72,7 @@ export async function updateFanfletDetails(
       event_date: event_date || null,
       slug,
       survey_question_id: survey_question_id || null,
+      theme_config,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -237,6 +247,83 @@ export async function deleteResourceBlock(blockId: string): Promise<{ error?: st
 
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
+}
+
+export async function addLibraryBlockToFanflet(
+  fanfletId: string,
+  libraryItemId: string,
+  mode: 'static' | 'dynamic'
+): Promise<{ error?: string; success?: boolean; id?: string }> {
+  const supabase = await createClient()
+  const ownership = await verifyOwnership(supabase, fanfletId)
+  if ('error' in ownership) return { error: ownership.error }
+
+  // Fetch the library item
+  const { data: libItem, error: libError } = await supabase
+    .from('resource_library')
+    .select('*')
+    .eq('id', libraryItemId)
+    .single()
+
+  if (libError || !libItem) return { error: 'Library resource not found' }
+
+  // Calculate next display_order
+  const { data: maxOrder } = await supabase
+    .from('resource_blocks')
+    .select('display_order')
+    .eq('fanflet_id', fanfletId)
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .single()
+
+  const nextOrder = (maxOrder?.display_order ?? -1) + 1
+
+  if (mode === 'static') {
+    // Static copy: duplicate all fields, no library_item_id
+    const { data: block, error } = await supabase
+      .from('resource_blocks')
+      .insert({
+        fanflet_id: fanfletId,
+        type: libItem.type,
+        title: libItem.title,
+        description: libItem.description,
+        url: libItem.url,
+        file_path: libItem.file_path,
+        image_url: libItem.image_url,
+        display_order: nextOrder,
+        section_name: libItem.section_name,
+        metadata: libItem.metadata ?? {},
+      })
+      .select('id')
+      .single()
+
+    if (error) return { error: error.message }
+    revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+    return { success: true, id: block.id }
+  } else {
+    // Dynamic link: store reference to library item
+    const { data: block, error } = await supabase
+      .from('resource_blocks')
+      .insert({
+        fanflet_id: fanfletId,
+        type: libItem.type,
+        title: libItem.title,
+        description: libItem.description,
+        url: libItem.url,
+        file_path: libItem.file_path,
+        image_url: libItem.image_url,
+        display_order: nextOrder,
+        section_name: libItem.section_name,
+        metadata: libItem.metadata ?? {},
+        library_item_id: libraryItemId,
+      })
+      .select('id')
+      .single()
+
+    if (error) return { error: error.message }
+    revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+    return { success: true, id: block.id }
+  }
 }
 
 export async function reorderBlock(

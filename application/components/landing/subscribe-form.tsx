@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mail } from "lucide-react";
 import { subscribeToSpeaker } from "@/app/[speakerSlug]/[fanfletSlug]/actions";
 
 type SubscribeFormProps = {
@@ -59,7 +58,7 @@ export function SubscribeForm({
         <Button
           type="submit"
           disabled={status === "loading" || status === "success"}
-          className="bg-[#1B365D] hover:bg-[#152b4d] text-white shrink-0 h-10 px-5 font-semibold text-sm"
+          className="bg-[var(--theme-primary)] hover:bg-[var(--theme-primary-dark)] text-white shrink-0 h-10 px-5 font-semibold text-sm"
         >
           {status === "loading" ? "..." : "Subscribe"}
         </Button>

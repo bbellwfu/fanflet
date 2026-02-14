@@ -66,7 +66,6 @@ export default async function DashboardPage() {
   for (let i = 59; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split("T")[0];
     chartData.push({
       date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       subscribers: 0,

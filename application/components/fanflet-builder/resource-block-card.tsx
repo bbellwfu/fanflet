@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
 } from "@/app/dashboard/fanflets/[id]/actions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { ChevronUp, ChevronDown, Pencil, Trash2, Loader2 } from "lucide-react";
+import { ChevronUp, ChevronDown, Pencil, Trash2, Loader2, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,6 +45,7 @@ export type ResourceBlock = {
   display_order: number;
   section_name: string | null;
   metadata: Record<string, unknown> | null;
+  library_item_id?: string | null;
 };
 
 interface ResourceBlockCardProps {
@@ -121,6 +123,7 @@ export function ResourceBlockCard({
   };
 
   const Icon = typeIcons[block.type] ?? Link2;
+  const isDynamic = !!block.library_item_id;
 
   const handleSave = async () => {
     setSaving(true);
@@ -168,6 +171,61 @@ export function ResourceBlockCard({
   };
 
   const ctaText = (metadata?.cta_text as string) ?? "Learn More";
+
+  if (editing && isDynamic) {
+    return (
+      <Card className="border-[#3BA5D9]/40 bg-slate-50/50">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <LinkIcon className="w-4 h-4 text-[#3BA5D9]" />
+            <span className="text-sm font-medium text-[#1B365D]">Linked Resource</span>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This resource is dynamically linked to your Resource Library. To edit its content, go to{" "}
+            <Link href="/dashboard/resources" className="text-[#3BA5D9] hover:underline font-medium">
+              Resource Library
+            </Link>
+            . Changes there will automatically update this fanflet.
+          </p>
+          <div className="space-y-2">
+            <Label>Section Name</Label>
+            <Input
+              value={sectionName}
+              onChange={(e) => setSectionName(e.target.value)}
+              placeholder="Resources"
+              className="border-[#e2e8f0]"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={async () => {
+                setSaving(true);
+                const result = await updateResourceBlock(block.id, {
+                  section_name: sectionName || undefined,
+                });
+                setSaving(false);
+                if (result.error) {
+                  toast.error(result.error);
+                  return;
+                }
+                toast.success("Section name updated");
+                setEditing(false);
+                router.refresh();
+              }}
+              disabled={saving}
+              className="bg-[#1B365D] hover:bg-[#152b4d]"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (editing) {
     return (
@@ -338,7 +396,13 @@ export function ResourceBlockCard({
             </span>
             {block.section_name && (
               <span className="text-xs text-slate-400">
-                • {block.section_name}
+                &bull; {block.section_name}
+              </span>
+            )}
+            {isDynamic && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#3BA5D9]/10 text-[#3BA5D9] border border-[#3BA5D9]/20">
+                <LinkIcon className="w-2.5 h-2.5" />
+                Linked
               </span>
             )}
           </div>

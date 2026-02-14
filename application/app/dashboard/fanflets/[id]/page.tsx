@@ -49,6 +49,13 @@ export default async function FanfletEditorPage({
     .eq("speaker_id", speaker.id)
     .order("created_at", { ascending: true });
 
+  // Fetch speaker's resource library for the "Add from Library" flow
+  const { data: libraryItems } = await supabase
+    .from("resource_library")
+    .select("id, type, title, description, url, file_path, image_url, section_name, metadata")
+    .eq("speaker_id", speaker.id)
+    .order("created_at", { ascending: true });
+
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3002";
   const publicUrl =
     fanflet.status === "published" && speaker.slug
@@ -64,6 +71,7 @@ export default async function FanfletEditorPage({
       hasSpeakerSlug={!!speaker.slug}
       authUserId={user.id}
       surveyQuestions={surveyQuestions ?? []}
+      libraryItems={libraryItems ?? []}
     />
   );
 }

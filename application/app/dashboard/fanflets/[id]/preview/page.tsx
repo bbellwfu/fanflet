@@ -1,82 +1,55 @@
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
+import { redirect, notFound } from "next/navigation";
 import { LandingPage } from "@/components/landing/landing-page";
-import { AnalyticsScript } from "@/components/landing/analytics-script";
 import { SurveyPrompt } from "@/components/landing/survey-prompt";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
+import Link from "next/link";
 
-export const revalidate = 3600; // Cache for 1 hour
-
-type Props = {
-  params: Promise<{ speakerSlug: string; fanfletSlug: string }>;
-};
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { speakerSlug, fanfletSlug } = await params;
+export default async function FanfletPreviewPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Verify the speaker owns this fanflet
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("id, name")
-    .eq("slug", speakerSlug)
+    .select("*")
+    .eq("auth_user_id", user.id)
     .single();
 
   if (!speaker) {
-    return { title: "Fanflet Not Found" };
+    redirect("/dashboard/settings");
   }
 
+  // Fetch fanflet WITHOUT filtering by status — this is the key difference from the public route
   const { data: fanflet } = await supabase
     .from("fanflets")
-    .select("title, event_name, event_date")
+    .select("*")
+    .eq("id", id)
     .eq("speaker_id", speaker.id)
-    .eq("slug", fanfletSlug)
-    .eq("status", "published")
     .single();
 
   if (!fanflet) {
-    return { title: "Fanflet Not Found" };
+    notFound();
   }
 
-  const eventContext = fanflet.event_name
-    ? `${fanflet.event_name}${fanflet.event_date ? ` · ${new Date(fanflet.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}`
-    : "Presentation resources";
-
-  return {
-    title: `${fanflet.title} | ${speaker.name}`,
-    description: `${fanflet.title} by ${speaker.name}. ${eventContext}.`,
-  };
-}
-
-export default async function AudienceLandingPage({ params }: Props) {
-  const { speakerSlug, fanfletSlug } = await params;
-  const supabase = await createClient();
-
-  const { data: speaker } = await supabase
-    .from("speakers")
-    .select("*")
-    .eq("slug", speakerSlug)
-    .single();
-
-  if (!speaker) notFound();
-
-  const { data: fanflet } = await supabase
-    .from("fanflets")
-    .select("*")
-    .eq("speaker_id", speaker.id)
-    .eq("slug", fanfletSlug)
-    .eq("status", "published")
-    .single();
-
-  if (!fanflet) notFound();
-
+  // Fetch resource blocks with library joins (same logic as public page)
   const { data: rawBlocks } = await supabase
     .from("resource_blocks")
     .select("*, resource_library(*)")
     .eq("fanflet_id", fanflet.id)
     .order("display_order", { ascending: true });
 
-  // For dynamic blocks (library_item_id set), merge library item data over block data
   const resourceBlocks = (rawBlocks ?? []).map((block) => {
     const lib = block.resource_library;
     if (lib && block.library_item_id) {
@@ -89,7 +62,6 @@ export default async function AudienceLandingPage({ params }: Props) {
         image_url: lib.image_url ?? block.image_url,
         metadata: lib.metadata ?? block.metadata,
         type: lib.type ?? block.type,
-        // Keep block's own section_name and display_order
         resource_library: undefined,
       };
     }
@@ -101,8 +73,12 @@ export default async function AudienceLandingPage({ params }: Props) {
     .select("*", { count: "exact", head: true })
     .eq("speaker_id", speaker.id);
 
-  // Fetch survey question if the fanflet has one configured
-  let surveyQuestion: { id: string; question_text: string; question_type: string } | null = null;
+  // Fetch survey question if configured
+  let surveyQuestion: {
+    id: string;
+    question_text: string;
+    question_type: string;
+  } | null = null;
   if (fanflet.survey_question_id) {
     const { data } = await supabase
       .from("survey_questions")
@@ -121,14 +97,27 @@ export default async function AudienceLandingPage({ params }: Props) {
   const themeVars = getThemeCSSVariables(themeId);
 
   return (
-    <div style={themeVars}>
-      <AnalyticsScript fanfletId={fanflet.id} />
+    <div className="min-h-screen bg-slate-100" style={themeVars}>
+      {/* Preview banner */}
+      <div className="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium sticky top-0 z-50">
+        Preview Mode — This is how your Fanflet will appear to your audience.{" "}
+        <Link
+          href={`/dashboard/fanflets/${id}`}
+          className="underline font-semibold hover:text-white/90"
+        >
+          Back to Editor
+        </Link>
+      </div>
+
+      {/* No AnalyticsScript — preview visits are not tracked */}
       {surveyQuestion && (
         <SurveyPrompt
           fanfletId={fanflet.id}
           questionId={surveyQuestion.id}
           questionText={surveyQuestion.question_text}
-          questionType={surveyQuestion.question_type as "nps" | "yes_no" | "rating"}
+          questionType={
+            surveyQuestion.question_type as "nps" | "yes_no" | "rating"
+          }
         />
       )}
       <LandingPage

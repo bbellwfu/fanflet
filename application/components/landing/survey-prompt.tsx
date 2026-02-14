@@ -32,8 +32,8 @@ export function SurveyPrompt({
     const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${fanfletId}`);
     if (stored === "submitted" || stored === "dismissed") return;
 
-    // Show the modal
-    setVisible(true);
+    // Show the modal (defer to satisfy set-state-in-effect rule)
+    queueMicrotask(() => setVisible(true));
   }, [fanfletId]);
 
   const dismiss = () => {
@@ -108,7 +108,7 @@ export function SurveyPrompt({
         ) : (
           /* Question state */
           <div className="px-6 pt-8 pb-6">
-            <p className="text-xs font-medium text-[#3BA5D9] uppercase tracking-wider mb-2">
+            <p className="text-xs font-medium text-[var(--theme-accent)] uppercase tracking-wider mb-2">
               Quick Feedback
             </p>
             <h2 className="text-lg font-semibold text-slate-900 leading-snug pr-6">
@@ -161,7 +161,7 @@ function NpsInput({
             key={i}
             onClick={() => onSubmit(String(i))}
             disabled={disabled}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-md text-xs sm:text-sm font-semibold border border-slate-200 hover:bg-[#1B365D] hover:text-white hover:border-[#1B365D] transition-colors disabled:opacity-50 text-slate-700"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-md text-xs sm:text-sm font-semibold border border-slate-200 hover:bg-[var(--theme-primary)] hover:text-white hover:border-[var(--theme-primary)] transition-colors disabled:opacity-50 text-slate-700"
           >
             {i}
           </button>

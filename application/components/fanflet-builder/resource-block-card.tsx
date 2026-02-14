@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,9 +182,9 @@ export function ResourceBlockCard({
           </div>
           <p className="text-sm text-muted-foreground">
             This resource is dynamically linked to your Resource Library. To edit its content, go to{" "}
-            <a href="/dashboard/resources" className="text-[#3BA5D9] hover:underline font-medium">
+            <Link href="/dashboard/resources" className="text-[#3BA5D9] hover:underline font-medium">
               Resource Library
-            </a>
+            </Link>
             . Changes there will automatically update this fanflet.
           </p>
           <div className="space-y-2">

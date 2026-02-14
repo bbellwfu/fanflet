@@ -44,7 +44,13 @@ export async function updateSpeakerProfile(formData: FormData) {
     .update(updateData)
     .eq('auth_user_id', user.id)
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Catch unique-constraint violation on slug and return a friendly message
+    if (error.code === '23505' && error.message?.includes('slug')) {
+      return { error: 'This URL slug is already taken. Please choose a different one.' }
+    }
+    return { error: error.message }
+  }
 
   revalidatePath('/dashboard/settings')
   return { success: true }

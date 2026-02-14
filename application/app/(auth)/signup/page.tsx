@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -87,6 +88,7 @@ export default function SignupPage() {
               type="text"
               placeholder="Jane Doe"
               required
+              autoFocus
               autoComplete="name"
               disabled={isLoading}
               className="border-[#e2e8f0] focus-visible:ring-[#3BA5D9]"
@@ -124,7 +126,14 @@ export default function SignupPage() {
             disabled={isLoading}
             className="w-full bg-[#1B365D] hover:bg-[#1B365D]/90"
           >
-            {isLoading ? 'Creating account...' : 'Create account'}
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating your account...
+              </>
+            ) : (
+              'Create account'
+            )}
           </Button>
         </form>
         <div className="relative">

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import {
   ArrowLeft,
+  Eye,
   ExternalLink,
   QrCode,
   Loader2,
@@ -40,6 +41,8 @@ import {
 import { toast } from "sonner";
 import { ResourceBlockCard } from "./resource-block-card";
 import { AddBlockForm } from "./add-block-form";
+import { ThemePicker } from "./theme-picker";
+import { resolveThemeId, DEFAULT_THEME_ID } from "@/lib/themes";
 
 type Fanflet = {
   id: string;
@@ -50,6 +53,7 @@ type Fanflet = {
   slug: string;
   status: string;
   survey_question_id: string | null;
+  theme_config: Record<string, unknown> | null;
 };
 
 type SurveyQuestion = {
@@ -69,6 +73,19 @@ type ResourceBlock = {
   display_order: number;
   section_name: string | null;
   metadata: Record<string, unknown> | null;
+  library_item_id: string | null;
+};
+
+type LibraryItem = {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  file_path: string | null;
+  image_url: string | null;
+  section_name: string | null;
+  metadata: Record<string, unknown> | null;
 };
 
 interface FanfletEditorProps {
@@ -79,6 +96,7 @@ interface FanfletEditorProps {
   hasSpeakerSlug: boolean;
   authUserId: string;
   surveyQuestions?: SurveyQuestion[];
+  libraryItems?: LibraryItem[];
 }
 
 export function FanfletEditor({
@@ -89,6 +107,7 @@ export function FanfletEditor({
   hasSpeakerSlug,
   authUserId,
   surveyQuestions = [],
+  libraryItems = [],
 }: FanfletEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -103,6 +122,9 @@ export function FanfletEditor({
   const [slug, setSlug] = useState(fanflet.slug);
   const [surveyQuestionId, setSurveyQuestionId] = useState(
     fanflet.survey_question_id ?? "none"
+  );
+  const [selectedThemeId, setSelectedThemeId] = useState(
+    resolveThemeId(fanflet.theme_config)
   );
 
   const slugChanged = slug !== fanflet.slug;
@@ -124,6 +146,14 @@ export function FanfletEditor({
     formData.set("event_date", eventDate || "");
     formData.set("slug", slug);
     formData.set("survey_question_id", surveyQuestionId === "none" ? "" : surveyQuestionId);
+    formData.set(
+      "theme_config",
+      JSON.stringify(
+        selectedThemeId === DEFAULT_THEME_ID
+          ? {}
+          : { preset: selectedThemeId }
+      )
+    );
 
     const result = await updateFanfletDetails(fanflet.id, formData);
     setSaving(false);
@@ -187,74 +217,97 @@ export function FanfletEditor({
   };
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      {/* Header bar */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon">
-            <Link href="/dashboard/fanflets">
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-slate-900 truncate">
-              {fanflet.title}
-            </h1>
-            <p className="text-sm text-muted-foreground truncate">
-              {fanflet.event_name}
-            </p>
+    <div className="max-w-4xl mx-auto">
+      {/* Sticky header bar */}
+      <div className="sticky top-16 md:top-0 z-30 bg-slate-50 -mx-6 md:-mx-8 px-6 md:px-8 pt-2 pb-4 border-b border-slate-200/80">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="shrink-0">
+              <Link href="/dashboard/fanflets">
+                <ArrowLeft className="w-4 h-4" />
+              </Link>
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold text-slate-900 truncate">
+                {fanflet.title}
+              </h1>
+              <p className="text-sm text-muted-foreground truncate">
+                {fanflet.event_name}
+              </p>
+            </div>
+            <StatusBadge />
           </div>
-          <StatusBadge />
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {fanflet.status === "draft" && (
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {fanflet.status === "draft" && (
+              <Button
+                size="sm"
+                onClick={handlePublish}
+                className="bg-[#1B365D] hover:bg-[#152b4d]"
+              >
+                Publish
+              </Button>
+            )}
+            {fanflet.status === "published" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleUnpublish}
+              >
+                Unpublish
+              </Button>
+            )}
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/dashboard/fanflets/${fanflet.id}/preview`} target="_blank">
+                <Eye className="w-4 h-4" />
+                Preview
+              </Link>
+            </Button>
+            {fanflet.status === "published" && publicUrl && (
+              <Button size="sm" variant="outline" asChild>
+                <a href={`${publicUrl}?preview`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4" />
+                  View Live
+                </a>
+              </Button>
+            )}
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
+                <QrCode className="w-4 h-4" />
+                QR Code
+              </Link>
+            </Button>
+            <div className="flex-1" />
             <Button
               size="sm"
-              onClick={handlePublish}
+              onClick={handleSaveClick}
+              disabled={saving}
               className="bg-[#1B365D] hover:bg-[#152b4d]"
             >
-              Publish
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Save"
+              )}
             </Button>
-          )}
-          {fanflet.status === "published" && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleUnpublish}
-            >
-              Unpublish
-            </Button>
-          )}
-          {publicUrl && (
-            <Button size="sm" variant="outline" asChild>
-              <a href={`${publicUrl}?preview`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="w-4 h-4" />
-                Preview
-              </a>
-            </Button>
-          )}
-          <Button size="sm" variant="outline" asChild>
-            <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
-              <QrCode className="w-4 h-4" />
-              QR Code
-            </Link>
-          </Button>
-        </div>
-
-        {!hasSpeakerSlug && (
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
-            Set your Speaker URL in{" "}
-            <Link
-              href="/dashboard/settings"
-              className="font-medium underline hover:no-underline"
-            >
-              Settings
-            </Link>{" "}
-            before publishing so your Fanflet has a public URL.
           </div>
-        )}
+        </div>
       </div>
+
+      {!hasSpeakerSlug && (
+        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 mt-6">
+          Set your Speaker URL in{" "}
+          <Link
+            href="/dashboard/settings"
+            className="font-medium underline hover:no-underline"
+          >
+            Settings
+          </Link>{" "}
+          before publishing so your Fanflet has a public URL.
+        </div>
+      )}
+
+      <div className="space-y-8 mt-6">
 
       {/* Details section */}
       <Card className="border-slate-200">
@@ -300,7 +353,7 @@ export function FanfletEditor({
                   type="date"
                   value={eventDate}
                   onChange={(e) => setEventDate(e.target.value)}
-                  className="border-[#e2e8f0]"
+                  className="border-[#e2e8f0] max-w-[200px]"
                 />
               </div>
               <div className="space-y-2">
@@ -329,17 +382,6 @@ export function FanfletEditor({
                   </p>
                 )}
               </div>
-              <Button
-                onClick={handleSaveClick}
-                disabled={saving}
-                className="bg-[#1B365D] hover:bg-[#152b4d]"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Save"
-                )}
-              </Button>
 
               {/* Slug change confirmation dialog */}
               <AlertDialog open={showSlugWarning} onOpenChange={setShowSlugWarning}>
@@ -371,6 +413,22 @@ export function FanfletEditor({
               </AlertDialog>
             </div>
           </CardContent>
+      </Card>
+
+      {/* Theme */}
+      <Card className="border-slate-200">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-[#1B365D]">Theme</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose a color theme for your Fanflet landing page.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ThemePicker
+            selectedThemeId={selectedThemeId}
+            onChange={setSelectedThemeId}
+          />
+        </CardContent>
       </Card>
 
       {/* Feedback Question */}
@@ -456,8 +514,10 @@ export function FanfletEditor({
             fanfletId={fanflet.id}
             authUserId={authUserId}
             onAdded={() => {}}
+            libraryItems={libraryItems}
           />
         </div>
+      </div>
       </div>
     </div>
   );

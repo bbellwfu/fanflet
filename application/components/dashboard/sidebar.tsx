@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, Settings, LogOut } from "lucide-react";
+import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,6 +13,7 @@ const sidebarItems = [
   { icon: FileText, label: "My Fanflets", href: "/dashboard/fanflets" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: MessageSquare, label: "Survey Questions", href: "/dashboard/surveys" },
+  { icon: BookOpen, label: "Resource Library", href: "/dashboard/resources" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 

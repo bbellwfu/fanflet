@@ -126,7 +126,7 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
               type="date"
               value={eventDate}
               onChange={(e) => setEventDate(e.target.value)}
-              className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30"
+              className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30 max-w-[200px]"
             />
           </div>
 

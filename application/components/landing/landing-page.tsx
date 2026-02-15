@@ -23,6 +23,7 @@ import {
 import { SubscribeForm } from "./subscribe-form";
 import { trackResourceClick } from "./analytics-script";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
+import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
 
 type Speaker = {
   id: string;
@@ -108,6 +109,7 @@ export function LandingPage({
   );
 
   const socialLinks = speaker.social_links ?? {};
+  const photoFrameStyle = getPhotoFrameImageStyle(readPhotoFrame(speaker.social_links));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50" style={themeVars}>
@@ -147,6 +149,7 @@ export function LandingPage({
                 src={speaker.photo_url ?? undefined}
                 alt={speaker.name}
                 className="object-cover"
+                style={photoFrameStyle}
               />
               <AvatarFallback className="text-xl font-bold bg-slate-700 text-white">
                 {getInitials(speaker.name)}

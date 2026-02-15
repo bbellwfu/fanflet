@@ -100,12 +100,15 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
     if (searchParams.get("focus") !== "example-link") return;
     if (resources.length > 0) return;
 
-    setShowAddForm(true);
-    setSelectedType("link");
-    setTitle("My Speaker Website");
-    setUrl("https://example.com");
-    setDescription("Learn more about my work and get in touch.");
-    setSectionName("Resources");
+    // Defer state updates to avoid cascading renders during effect
+    setTimeout(() => {
+      setShowAddForm(true);
+      setSelectedType("link");
+      setTitle("My Speaker Website");
+      setUrl("https://example.com");
+      setDescription("Learn more about my work and get in touch.");
+      setSectionName("Resources");
+    }, 0);
 
     const timeoutId = window.setTimeout(() => {
       document.getElementById("resource-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" });

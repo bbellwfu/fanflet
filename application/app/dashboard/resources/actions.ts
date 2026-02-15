@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { ensureUrl } from '@/lib/utils'
 
 async function getSpeakerId() {
   const supabase = await createClient()
@@ -75,7 +76,7 @@ export async function createLibraryResource(data: {
       type: data.type,
       title: data.title.trim(),
       description: data.description ?? null,
-      url: data.url ?? null,
+      url: ensureUrl(data.url),
       file_path: data.file_path ?? null,
       image_url: data.image_url ?? null,
       section_name: data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources'),
@@ -109,7 +110,7 @@ export async function updateLibraryResource(
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
   if (data.description !== undefined) updateData.description = data.description
-  if (data.url !== undefined) updateData.url = data.url
+  if (data.url !== undefined) updateData.url = ensureUrl(data.url)
   if (data.file_path !== undefined) updateData.file_path = data.file_path
   if (data.image_url !== undefined) updateData.image_url = data.image_url
   if (data.section_name !== undefined) updateData.section_name = data.section_name

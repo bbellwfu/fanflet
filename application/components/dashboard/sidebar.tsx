@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
+import type { CSSProperties } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
@@ -36,10 +38,11 @@ interface SidebarContentProps {
   displayName: string;
   displayEmail: string;
   photoUrl?: string;
+  photoFrameStyle?: CSSProperties;
   initials: string;
 }
 
-function SidebarContent({ pathname, displayName, displayEmail, photoUrl, initials }: SidebarContentProps) {
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrameStyle, initials }: SidebarContentProps) {
   return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -68,7 +71,7 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, initial
       <div className="p-4 border-t border-white/10 space-y-3">
         <div className="flex items-center gap-3">
           <Avatar className="w-9 h-9 border border-white/20">
-            <AvatarImage src={photoUrl} />
+            <AvatarImage src={photoUrl} style={photoFrameStyle} />
             <AvatarFallback className="bg-slate-800 text-white">{initials}</AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden">
@@ -94,7 +97,12 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, initial
 
 interface SidebarProps {
   user: { email?: string; user_metadata?: { full_name?: string } };
-  speaker: { name?: string; email?: string; photo_url?: string } | null;
+  speaker: {
+    name?: string;
+    email?: string;
+    photo_url?: string;
+    social_links?: { linkedin?: string; twitter?: string; website?: string; photo_frame?: unknown } | null;
+  } | null;
   children: React.ReactNode;
 }
 
@@ -104,13 +112,15 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
   const displayName = speaker?.name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
   const displayEmail = speaker?.email ?? user.email ?? "";
   const photoUrl = speaker?.photo_url ?? undefined;
+  const photoFrame = readPhotoFrame(speaker?.social_links ?? null);
+  const photoFrameStyle = getPhotoFrameImageStyle(photoFrame);
   const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
-        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} initials={initials} />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrameStyle={photoFrameStyle} initials={initials} />
       </aside>
 
       {/* Main Content */}
@@ -128,7 +138,7 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} initials={initials} />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrameStyle={photoFrameStyle} initials={initials} />
             </SheetContent>
           </Sheet>
         </header>

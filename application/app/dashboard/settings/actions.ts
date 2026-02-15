@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import type { PhotoFrame } from '@/lib/photo-frame'
 
 export async function updateSpeakerProfile(formData: FormData) {
   const supabase = await createClient()
@@ -28,11 +29,30 @@ export async function updateSpeakerProfile(formData: FormData) {
     return { error: 'This URL slug is already taken' }
   }
 
+  const { data: currentSpeaker } = await supabase
+    .from('speakers')
+    .select('social_links')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  const existingSocialLinks = currentSpeaker?.social_links
+  const existingPhotoFrame =
+    existingSocialLinks &&
+    typeof existingSocialLinks === 'object' &&
+    'photo_frame' in existingSocialLinks
+      ? (existingSocialLinks as Record<string, unknown>).photo_frame
+      : null
+
   const updateData: Record<string, unknown> = {
     name,
     bio,
     slug,
-    social_links: { linkedin: linkedin || null, twitter: twitter || null, website: website || null },
+    social_links: {
+      linkedin: linkedin || null,
+      twitter: twitter || null,
+      website: website || null,
+      ...(existingPhotoFrame ? { photo_frame: existingPhotoFrame } : {}),
+    },
   }
 
   if (photoUrl) {
@@ -73,18 +93,36 @@ export async function checkSlugAvailability(slug: string) {
   return { available: !existing }
 }
 
-export async function updateSpeakerPhoto(photoUrl: string) {
+export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFrame | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { data: currentSpeaker } = await supabase
+    .from('speakers')
+    .select('social_links')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  const existingSocialLinks =
+    currentSpeaker?.social_links && typeof currentSpeaker.social_links === 'object'
+      ? (currentSpeaker.social_links as Record<string, unknown>)
+      : {}
+
   const { error } = await supabase
     .from('speakers')
-    .update({ photo_url: photoUrl })
+    .update({
+      photo_url: photoUrl,
+      social_links: {
+        ...existingSocialLinks,
+        ...(photoFrame ? { photo_frame: photoFrame } : {}),
+      },
+    })
     .eq('auth_user_id', user.id)
 
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
   return { success: true }
 }

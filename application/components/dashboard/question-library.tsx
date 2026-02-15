@@ -125,10 +125,13 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
     const npsTemplate = TEMPLATES.find((template) => template.question_type === "nps");
     if (!npsTemplate) return;
 
-    setShowTemplatePicker(false);
-    setShowAddForm(true);
-    setNewText(npsTemplate.question_text);
-    setNewType(npsTemplate.question_type);
+    // Defer state updates to avoid cascading renders during effect
+    setTimeout(() => {
+      setShowTemplatePicker(false);
+      setShowAddForm(true);
+      setNewText(npsTemplate.question_text);
+      setNewType(npsTemplate.question_type);
+    }, 0);
 
     const timeoutId = window.setTimeout(() => {
       document.getElementById("survey-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" });

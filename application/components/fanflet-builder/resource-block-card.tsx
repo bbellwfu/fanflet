@@ -176,9 +176,41 @@ export function ResourceBlockCard({
     return (
       <Card className="border-[#3BA5D9]/40 bg-slate-50/50">
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <LinkIcon className="w-4 h-4 text-[#3BA5D9]" />
-            <span className="text-sm font-medium text-[#1B365D]">Linked Resource</span>
+          {/* Resource identity header */}
+          <div className="flex items-start gap-3">
+            {block.image_url ? (
+              <div className="w-10 h-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={block.image_url}
+                  alt={block.title || "Resource"}
+                  className="w-full h-full object-contain p-0.5"
+                />
+              </div>
+            ) : (
+              <div className="w-10 h-10 rounded-lg bg-[#1B365D]/10 flex items-center justify-center shrink-0 text-[#1B365D]">
+                <Icon className="w-5 h-5" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">
+                  {typeLabels[block.type] ?? block.type}
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#3BA5D9]/10 text-[#3BA5D9] border border-[#3BA5D9]/20">
+                  <LinkIcon className="w-2.5 h-2.5" />
+                  Linked
+                </span>
+              </div>
+              <p className="font-medium text-slate-900 truncate">
+                {block.title || "Untitled"}
+              </p>
+              {block.description && (
+                <p className="text-sm text-muted-foreground truncate mt-0.5">
+                  {block.description}
+                </p>
+              )}
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">
             This resource is dynamically linked to your Resource Library. To edit its content, go to{" "}

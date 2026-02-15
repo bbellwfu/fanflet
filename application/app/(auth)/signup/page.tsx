@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Loader2, Mail, Check } from 'lucide-react'
@@ -17,11 +17,29 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { signup, signInWithGoogle } from './actions'
 
+const REFERRAL_STORAGE_KEY = 'fanflet_ref'
+
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [referralId, setReferralId] = useState<string | null>(null)
+
+  // Capture referral param from URL and persist in localStorage
+  // (localStorage survives the OAuth redirect round-trip)
+  // Uses window.location instead of useSearchParams to avoid Suspense boundary requirement
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
+    if (ref) {
+      localStorage.setItem(REFERRAL_STORAGE_KEY, ref)
+      setReferralId(ref)
+    } else {
+      const stored = localStorage.getItem(REFERRAL_STORAGE_KEY)
+      if (stored) setReferralId(stored)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -35,6 +53,8 @@ export default function SignupPage() {
         setError(result.error)
         setIsLoading(false)
       } else if (result?.success) {
+        // Clear referral from localStorage on successful signup
+        localStorage.removeItem(REFERRAL_STORAGE_KEY)
         setSuccess(result.success)
       }
     } catch {
@@ -47,7 +67,9 @@ export default function SignupPage() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const result = await signInWithGoogle()
+      // referralId is already persisted in localStorage and will be
+      // available when the user returns from OAuth redirect
+      const result = await signInWithGoogle(referralId ?? undefined)
       if (result?.error) {
         setError(result.error)
       }
@@ -152,6 +174,9 @@ export default function SignupPage() {
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {referralId && (
+            <input type="hidden" name="ref" value={referralId} />
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>
             <Input

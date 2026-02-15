@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,9 @@ import {
   checkSlugAvailability,
 } from "@/app/dashboard/settings/actions";
 import { PhotoCropModal } from "@/components/dashboard/photo-crop-modal";
+import { ThemePicker } from "@/components/fanflet-builder/theme-picker";
 import { getPhotoFrameImageStyle, readPhotoFrame, type PhotoFrame } from "@/lib/photo-frame";
+import { getDefaultThemePreset } from "@/lib/speaker-preferences";
 import { toast } from "sonner";
 import { Check, X, Loader2, Upload } from "lucide-react";
 
@@ -23,7 +26,13 @@ type SpeakerProfile = {
   bio: string | null;
   photo_url: string | null;
   slug: string | null;
-  social_links: { linkedin?: string; twitter?: string; website?: string; photo_frame?: PhotoFrame } | null;
+  social_links: {
+    linkedin?: string;
+    twitter?: string;
+    website?: string;
+    photo_frame?: PhotoFrame;
+    default_theme_preset?: string;
+  } | null;
 };
 
 function slugify(text: string): string {
@@ -57,6 +66,7 @@ interface SettingsFormProps {
 }
 
 export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormProps) {
+  const searchParams = useSearchParams();
   const [name, setName] = useState(speaker?.name ?? "");
   const [bio, setBio] = useState(speaker?.bio ?? "");
   const [slug, setSlug] = useState(speaker?.slug ?? "");
@@ -65,6 +75,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
   const [linkedin, setLinkedin] = useState(speaker?.social_links?.linkedin ?? "");
   const [twitter, setTwitter] = useState(speaker?.social_links?.twitter ?? "");
   const [website, setWebsite] = useState(speaker?.social_links?.website ?? "");
+  const [defaultThemePreset, setDefaultThemePreset] = useState(getDefaultThemePreset(speaker?.social_links ?? null));
 
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -125,6 +136,49 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
     };
   }, [slug, checkSlug]);
 
+  useEffect(() => {
+    const focusTarget = searchParams.get("focus");
+    if (!focusTarget) return;
+
+    const scrollToId = (id: string) => {
+      const section = document.getElementById(id);
+      section?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return section;
+    };
+
+    const run = () => {
+      if (focusTarget === "photo") {
+        scrollToId("profile-photo-section");
+        (document.getElementById("upload-photo-button") as HTMLButtonElement | null)?.focus();
+        return;
+      }
+
+      if (focusTarget === "name") {
+        scrollToId("profile-info-section");
+        const input = document.getElementById("name") as HTMLInputElement | null;
+        input?.focus();
+        input?.select();
+        return;
+      }
+
+      if (focusTarget === "public-link") {
+        scrollToId("profile-info-section");
+        const input = document.getElementById("slug") as HTMLInputElement | null;
+        input?.focus();
+        input?.select();
+        return;
+      }
+
+      if (focusTarget === "default-theme") {
+        const section = scrollToId("default-theme-section");
+        (section?.querySelector("button") as HTMLButtonElement | null)?.focus();
+      }
+    };
+
+    const timeoutId = window.setTimeout(run, 50);
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams]);
+
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !authUserId) return;
@@ -172,11 +226,11 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
       return;
     }
     if (!slug.trim()) {
-      toast.error("Speaker URL slug is required.");
+      toast.error("Public profile link is required.");
       return;
     }
     if (slugAvailable === false) {
-      toast.error("Please choose an available URL slug.");
+      toast.error("Please choose an available public profile link.");
       return;
     }
 
@@ -189,6 +243,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
     formData.set("linkedin", linkedin.trim());
     formData.set("twitter", twitter.trim());
     formData.set("website", website.trim());
+    formData.set("default_theme_preset", defaultThemePreset);
 
     const result = await updateSpeakerProfile(formData);
 
@@ -209,7 +264,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl">
       {/* Photo upload section */}
-      <Card className="border-[#e2e8f0]">
+      <Card id="profile-photo-section" className="border-[#e2e8f0]">
         <CardHeader>
           <CardTitle className="text-[#1B365D]">Profile Photo</CardTitle>
           <CardDescription>
@@ -233,6 +288,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
               disabled={cropModalOpen}
             />
             <Button
+              id="upload-photo-button"
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
@@ -267,7 +323,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
       </Card>
 
       {/* Profile fields */}
-      <Card className="border-[#e2e8f0]">
+      <Card id="profile-info-section" className="border-[#e2e8f0]">
         <CardHeader>
           <CardTitle className="text-[#1B365D]">Profile Information</CardTitle>
           <CardDescription>
@@ -309,7 +365,7 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
 
           <div className="space-y-2">
             <Label htmlFor="slug" className="text-[#1B365D]">
-              Speaker URL <span className="text-destructive">*</span>
+              Public profile link <span className="text-destructive">*</span>
             </Label>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground whitespace-nowrap shrink-0">
@@ -343,10 +399,25 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Lowercase letters, numbers, and hyphens only. Your page will be at
+              Lowercase letters, numbers, and hyphens only. Your profile will be at
               fanflet.com/{slug || "your-slug"}.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card id="default-theme-section" className="border-[#e2e8f0]">
+        <CardHeader>
+          <CardTitle className="text-[#1B365D]">Default Fanflet Theme</CardTitle>
+          <CardDescription>
+            Pick the color theme used by default for new Fanflets. You can still override this per Fanflet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ThemePicker
+            selectedThemeId={defaultThemePreset}
+            onChange={setDefaultThemePreset}
+          />
         </CardContent>
       </Card>
 

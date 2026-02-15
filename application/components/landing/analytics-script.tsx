@@ -61,3 +61,23 @@ export function trackResourceClick(fanfletId: string, resourceBlockId: string) {
     }).catch(() => {})
   }
 }
+
+// Track referral CTA clicks (platform-level metric for admin portal only)
+export function trackReferralClick(fanfletId: string) {
+  if (isPreviewMode()) return
+
+  const payload = JSON.stringify({
+    fanflet_id: fanfletId,
+    event_type: 'referral_click',
+  })
+
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon('/api/track', new Blob([payload], { type: 'application/json' }))
+  } else {
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }).catch(() => {})
+  }
+}

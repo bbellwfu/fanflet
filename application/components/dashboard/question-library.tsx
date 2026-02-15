@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -105,6 +107,7 @@ interface QuestionLibraryProps {
 
 export function QuestionLibrary({ questions }: QuestionLibraryProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -114,6 +117,29 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
   // Add form state
   const [newText, setNewText] = useState("");
   const [newType, setNewType] = useState("nps");
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "nps-template") return;
+    if (questions.length > 0) return;
+
+    const npsTemplate = TEMPLATES.find((template) => template.question_type === "nps");
+    if (!npsTemplate) return;
+
+    // Defer state updates to avoid cascading renders during effect
+    setTimeout(() => {
+      setShowTemplatePicker(false);
+      setShowAddForm(true);
+      setNewText(npsTemplate.question_text);
+      setNewType(npsTemplate.question_type);
+    }, 0);
+
+    const timeoutId = window.setTimeout(() => {
+      document.getElementById("survey-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      (document.getElementById("new-survey-question") as HTMLInputElement | null)?.focus();
+    }, 50);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, questions.length]);
 
   const handleSelectTemplate = (template: QuestionTemplate) => {
     setNewText(template.question_text);
@@ -264,7 +290,7 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
 
         {/* Add form */}
         {showAddForm && (
-          <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
+          <div id="survey-add-form" className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-white/15">
               <Plus className="w-4 h-4 text-[#3BA5D9]" />
               <h3 className="text-sm font-semibold text-white">Create New Question</h3>
@@ -272,6 +298,7 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
             <div className="space-y-2">
               <Label className="text-white/90 font-medium">Question Text</Label>
               <Input
+                id="new-survey-question"
                 value={newText}
                 onChange={(e) => setNewText(e.target.value)}
                 placeholder="e.g. How likely are you to recommend this session to a colleague?"

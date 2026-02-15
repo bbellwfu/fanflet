@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { PhotoFrame } from '@/lib/photo-frame'
+import { DEFAULT_THEME_ID, THEME_PRESETS } from '@/lib/themes'
+import { toSocialLinksRecord } from '@/lib/speaker-preferences'
+import { ensureUrl } from '@/lib/utils'
 
 export async function updateSpeakerProfile(formData: FormData) {
   const supabase = await createClient()
@@ -16,6 +19,7 @@ export async function updateSpeakerProfile(formData: FormData) {
   const linkedin = formData.get('linkedin') as string
   const twitter = formData.get('twitter') as string
   const website = formData.get('website') as string
+  const defaultThemePreset = formData.get('default_theme_preset') as string
 
   // Validate slug uniqueness
   const { data: existing } = await supabase
@@ -26,7 +30,7 @@ export async function updateSpeakerProfile(formData: FormData) {
     .maybeSingle()
 
   if (existing) {
-    return { error: 'This URL slug is already taken' }
+    return { error: 'This public profile link is already taken' }
   }
 
   const { data: currentSpeaker } = await supabase
@@ -35,22 +39,26 @@ export async function updateSpeakerProfile(formData: FormData) {
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  const existingSocialLinks = currentSpeaker?.social_links
+  const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links)
   const existingPhotoFrame =
-    existingSocialLinks &&
-    typeof existingSocialLinks === 'object' &&
     'photo_frame' in existingSocialLinks
-      ? (existingSocialLinks as Record<string, unknown>).photo_frame
+      ? existingSocialLinks.photo_frame
       : null
+  const validThemePresetIds = new Set(THEME_PRESETS.map((theme) => theme.id))
+  const safeThemePreset = validThemePresetIds.has(defaultThemePreset)
+    ? defaultThemePreset
+    : DEFAULT_THEME_ID
 
   const updateData: Record<string, unknown> = {
     name,
     bio,
     slug,
     social_links: {
-      linkedin: linkedin || null,
-      twitter: twitter || null,
-      website: website || null,
+      ...existingSocialLinks,
+      linkedin: ensureUrl(linkedin),
+      twitter: ensureUrl(twitter),
+      website: ensureUrl(website),
+      default_theme_preset: safeThemePreset,
       ...(existingPhotoFrame ? { photo_frame: existingPhotoFrame } : {}),
     },
   }
@@ -67,7 +75,7 @@ export async function updateSpeakerProfile(formData: FormData) {
   if (error) {
     // Catch unique-constraint violation on slug and return a friendly message
     if (error.code === '23505' && error.message?.includes('slug')) {
-      return { error: 'This URL slug is already taken. Please choose a different one.' }
+      return { error: 'This public profile link is already taken. Please choose another one.' }
     }
     return { error: error.message }
   }
@@ -104,10 +112,7 @@ export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFra
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  const existingSocialLinks =
-    currentSpeaker?.social_links && typeof currentSpeaker.social_links === 'object'
-      ? (currentSpeaker.social_links as Record<string, unknown>)
-      : {}
+  const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links)
 
   const { error } = await supabase
     .from('speakers')

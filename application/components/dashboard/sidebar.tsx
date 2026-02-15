@@ -9,6 +9,8 @@ import Image from "next/image";
 import type { CSSProperties } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
+import { SetupChecklistPanel } from "@/components/dashboard/setup-checklist-panel";
+import { hasStoredDefaultThemePreset, isOnboardingDismissed } from "@/lib/speaker-preferences";
 
 const sidebarItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
@@ -98,15 +100,36 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
 interface SidebarProps {
   user: { email?: string; user_metadata?: { full_name?: string } };
   speaker: {
+    id?: string;
     name?: string;
     email?: string;
     photo_url?: string;
-    social_links?: { linkedin?: string; twitter?: string; website?: string; photo_frame?: unknown } | null;
+    slug?: string;
+    social_links?: {
+      linkedin?: string;
+      twitter?: string;
+      website?: string;
+      photo_frame?: unknown;
+      default_theme_preset?: string;
+      onboarding?: { dismissed?: boolean; dismissed_at?: string | null };
+    } | null;
   } | null;
+  fanfletCount: number;
+  publishedFanfletCount: number;
+  surveyQuestionCount: number;
+  resourceLibraryCount: number;
   children: React.ReactNode;
 }
 
-export function Sidebar({ user, speaker, children }: SidebarProps) {
+export function Sidebar({
+  user,
+  speaker,
+  fanfletCount,
+  publishedFanfletCount,
+  surveyQuestionCount,
+  resourceLibraryCount,
+  children,
+}: SidebarProps) {
   const pathname = usePathname();
 
   const displayName = speaker?.name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
@@ -115,6 +138,21 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
   const photoFrame = readPhotoFrame(speaker?.social_links ?? null);
   const photoFrameStyle = getPhotoFrameImageStyle(photoFrame);
   const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
+  const isChecklistDismissed = isOnboardingDismissed(speaker?.social_links ?? null);
+  const hasCreatedFanflet =
+    fanfletCount > 0 ||
+    (pathname.startsWith("/dashboard/fanflets/") && pathname !== "/dashboard/fanflets/new");
+  const hasPendingChecklistSteps = !(
+    Boolean(speaker?.name?.trim()) &&
+    Boolean(speaker?.photo_url) &&
+    Boolean(speaker?.slug?.trim()) &&
+    hasStoredDefaultThemePreset(speaker?.social_links ?? null) &&
+    surveyQuestionCount > 0 &&
+    resourceLibraryCount > 0 &&
+    hasCreatedFanflet &&
+    publishedFanfletCount > 0
+  );
+  const showChecklistPanel = hasPendingChecklistSteps && (!isChecklistDismissed || pathname === "/dashboard");
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -143,7 +181,38 @@ export function Sidebar({ user, speaker, children }: SidebarProps) {
           </Sheet>
         </header>
 
-        <div className="flex-1 p-6 md:p-8">{children}</div>
+        <div className="flex-1 p-6 md:p-8">
+          <div className="mx-auto max-w-[1400px]">
+            {showChecklistPanel && (
+              <div className="xl:hidden mb-4">
+                <SetupChecklistPanel
+                  speaker={speaker}
+                  fanfletCount={fanfletCount}
+                  publishedFanfletCount={publishedFanfletCount}
+                  surveyQuestionCount={surveyQuestionCount}
+                  resourceLibraryCount={resourceLibraryCount}
+                  pathname={pathname}
+                  compact
+                />
+              </div>
+            )}
+            <div className={showChecklistPanel ? "xl:flex xl:items-start xl:gap-8" : ""}>
+              <div className="min-w-0 flex-1">{children}</div>
+              {showChecklistPanel && (
+                <aside className="hidden xl:block w-80 shrink-0 sticky top-8">
+                  <SetupChecklistPanel
+                    speaker={speaker}
+                    fanfletCount={fanfletCount}
+                    publishedFanfletCount={publishedFanfletCount}
+                    surveyQuestionCount={surveyQuestionCount}
+                    resourceLibraryCount={resourceLibraryCount}
+                    pathname={pathname}
+                  />
+                </aside>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

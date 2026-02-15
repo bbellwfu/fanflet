@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +75,7 @@ interface ResourceLibraryProps {
 
 export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -92,6 +95,29 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
   const [filePath, setFilePath] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "example-link") return;
+    if (resources.length > 0) return;
+
+    // Defer state updates to avoid cascading renders during effect
+    setTimeout(() => {
+      setShowAddForm(true);
+      setSelectedType("link");
+      setTitle("My Speaker Website");
+      setUrl("https://example.com");
+      setDescription("Learn more about my work and get in touch.");
+      setSectionName("Resources");
+    }, 0);
+
+    const timeoutId = window.setTimeout(() => {
+      document.getElementById("resource-add-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      (document.getElementById("new-resource-title") as HTMLInputElement | null)?.focus();
+      (document.getElementById("new-resource-title") as HTMLInputElement | null)?.select();
+    }, 50);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams, resources.length]);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState("");
@@ -327,7 +353,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
         )}
 
         {showAddForm && selectedType && (
-          <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
+          <div id="resource-add-form" className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/15">
               <div className="flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[#3BA5D9]" />
@@ -350,6 +376,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
                 {selectedType === "sponsor" ? "Sponsor Name" : "Title"}
               </Label>
               <Input
+                id="new-resource-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={selectedType === "sponsor" ? "Acme Health" : "My Website"}

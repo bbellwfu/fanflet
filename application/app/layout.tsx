@@ -21,10 +21,10 @@ export const metadata: Metadata = {
   description: "The professional way to share resources, capture leads, and dazzle sponsors. One QR code. Zero friction. Lifelong fans.",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "32x32" },
-      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+      { url: "/favicon.ico?v=20260215", sizes: "32x32" },
+      { url: "/icon.png?v=20260215", sizes: "192x192", type: "image/png" },
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png?v=20260215", sizes: "180x180", type: "image/png" }],
   },
 };
 

@@ -8,13 +8,20 @@ import { getSiteUrl } from '@/lib/config'
 export async function signup(formData: FormData) {
   const supabase = await createClient()
   const siteUrl = getSiteUrl()
+  const referredByFanfletId = formData.get('ref') as string | null
+
+  const metadata: Record<string, string> = {
+    full_name: formData.get('name') as string,
+  }
+  if (referredByFanfletId) {
+    metadata.referred_by_fanflet_id = referredByFanfletId
+  }
+
   const data = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
     options: {
-      data: {
-        full_name: formData.get('name') as string,
-      },
+      data: metadata,
       emailRedirectTo: `${siteUrl}/auth/confirm`,
     },
   }
@@ -33,13 +40,20 @@ export async function signup(formData: FormData) {
   redirect('/dashboard/settings')
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(referredByFanfletId?: string) {
   const supabase = await createClient()
   const siteUrl = getSiteUrl()
+
+  // Build the callback URL, appending the referral param so the
+  // auth callback can persist it in user metadata after OAuth completes
+  const callbackUrl = referredByFanfletId
+    ? `${siteUrl}/auth/callback?ref=${encodeURIComponent(referredByFanfletId)}`
+    : `${siteUrl}/auth/callback`
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${siteUrl}/auth/callback`,
+      redirectTo: callbackUrl,
     },
   })
   if (error) {

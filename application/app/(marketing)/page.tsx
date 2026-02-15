@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, QrCode, Zap, Smartphone, CheckCircle2 } from "lucide-react";
+import { ArrowRight, QrCode, Zap, CheckCircle2 } from "lucide-react";
 
 export default function MarketingHome() {
   return (

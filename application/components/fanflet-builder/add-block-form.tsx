@@ -278,9 +278,10 @@ export function AddBlockForm({
             Back
           </Button>
         </div>
-        <p className="text-xs text-white/60">
-          Choose a resource from your library. <strong className="text-white/80">Static Copy</strong> is independent after adding.{" "}
-          <strong className="text-white/80">Dynamic Link</strong> stays synced with your library.
+        <p className="text-sm leading-relaxed text-white/75">
+          Pick a saved resource from your library. <strong className="text-white/80">Static Copy</strong> creates a one-time copy
+          you can edit just for this Fanflet. <strong className="text-white/80">Dynamic Link</strong> keeps this block updated
+          automatically when you change the library version.
         </p>
         <div className="space-y-2">
           {libraryItems.map((item) => {
@@ -308,13 +309,13 @@ export function AddBlockForm({
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold text-white/50 uppercase">
+                    <span className="text-xs font-semibold text-white/60 uppercase tracking-wide">
                       {libraryTypeLabels[item.type] ?? item.type}
                     </span>
                   </div>
                   <p className="text-sm font-medium text-white truncate">{item.title || "Untitled"}</p>
                   {preview && (
-                    <p className="text-xs text-white/50 truncate mt-0.5">{preview}</p>
+                    <p className="text-sm text-white/70 truncate mt-0.5">{preview}</p>
                   )}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
@@ -322,7 +323,7 @@ export function AddBlockForm({
                     size="sm"
                     disabled={isAdding}
                     onClick={() => handleAddFromLibrary(item.id, 'static')}
-                    className="h-7 text-xs bg-white/20 hover:bg-white/30 text-white border-0 gap-1"
+                    className="h-8 text-sm bg-white/20 hover:bg-white/30 text-white border-0 gap-1.5"
                     title="Copies this resource -- edits to the library won't affect this fanflet"
                   >
                     {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
@@ -332,7 +333,7 @@ export function AddBlockForm({
                     size="sm"
                     disabled={isAdding}
                     onClick={() => handleAddFromLibrary(item.id, 'dynamic')}
-                    className="h-7 text-xs bg-[#3BA5D9]/80 hover:bg-[#3BA5D9] text-white border-0 gap-1"
+                    className="h-8 text-sm bg-[#3BA5D9]/80 hover:bg-[#3BA5D9] text-white border-0 gap-1.5"
                     title="Links this resource -- changes in your library will update this fanflet"
                   >
                     {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <LinkIcon className="w-3 h-3" />}

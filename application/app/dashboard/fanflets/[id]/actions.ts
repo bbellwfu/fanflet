@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { ensureUrl } from '@/lib/utils'
 
 async function verifyOwnership(supabase: Awaited<ReturnType<typeof createClient>>, fanfletId: string) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -85,10 +86,16 @@ export async function updateFanfletDetails(
   return { success: true }
 }
 
-export async function publishFanflet(id: string): Promise<{ error?: string; success?: boolean }> {
+export async function publishFanflet(id: string): Promise<{ error?: string; success?: boolean; firstPublished?: boolean }> {
   const supabase = await createClient()
   const ownership = await verifyOwnership(supabase, id)
   if ('error' in ownership) return { error: ownership.error }
+
+  const { count: existingPublishedCount } = await supabase
+    .from('fanflets')
+    .select('id', { count: 'exact', head: true })
+    .eq('speaker_id', ownership.fanflet!.speaker_id)
+    .eq('status', 'published')
 
   const { error } = await supabase
     .from('fanflets')
@@ -103,7 +110,8 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
-  return { success: true }
+  revalidatePath('/dashboard', 'layout')
+  return { success: true, firstPublished: (existingPublishedCount ?? 0) === 0 }
 }
 
 export async function unpublishFanflet(id: string): Promise<{ error?: string; success?: boolean }> {
@@ -123,6 +131,7 @@ export async function unpublishFanflet(id: string): Promise<{ error?: string; su
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
+  revalidatePath('/dashboard', 'layout')
   return { success: true }
 }
 
@@ -158,7 +167,7 @@ export async function addResourceBlock(
     type: data.type,
     title: data.title ?? '',
     description: data.description ?? null,
-    url: data.url ?? null,
+    url: ensureUrl(data.url),
     file_path: data.file_path ?? null,
     image_url: data.image_url ?? null,
     display_order: nextOrder,
@@ -206,7 +215,7 @@ export async function updateResourceBlock(
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
   if (data.description !== undefined) updateData.description = data.description
-  if (data.url !== undefined) updateData.url = data.url
+  if (data.url !== undefined) updateData.url = ensureUrl(data.url)
   if (data.file_path !== undefined) updateData.file_path = data.file_path
   if (data.image_url !== undefined) updateData.image_url = data.image_url
   if (data.section_name !== undefined) updateData.section_name = data.section_name

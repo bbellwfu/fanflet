@@ -21,8 +21,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { SubscribeForm } from "./subscribe-form";
-import { trackResourceClick } from "./analytics-script";
+import { trackResourceClick, trackReferralClick } from "./analytics-script";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
+import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
+import { ensureUrl } from "@/lib/utils";
 
 type Speaker = {
   id: string;
@@ -108,6 +110,7 @@ export function LandingPage({
   );
 
   const socialLinks = speaker.social_links ?? {};
+  const photoFrameStyle = getPhotoFrameImageStyle(readPhotoFrame(speaker.social_links));
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50" style={themeVars}>
@@ -147,6 +150,7 @@ export function LandingPage({
                 src={speaker.photo_url ?? undefined}
                 alt={speaker.name}
                 className="object-cover"
+                style={photoFrameStyle}
               />
               <AvatarFallback className="text-xl font-bold bg-slate-700 text-white">
                 {getInitials(speaker.name)}
@@ -164,7 +168,7 @@ export function LandingPage({
               <div className="flex items-center gap-2.5 mt-3">
                 {socialLinks.linkedin && (
                   <a
-                    href={socialLinks.linkedin}
+                    href={ensureUrl(socialLinks.linkedin) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
@@ -175,7 +179,7 @@ export function LandingPage({
                 )}
                 {socialLinks.twitter && (
                   <a
-                    href={socialLinks.twitter}
+                    href={ensureUrl(socialLinks.twitter) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
@@ -186,7 +190,7 @@ export function LandingPage({
                 )}
                 {socialLinks.website && (
                   <a
-                    href={socialLinks.website}
+                    href={ensureUrl(socialLinks.website) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-[var(--theme-hero-text)] hover:text-white transition-colors"
@@ -275,7 +279,7 @@ export function LandingPage({
                 return (
                   <a
                     key={block.id}
-                    href={block.url}
+                    href={ensureUrl(block.url) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block"
@@ -370,7 +374,7 @@ export function LandingPage({
                 return (
                   <a
                     key={block.id}
-                    href={block.url}
+                    href={ensureUrl(block.url) ?? "#"}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block"
@@ -441,7 +445,7 @@ export function LandingPage({
                   )}
                   {block.url && (
                     <a
-                      href={block.url}
+                      href={ensureUrl(block.url) ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block"
@@ -461,32 +465,39 @@ export function LandingPage({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="text-center pb-8 px-4 border-t border-slate-200/60 pt-6">
-        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5">
-          Powered by{" "}
-          <span className="font-bold text-[var(--theme-primary)] flex items-center gap-1">
-            <Image
-              src="/logo.png"
-              alt="Fanflet Logo"
-              width={16}
-              height={16}
-              className="w-4 h-4"
-            />
+      {/* Referral CTA Footer */}
+      <div className="border-t border-slate-200/60 bg-slate-50/80 px-6 py-10 text-center">
+        <div className="flex items-center justify-center gap-2.5 mb-3">
+          <Image
+            src="/logo.png"
+            alt="Fanflet"
+            width={32}
+            height={32}
+            className="w-8 h-8"
+          />
+          <span className="text-lg font-bold tracking-tight text-[#1B365D]">
             Fanflet
           </span>
+        </div>
+        <p className="text-base font-medium text-slate-700 mb-1">
+          Engage your audience after every talk.
         </p>
-        <div className="flex justify-center gap-4 mt-3 text-xs text-slate-400">
-          <Link
-            href="/signup"
-            className="hover:text-[var(--theme-primary)] transition-colors"
-          >
-            Create your own
-          </Link>
-          <Link href="#" className="hover:text-[var(--theme-primary)] transition-colors">
+        <p className="text-sm text-slate-500 mb-5">
+          Share resources. Capture leads. Delight sponsors.
+        </p>
+        <Link
+          href={`/signup?ref=${fanflet.id}`}
+          onClick={() => trackReferralClick(fanflet.id)}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#1B365D] px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#152b4d] transition-colors"
+        >
+          Get your free Fanflet
+          <ChevronRight className="w-4 h-4" />
+        </Link>
+        <div className="flex justify-center gap-4 mt-6 text-xs text-slate-400">
+          <Link href="#" className="hover:text-slate-600 transition-colors">
             Privacy
           </Link>
-          <Link href="#" className="hover:text-[var(--theme-primary)] transition-colors">
+          <Link href="#" className="hover:text-slate-600 transition-colors">
             Terms
           </Link>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ interface NewFanfletFormProps {
 }
 
 export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
+  const searchParams = useSearchParams();
   const [title, setTitle] = useState("");
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -39,6 +41,21 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
       }
     }
   }, [title, slugManuallyEdited]);
+
+  useEffect(() => {
+    if (searchParams.get("focus") !== "title") return;
+
+    const timeoutId = window.setTimeout(() => {
+      document
+        .getElementById("new-fanflet-details")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const titleInput = document.getElementById("title") as HTMLInputElement | null;
+      titleInput?.focus();
+      titleInput?.select();
+    }, 50);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchParams]);
 
   const handleSlugChange = (value: string) => {
     setSlugManuallyEdited(true);
@@ -83,7 +100,7 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
   };
 
   return (
-    <Card className="border-[#e2e8f0]">
+    <Card id="new-fanflet-details" className="border-[#e2e8f0]">
       <CardHeader>
         <CardTitle className="text-[#1B365D]">Fanflet Details</CardTitle>
         <CardDescription>

@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -17,20 +18,47 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { signup, signInWithGoogle } from './actions'
 
+const REFERRAL_STORAGE_KEY = 'fanflet_ref'
+
 export default function SignupPage() {
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [referralId, setReferralId] = useState<string | null>(null)
 
-  async function handleSubmit(formData: FormData) {
+  // Capture referral param from URL and persist in localStorage
+  // (localStorage survives the OAuth redirect round-trip)
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      localStorage.setItem(REFERRAL_STORAGE_KEY, ref)
+      setReferralId(ref)
+    } else {
+      const stored = localStorage.getItem(REFERRAL_STORAGE_KEY)
+      if (stored) setReferralId(stored)
+    }
+  }, [searchParams])
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
     setError(null)
+    setSuccess(null)
     setIsLoading(true)
     try {
+      const formData = new FormData(e.currentTarget)
       const result = await signup(formData)
       if (result?.error) {
         setError(result.error)
+        setIsLoading(false)
+      } else if (result?.success) {
+        // Clear referral from localStorage on successful signup
+        localStorage.removeItem(REFERRAL_STORAGE_KEY)
+        setSuccess(result.success)
       }
-    } finally {
+    } catch {
+      setError('Something went wrong. Please try again.')
       setIsLoading(false)
     }
   }
@@ -39,7 +67,9 @@ export default function SignupPage() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const result = await signInWithGoogle()
+      // referralId is already persisted in localStorage and will be
+      // available when the user returns from OAuth redirect
+      const result = await signInWithGoogle(referralId ?? undefined)
       if (result?.error) {
         setError(result.error)
       }
@@ -48,6 +78,70 @@ export default function SignupPage() {
     }
   }
 
+  // ── Success state: account created, check email ──
+  if (success) {
+    return (
+      <Card className="w-full max-w-md border-[#e2e8f0] bg-white shadow-xl shadow-[#1B365D]/5 rounded-2xl">
+        <div className="flex flex-col items-center text-center px-10 py-12 sm:px-12">
+          {/* Branding */}
+          <div className="flex items-center justify-center gap-2.5 mb-8">
+            <Image
+              src="/logo.png"
+              alt="Fanflet"
+              width={32}
+              height={32}
+              priority
+              className="h-8 w-8"
+            />
+            <span className="text-xl font-bold tracking-tight text-[#1B365D]">Fanflet</span>
+          </div>
+
+          {/* Large checkmark */}
+          <div className="w-20 h-20 rounded-full bg-[#A8D5BA]/40 flex items-center justify-center mb-6">
+            <Check className="h-9 w-9 text-emerald-700" strokeWidth={2.5} />
+          </div>
+
+          {/* Heading */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1B365D] mb-1">
+            Account created!
+          </h1>
+
+          {/* Mail icon */}
+          <Mail className="h-7 w-7 text-[#3BA5D9] mt-4 mb-4" strokeWidth={1.75} />
+
+          {/* Main message */}
+          <p className="text-base text-slate-600 max-w-sm leading-relaxed mb-3">
+            {success}
+          </p>
+
+          {/* Helper text */}
+          <p className="text-sm text-slate-400 mb-8">
+            Didn&apos;t receive it? Check your spam folder or{' '}
+            <Link href="/signup" className="text-[#3BA5D9] hover:underline">
+              try signing up again
+            </Link>
+            .
+          </p>
+
+          {/* Divider */}
+          <div className="w-full border-t border-slate-200 mb-6" />
+
+          {/* Sign in link */}
+          <p className="text-sm text-slate-500">
+            Already confirmed?{' '}
+            <Link
+              href="/login"
+              className="font-medium text-[#3BA5D9] hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </Card>
+    )
+  }
+
+  // ── Default state: signup form ──
   return (
     <Card className="w-full max-w-md border-[#e2e8f0] bg-white shadow-xl shadow-[#1B365D]/5">
       <CardHeader className="space-y-4 text-center">
@@ -79,7 +173,10 @@ export default function SignupPage() {
             {error}
           </div>
         )}
-        <form action={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {referralId && (
+            <input type="hidden" name="ref" value={referralId} />
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>
             <Input
@@ -150,7 +247,7 @@ export default function SignupPage() {
           type="button"
           variant="outline"
           className="w-full border-[#e2e8f0] hover:bg-[#f1f5f9] hover:border-[#3BA5D9]/30"
-          disabled={isGoogleLoading}
+          disabled={isGoogleLoading || isLoading}
           onClick={handleGoogleSignIn}
         >
           {isGoogleLoading ? (

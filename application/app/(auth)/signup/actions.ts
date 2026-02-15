@@ -26,7 +26,7 @@ export async function signup(formData: FormData) {
   // If email confirmation is required, the user won't have a session yet
   // Check if the user's email is confirmed (i.e. auto-confirm is on)
   if (authData.user && !authData.session) {
-    return { error: 'Please check your email to confirm your account, then sign in.' }
+    return { success: 'Check your email for a confirmation link to finish setting up your account.' }
   }
 
   revalidatePath('/', 'layout')

@@ -1,0 +1,21 @@
+{
+  "name": "fanflet-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "dev:web": "turbo dev --filter=@fanflet/web",
+    "dev:admin": "turbo dev --filter=@fanflet/admin",
+    "build:web": "turbo build --filter=@fanflet/web",
+    "build:admin": "turbo build --filter=@fanflet/admin"
+  },
+  "devDependencies": {
+    "turbo": "^2"
+  },
+  "packageManager": "npm@10.9.2"
+}

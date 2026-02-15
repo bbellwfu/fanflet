@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fanflet — Pitch Deck</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --navy: #1B365D;
+            --sky: #3BA5D9;
+            --sky-light: #e8f4fd;
+            --dark: #0f172a;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-600: #475569;
+            --slate-400: #94a3b8;
+            --slate-200: #e2e8f0;
+            --slate-50: #f8fafc;
+            --white: #ffffff;
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --red: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--dark);
+            overflow: hidden;
+            height: 100vh;
+            color: var(--white);
+        }
+
+        /* Slide Container */
+        .deck {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 80px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            transform: translateX(30px);
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(0);
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+            margin-bottom: 24px;
+        }
+
+        h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 1.15rem;
+            line-height: 1.65;
+            color: var(--slate-400);
+        }
+
+        .lead {
+            font-size: 1.35rem;
+            line-height: 1.55;
+            color: var(--slate-400);
+            max-width: 680px;
+        }
+
+        .eyebrow {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--sky);
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        /* Layout helpers */
+        .text-center {
+            text-align: center;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .max-w {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .flex {
+            display: flex;
+            align-items: center;
+        }
+
+        .gap-2 {
+            gap: 12px;
+        }
+
+        .gap-4 {
+            gap: 24px;
+        }
+
+        .gap-6 {
+            gap: 40px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 24px;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .mt-1 {
+            margin-top: 8px;
+        }
+
+        .mt-2 {
+            margin-top: 16px;
+        }
+
+        .mt-3 {
+            margin-top: 24px;
+        }
+
+        .mt-4 {
+            margin-top: 32px;
+        }
+
+        .mb-2 {
+            margin-bottom: 16px;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--slate-800);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 32px;
+        }
+
+        .card-glow {
+            background: linear-gradient(135deg, rgba(59, 165, 217, 0.08), rgba(27, 54, 93, 0.12));
+            border: 1px solid rgba(59, 165, 217, 0.15);
+        }
+
+        .card-dark {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        /* Stat */
+        .stat-value {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: var(--sky);
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--slate-400);
+            font-weight: 500;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            font-weight: 600;
+            color: var(--sky);
+            border-bottom: 2px solid rgba(59, 165, 217, 0.2);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--slate-400);
+        }
+
+        td:first-child {
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tag-green {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--emerald);
+        }
+
+        .tag-blue {
+            background: rgba(59, 165, 217, 0.15);
+            color: var(--sky);
+        }
+
+        .tag-amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber);
+        }
+
+        /* Accent line */
+        .accent-line {
+            width: 48px;
+            height: 4px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, var(--sky), var(--navy));
+            margin-bottom: 24px;
+        }
+
+        /* Logo */
+        .logo-mark {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--white);
+            letter-spacing: -0.02em;
+        }
+
+        /* Icon circles */
+        .icon-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .ic-blue {
+            background: rgba(59, 165, 217, 0.15);
+        }
+
+        .ic-green {
+            background: rgba(16, 185, 129, 0.15);
+        }
+
+        .ic-amber {
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        .ic-navy {
+            background: rgba(27, 54, 93, 0.3);
+        }
+
+        /* Journey steps */
+        .journey-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 16px 0;
+        }
+
+        .step-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--sky);
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--sky), var(--navy));
+            transition: width 0.4s ease;
+            z-index: 100;
+        }
+
+        /* Nav */
+        .nav {
+            position: fixed;
+            bottom: 24px;
+            right: 32px;
+            z-index: 100;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--slate-800);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--white);
+            font-size: 1.1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover {
+            background: var(--sky);
+            border-color: var(--sky);
+        }
+
+        .slide-counter {
+            font-size: 0.75rem;
+            color: var(--slate-400);
+            font-weight: 600;
+            background: var(--slate-800);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 14px;
+            border-radius: 20px;
+        }
+
+        /* Slide-specific backgrounds */
+        .slide-title {
+            background: linear-gradient(135deg, var(--dark) 0%, #111827 50%, var(--dark) 100%);
+        }
+
+        .slide-hero-bg {
+            background: linear-gradient(to bottom, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.97)),
+                url('/pitch/speaker_hero.png') center/cover no-repeat;
+        }
+
+        .slide-navy {
+            background: linear-gradient(135deg, var(--navy), #152b4d);
+        }
+
+        /* Blockquote */
+        .blockquote {
+            border-left: 3px solid var(--sky);
+            padding: 16px 24px;
+            font-style: italic;
+            font-size: 1.3rem;
+            color: var(--slate-400);
+            line-height: 1.5;
+            max-width: 700px;
+        }
+
+        .blockquote strong {
+            color: var(--white);
+            font-style: normal;
+        }
+
+        /* Comparison list */
+        .pain-point {
+            color: var(--red);
+        }
+
+        .solution {
+            color: var(--emerald);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .slide {
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 2.2rem;
+            }
+
+            h2 {
+                font-size: 1.8rem;
+            }
+
+            .grid-2,
+            .grid-3,
+            .grid-4 {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-value {
+                font-size: 2rem;
+            }
+
+            .lead {
+                font-size: 1.1rem;
+            }
+
+            .nav {
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="deck" id="deck">
+
+        <!-- SLIDE 1: Title -->
+        <div class="slide slide-title active" data-slide="0">
+            <div class="text-center" style="max-width: 700px;">
+                <div class="flex gap-2 mb-2" style="justify-content: center;">
+                    <img src="/pitch/logo.png" class="logo-mark" alt="Fanflet Logo">
+                </div>
+                <h1 style="margin-bottom: 24px;">
+                    Turn Event Talks into<br>
+                    <span
+                        style="background: linear-gradient(90deg, var(--sky), #7dd3fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Lasting
+                        Engagement</span>
+                </h1>
+                <p class="lead text-center" style="margin: 0 auto 40px;">
+                    The platform that helps professional speakers capture, engage, and monetize their audiences —
+                    starting the moment their talk ends.
+                </p>
+                <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                    <span class="tag tag-blue">Pitch Deck — February 2026</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 2: The Problem -->
+        <div class="slide" data-slide="1">
+            <div class="max-w">
+                <span class="eyebrow">The Problem</span>
+                <h2>Every speaker loses their audience<br>the moment the talk ends.</h2>
+                <div class="grid-3 mt-3">
+                    <div class="card">
+                        <div class="flex gap-2 mb-2">
+                            <div class="icon-circle ic-blue">🎤</div>
+                            <h3 style="margin-bottom:0;">Speakers</h3>
+                        </div>
+                        <p style="font-size: 0.95rem;">No way to share resources, capture leads, or prove impact to
+                            sponsors. After-event activities represent <strong style="color:var(--white)">60% of
+                                income</strong> — yet tools are fragmented.</p>
+                    </div>
+                    <div class="card">
+                        <div class="flex gap-2 mb-2">
+                            <div class="icon-circle ic-green">👥</div>
+                            <h3 style="margin-bottom:0;">Audiences</h3>
+                        </div>
+                        <p style="font-size: 0.95rem;">Blurry slide photos, scribbled URLs, lost context within days. No
+                            reliable way to access materials or reconnect with the speaker.</p>
+                    </div>
+                    <div class="card">
+                        <div class="flex gap-2 mb-2">
+                            <div class="icon-circle ic-amber">💼</div>
+                            <h3 style="margin-bottom:0;">Sponsors</h3>
+                        </div>
+                        <p style="font-size: 0.95rem;">Limited visibility into sponsorship ROI. No direct mechanism to
+                            capture leads from the audiences they're paying to reach.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 3: Quote / Insight -->
+        <div class="slide slide-hero-bg" data-slide="2">
+            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow">The Core Insight</span>
+                <div class="blockquote mt-2" style="border-left: none; text-align: center;">
+                    <p style="font-size: 1.6rem; color: var(--slate-400); line-height: 1.5;">
+                        "The moment a session ends, the connection with the audience <strong>evaporates</strong>.
+                        Audience members have taken blurry photos of slides, scribbled partial URLs, and lost context
+                        within days.
+                        Speakers have <strong>no data</strong> on who attended and <strong>no proof of impact</strong>
+                        to show sponsors."
+                    </p>
+                </div>
+                <p class="mt-3" style="color: var(--sky); font-weight: 600; font-size: 1.1rem;">This is a broken
+                    handoff. Fanflet is the fix.</p>
+            </div>
+        </div>
+
+        <!-- SLIDE 4: The Solution -->
+        <div class="slide" data-slide="3">
+            <div class="max-w">
+                <span class="eyebrow">The Solution</span>
+                <h2>One QR code. Every resource. Lifelong fans.</h2>
+                <p class="lead mb-2">Fanflet gives speakers a beautiful, branded resource page their audience can access
+                    with a single QR scan — no app downloads, no login friction.</p>
+                <div class="grid-2 mt-3">
+                    <div>
+                        <h3 style="color: var(--sky);">For Speakers</h3>
+                        <div class="journey-step">
+                            <div class="step-num">1</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Create</h3>
+                                <p style="font-size: 0.9rem;">Build a Fanflet with slides, links, videos, and sponsor
+                                    placements</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">2</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Present</h3>
+                                <p style="font-size: 0.9rem;">Add the generated QR code to your last slide</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">3</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Grow</h3>
+                                <p style="font-size: 0.9rem;">Capture emails, track engagement, build a persistent
+                                    audience</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="color: var(--sky);">For Audiences</h3>
+                        <div class="journey-step">
+                            <div class="step-num">1</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Scan</h3>
+                                <p style="font-size: 0.9rem;">Point your phone at the QR code on screen</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">2</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Access</h3>
+                                <p style="font-size: 0.9rem;">Instantly land on a clean, mobile-first resource page</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="step-num">3</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Connect</h3>
+                                <p style="font-size: 0.9rem;">Subscribe for updates and future content</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 5: Example Speaker Slide -->
+        <div class="slide" data-slide="4">
+            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow">Product In Action</span>
+                <h2 style="margin-bottom: 8px;">What the audience sees on screen</h2>
+                <p style="font-size: 0.95rem; color: var(--slate-400); margin-bottom: 32px;">This slide drops into the
+                    speaker's existing deck as their final slide.</p>
+
+                <!-- Simulated Presentation Slide -->
+                <div style="
+              width: 100%; max-width: 820px; aspect-ratio: 16/9;
+              background: linear-gradient(135deg, #0f172a 0%, #1B365D 100%);
+              border-radius: 16px; border: 2px solid rgba(255,255,255,0.08);
+              padding: 48px 56px; display: flex; align-items: center; gap: 48px;
+              box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+              position: relative; overflow: hidden;
+            ">
+                    <!-- Subtle background glow -->
+                    <div
+                        style="position:absolute; top:-40px; right:-40px; width:200px; height:200px; background: rgba(59,165,217,0.08); border-radius:50%; filter:blur(60px);">
+                    </div>
+
+                    <!-- Left side: Text CTAs -->
+                    <div style="flex: 1; text-align: left; z-index: 1;">
+                        <p
+                            style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--sky); font-weight: 700; margin-bottom: 12px;">
+                            Thank You! Don't Lose These Resources →</p>
+                        <h3 style="font-size: 1.6rem; color: white; margin-bottom: 20px; line-height: 1.2;">Scan to
+                            Get<br>Everything From<br>Today's Talk</h3>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.1rem;">📄</span>
+                                <span style="color: var(--slate-200); font-size: 0.9rem; font-weight: 500;">Presentation
+                                    Slides (PDF)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.1rem;">🔗</span>
+                                <span style="color: var(--slate-200); font-size: 0.9rem; font-weight: 500;">Tools &
+                                    Templates I Mentioned</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 1.1rem;">📬</span>
+                                <span style="color: var(--slate-200); font-size: 0.9rem; font-weight: 500;">Monthly
+                                    Design Newsletter</span>
+                            </div>
+                        </div>
+                        <p style="color: var(--slate-400); font-size: 0.7rem; margin-top: 16px;">
+                            fanflet.com/jduncan/healthtech-2026</p>
+                    </div>
+
+                    <!-- Right side: QR Code -->
+                    <div style="flex-shrink: 0; z-index: 1; text-align: center;">
+                        <div
+                            style="background: white; border-radius: 16px; padding: 10px; display: inline-block; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+                            <img src="/pitch/qr_branded.png" alt="QR Code with Fanflet logo"
+                                style="width: 280px; height: 280px; display: block;">
+                        </div>
+                        <p
+                            style="color: var(--sky); font-size: 0.75rem; font-weight: 700; margin-top: 12px; letter-spacing: 0.05em;">
+                            POINT YOUR CAMERA HERE</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 6: Landing Page Example -->
+        <div class="slide" data-slide="5">
+            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow">Audience Experience</span>
+                <h2 style="margin-bottom: 8px;">What opens when they scan</h2>
+                <p style="font-size: 0.95rem; color: var(--slate-400); margin-bottom: 28px;">A branded, mobile-first
+                    landing page with everything from the talk — plus email capture and sponsor placements.</p>
+                <div style="
+              max-width: 380px; width: 100%;
+              border-radius: 24px; overflow: hidden;
+              border: 3px solid rgba(255,255,255,0.1);
+              box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+            ">
+                    <img src="/pitch/screenshot_landing.png" alt="Fanflet event landing page"
+                        style="width: 100%; display: block;">
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 7: Dashboard Example -->
+        <div class="slide" data-slide="6">
+            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow">Speaker Dashboard</span>
+                <h2 style="margin-bottom: 8px;">Real-time analytics for every talk</h2>
+                <p style="font-size: 0.95rem; color: var(--slate-400); margin-bottom: 28px;">Speakers see subscribers,
+                    downloads, and sponsor clicks across all their Fanflets — with data to prove ROI.</p>
+                <div style="
+              max-width: 880px; width: 100%;
+              border-radius: 16px; overflow: hidden;
+              border: 3px solid rgba(255,255,255,0.1);
+              box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+            ">
+                    <img src="/pitch/screenshot_dashboard.png" alt="Fanflet speaker dashboard"
+                        style="width: 100%; display: block;">
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 8: Market Opportunity -->
+        <div class="slide" data-slide="7">
+            <div class="max-w">
+                <span class="eyebrow">Market Opportunity</span>
+                <h2>A massive, growing market with no purpose-built solution.</h2>
+                <div class="grid-4 mt-3">
+                    <div class="card card-glow text-center">
+                        <div class="stat-value">$1.5T</div>
+                        <div class="stat-label">Global Events Industry</div>
+                    </div>
+                    <div class="card card-glow text-center">
+                        <div class="stat-value">9.7%</div>
+                        <div class="stat-label">Annual Growth (CAGR)</div>
+                    </div>
+                    <div class="card card-glow text-center">
+                        <div class="stat-value">40K</div>
+                        <div class="stat-label">US Professional Speakers</div>
+                    </div>
+                    <div class="card card-glow text-center">
+                        <div class="stat-value">$24M</div>
+                        <div class="stat-label">SAM (Subscriptions Alone)</div>
+                    </div>
+                </div>
+                <div class="card card-dark mt-3" style="padding: 24px 32px;">
+                    <p style="font-size: 1rem; color: var(--slate-400);">
+                        <strong style="color: var(--white);">86.4%</strong> of event organizers plan to maintain or
+                        increase in-person events.
+                        Sponsorship accounts for <strong style="color: var(--white);">46%</strong> of total event
+                        revenue.
+                        Yet there is <strong style="color: var(--sky);">no purpose-built tool</strong> for speakers to
+                        systematically capture, engage, and monetize their audiences post-event.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 6: Business Model -->
+        <div class="slide" data-slide="8">
+            <div class="max-w">
+                <span class="eyebrow">Business Model</span>
+                <h2>Multiple revenue streams, compounding value.</h2>
+                <div class="grid-2 mt-3">
+                    <div>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tier</th>
+                                    <th>Price</th>
+                                    <th>Includes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Free</td>
+                                    <td>$0</td>
+                                    <td>1 Fanflet, basic analytics, branding</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--sky)">Pro</span></td>
+                                    <td>$19/mo</td>
+                                    <td>Unlimited Fanflets, full analytics, custom branding</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--emerald)">Business</span></td>
+                                    <td>$49/mo</td>
+                                    <td>+ Sponsor tools, segmentation, integrations</td>
+                                </tr>
+                                <tr>
+                                    <td><span style="color: var(--amber)">Enterprise</span></td>
+                                    <td>Custom</td>
+                                    <td>White-label, API, event org portal</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <div class="card card-glow" style="margin-bottom: 16px;">
+                            <h3>💰 Sponsor Integrations</h3>
+                            <p style="font-size: 0.9rem;">Sponsors pay for featured placements, click analytics, and
+                                lead capture data. High-margin, growth multiplier.</p>
+                        </div>
+                        <div class="card card-dark">
+                            <h3>📊 Data & Insights</h3>
+                            <p style="font-size: 0.9rem;">Aggregated engagement intelligence for event organizers and
+                                the events industry.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 7: Competitive Landscape -->
+        <div class="slide" data-slide="9">
+            <div class="max-w">
+                <span class="eyebrow">Competitive Landscape</span>
+                <h2>No one owns the post-event engagement layer.</h2>
+                <table class="mt-3">
+                    <thead>
+                        <tr>
+                            <th>Competitor</th>
+                            <th>What They Do</th>
+                            <th>Where Fanflet Wins</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Linktree</td>
+                            <td>Generic "link in bio" pages</td>
+                            <td style="color: var(--emerald)">No QR workflow, no event context, no sponsor layer</td>
+                        </tr>
+                        <tr>
+                            <td>Talkadot</td>
+                            <td>Speaker feedback & rebooking</td>
+                            <td style="color: var(--emerald)">Focuses on surveys, not resource delivery & engagement
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>SlideShare</td>
+                            <td>Slide hosting</td>
+                            <td style="color: var(--emerald)">Upload-and-forget — no audience connection</td>
+                        </tr>
+                        <tr>
+                            <td>Google Drive</td>
+                            <td>File sharing</td>
+                            <td style="color: var(--emerald)">Generic, unprofessional, zero analytics</td>
+                        </tr>
+                        <tr>
+                            <td>Eventbrite</td>
+                            <td>Event ticketing</td>
+                            <td style="color: var(--emerald)">Pre-event focus — not post-event engagement</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="card card-glow mt-3" style="padding: 20px 28px;">
+                    <p style="font-size: 0.95rem; color: var(--slate-400);">
+                        <strong style="color: var(--white)">Positioning:</strong> Fanflet is the only platform
+                        purpose-built for the moment <em>after</em> the talk ends — giving speakers branded resource
+                        pages, sponsors measurable engagement, and audiences instant access.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 8: Go-to-Market -->
+        <div class="slide" data-slide="10">
+            <div class="max-w">
+                <span class="eyebrow">Go-to-Market Strategy</span>
+                <h2>Healthcare first. Then expand.</h2>
+                <div class="grid-3 mt-3">
+                    <div class="card">
+                        <span class="tag tag-blue mb-2">Phase 1 · Mo 1–6</span>
+                        <h3>Founder-Led Sales</h3>
+                        <p style="font-size: 0.9rem;">Recruit 20–50 speakers from Brian's network. Attend healthcare
+                            conferences in person. Collect testimonials.</p>
+                        <p class="mt-2" style="font-size: 0.8rem; color: var(--sky); font-weight: 600;">Target: 50
+                            active speakers</p>
+                    </div>
+                    <div class="card">
+                        <span class="tag tag-green mb-2">Phase 2 · Mo 6–12</span>
+                        <h3>Community Growth</h3>
+                        <p style="font-size: 0.9rem;">Speaker referral program, content marketing, partnerships with
+                            speaker bureaus and NSA chapters.</p>
+                        <p class="mt-2" style="font-size: 0.8rem; color: var(--emerald); font-weight: 600;">Target: 200+
+                            speakers, organic > outbound</p>
+                    </div>
+                    <div class="card">
+                        <span class="tag tag-amber mb-2">Phase 3 · Mo 12–24</span>
+                        <h3>Vertical Expansion</h3>
+                        <p style="font-size: 0.9rem;">Expand into business & education. Launch sponsor self-serve
+                            portal. Event platform integrations (Cvent, Bizzabo).</p>
+                        <p class="mt-2" style="font-size: 0.8rem; color: var(--amber); font-weight: 600;">Target: 1,000+
+                            speakers, sponsor rev > 25%</p>
+                    </div>
+                </div>
+                <div class="card card-dark mt-3" style="padding: 20px 28px;">
+                    <p style="font-size: 0.95rem; color: var(--slate-400);">
+                        <strong style="color: var(--white)">Why Healthcare?</strong>
+                        High-value content (clinical protocols), deep sponsor involvement (pharma, MedTech), CME
+                        compliance requirements, and premium willingness to pay.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 9: Moat -->
+        <div class="slide slide-navy" data-slide="11">
+            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
+                <span class="eyebrow">Defensibility</span>
+                <h2 style="color: var(--white);">Compounding moats over time.</h2>
+                <div class="grid-3 mt-3" style="text-align: left;">
+                    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1);">
+                        <span class="tag tag-blue mb-2">Year 1</span>
+                        <h3>Purpose-Built UX</h3>
+                        <p style="font-size: 0.9rem;">The QR-to-landing-page workflow is faster and more elegant than
+                            any generic alternative. Speaks directly to speakers' workflow.</p>
+                    </div>
+                    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1);">
+                        <span class="tag tag-green mb-2">Years 2–3</span>
+                        <h3>Network Effects</h3>
+                        <p style="font-size: 0.9rem;">Data network effects, sponsor marketplace flywheel, and
+                            accumulated subscriber base create switching costs.</p>
+                    </div>
+                    <div class="card" style="background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1);">
+                        <span class="tag tag-amber mb-2">Year 3+</span>
+                        <h3>Platform Lock-In</h3>
+                        <p style="font-size: 0.9rem;">Deep integrations with event platforms, brand synonymy ("the thing
+                            on the last slide"), and AI-powered insights.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 10: Founder -->
+        <div class="slide" data-slide="12">
+            <div class="max-w">
+                <div class="grid-2">
+                    <div>
+                        <span class="eyebrow">Founder-Market Fit</span>
+                        <h2>Built by someone who knows the game.</h2>
+                        <div class="accent-line"></div>
+                        <div class="journey-step">
+                            <div class="icon-circle ic-blue">💼</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">20+ Years Enterprise SaaS</h3>
+                                <p style="font-size: 0.9rem;">From startup founding to Fortune 50 executive leadership
+                                </p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="icon-circle ic-green">📈</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">$1B+ Enterprise Value Delivered</h3>
+                                <p style="font-size: 0.9rem;">Track record with Tier 1 private equity and B2B SaaS
+                                    growth</p>
+                            </div>
+                        </div>
+                        <div class="journey-step">
+                            <div class="icon-circle ic-amber">🤝</div>
+                            <div>
+                                <h3 style="font-size: 1rem;">Deep Speaker Network</h3>
+                                <p style="font-size: 0.9rem;">Direct access to the healthcare conference ecosystem and
+                                    enterprise sales motion</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card card-glow"
+                        style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+                        <div
+                            style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--navy), var(--sky)); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 800; margin-bottom: 20px;">
+                            BB</div>
+                        <h3 style="font-size: 1.3rem; margin-bottom: 4px;">Brian Bell</h3>
+                        <p style="color: var(--sky); font-size: 0.9rem; font-weight: 600; margin-bottom: 16px;">Founder
+                            & CEO</p>
+                        <p style="font-size: 0.9rem;">Fanflet's long-term value lies in its B2B motion — sponsor
+                            integrations and enterprise event partnerships. Brian's network and instincts are a
+                            meaningful unfair advantage.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLIDE 11: The Ask / CTA -->
+        <div class="slide slide-title" data-slide="13">
+            <div class="text-center" style="max-width: 700px;">
+                <img src="/pitch/logo.png" class="logo-mark mb-2" alt="Fanflet Logo" style="margin: 0 auto 24px;">
+                <h2 style="font-size: 2.8rem; margin-bottom: 16px;">
+                    Ready to own the<br>
+                    <span style="color: var(--sky);">post-event engagement layer?</span>
+                </h2>
+                <p class="lead text-center" style="margin: 0 auto 40px;">
+                    The events industry is a $1.5 trillion market with no purpose-built solution for speaker-audience
+                    connection. Fanflet is building it.
+                </p>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+                        <span class="tag tag-green" style="font-size: 0.8rem; padding: 8px 16px;">✉️
+                            brian@fanflet.com</span>
+                        <span class="tag tag-blue" style="font-size: 0.8rem; padding: 8px 16px;">🌐 fanflet.com</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav">
+        <button class="nav-btn" id="prev" aria-label="Previous slide">←</button>
+        <div class="slide-counter"><span id="current">1</span> / <span id="total">14</span></div>
+        <button class="nav-btn" id="next" aria-label="Next slide">→</button>
+    </div>
+    <div class="progress-bar" id="progress"></div>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        const total = slides.length;
+        let current = 0;
+
+        function goTo(index) {
+            if (index < 0 || index >= total) return;
+            slides[current].classList.remove('active');
+            current = index;
+            slides[current].classList.add('active');
+            document.getElementById('current').textContent = current + 1;
+            document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+        }
+
+        document.getElementById('next').addEventListener('click', () => goTo(current + 1));
+        document.getElementById('prev').addEventListener('click', () => goTo(current - 1));
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goTo(current + 1); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(current - 1); }
+            if (e.key === 'Home') goTo(0);
+            if (e.key === 'End') goTo(total - 1);
+        });
+
+        // Touch support
+        let touchStartX = 0;
+        document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+        document.addEventListener('touchend', (e) => {
+            const diff = touchStartX - e.changedTouches[0].clientX;
+            if (Math.abs(diff) > 50) {
+                if (diff > 0) goTo(current + 1);
+                else goTo(current - 1);
+            }
+        });
+
+        // Init progress
+        document.getElementById('progress').style.width = (1 / total * 100) + '%';
+    </script>
+</body>
+
+</html>

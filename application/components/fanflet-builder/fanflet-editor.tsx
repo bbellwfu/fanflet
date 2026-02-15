@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,9 @@ import {
   QrCode,
   Loader2,
   MessageSquare,
+  FileText,
+  Palette,
+  LayoutGrid,
 } from "lucide-react";
 import {
   updateFanfletDetails,
@@ -126,8 +129,47 @@ export function FanfletEditor({
   const [selectedThemeId, setSelectedThemeId] = useState(
     resolveThemeId(fanflet.theme_config)
   );
+  const [activeShortcutId, setActiveShortcutId] = useState("fanflet-details-section");
 
   const slugChanged = slug !== fanflet.slug;
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveShortcutId(sectionId);
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const top = section.getBoundingClientRect().top + window.scrollY - 190;
+    window.scrollTo({ top, behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    const sectionIds = [
+      "fanflet-details-section",
+      "fanflet-theme-section",
+      "fanflet-feedback-section",
+      "fanflet-resource-blocks-section",
+    ];
+
+    const updateActiveSection = () => {
+      let current = sectionIds[0];
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (el.getBoundingClientRect().top <= 220) {
+          current = id;
+        }
+      }
+      setActiveShortcutId(current);
+    };
+
+    updateActiveSection();
+    window.addEventListener("scroll", updateActiveSection, { passive: true });
+    window.addEventListener("resize", updateActiveSection);
+    return () => {
+      window.removeEventListener("scroll", updateActiveSection);
+      window.removeEventListener("resize", updateActiveSection);
+    };
+  }, []);
 
   const handleSaveClick = () => {
     if (slugChanged && fanflet.status === "published") {
@@ -180,7 +222,11 @@ export function FanfletEditor({
     const result = await publishFanflet(fanflet.id);
     if (result.error) toast.error(result.error);
     else {
-      toast.success("Fanflet published!");
+      if (result.firstPublished) {
+        toast.success("Huge win! Your first Fanflet is live and QR-ready.");
+      } else {
+        toast.success("Fanflet published!");
+      }
       router.refresh();
     }
   };
@@ -210,10 +256,10 @@ export function FanfletEditor({
     );
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="w-full">
       {/* Sticky header bar */}
       <div className="sticky top-16 md:top-0 z-30 bg-slate-50 -mx-6 md:-mx-8 px-6 md:px-8 pt-2 pb-4 border-b border-slate-200/80">
-        <div className="max-w-4xl mx-auto">
+        <div className="w-full">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="shrink-0">
               <Link href="/dashboard/fanflets">
@@ -236,7 +282,7 @@ export function FanfletEditor({
               <Button
                 size="sm"
                 onClick={handlePublish}
-                className="bg-[#1B365D] hover:bg-[#152b4d]"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
                 Publish
               </Button>
@@ -284,6 +330,62 @@ export function FanfletEditor({
               )}
             </Button>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              Shortcuts
+            </span>
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => scrollToSection("fanflet-details-section")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  activeShortcutId === "fanflet-details-section"
+                    ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
+                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                }`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Details
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection("fanflet-theme-section")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  activeShortcutId === "fanflet-theme-section"
+                    ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
+                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                }`}
+              >
+                <Palette className="h-3.5 w-3.5" />
+                Theme
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection("fanflet-feedback-section")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  activeShortcutId === "fanflet-feedback-section"
+                    ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
+                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                }`}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                Feedback Question
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToSection("fanflet-resource-blocks-section")}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                  activeShortcutId === "fanflet-resource-blocks-section"
+                    ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
+                    : "text-slate-600 hover:bg-white hover:text-slate-900"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Resource Blocks
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -303,7 +405,7 @@ export function FanfletEditor({
       <div className="space-y-8 mt-6">
 
       {/* Details section */}
-      <Card className="border-slate-200">
+      <Card id="fanflet-details-section" className="border-slate-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-[#1B365D]">Details</CardTitle>
         </CardHeader>
@@ -409,7 +511,7 @@ export function FanfletEditor({
       </Card>
 
       {/* Theme */}
-      <Card className="border-slate-200">
+      <Card id="fanflet-theme-section" className="border-slate-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-[#1B365D]">Theme</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -425,7 +527,7 @@ export function FanfletEditor({
       </Card>
 
       {/* Feedback Question */}
-      <Card className="border-slate-200">
+      <Card id="fanflet-feedback-section" className="border-slate-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-[#1B365D] flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
@@ -483,7 +585,7 @@ export function FanfletEditor({
       </Card>
 
       {/* Resource blocks */}
-      <div className="space-y-4">
+      <div id="fanflet-resource-blocks-section" className="space-y-4">
         <h2 className="text-lg font-semibold text-[#1B365D]">
           Resource Blocks
         </h2>

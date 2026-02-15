@@ -238,37 +238,37 @@ export default async function AnalyticsPage() {
       </div>
 
       {/* Aggregate Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Page Views</CardTitle>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="h-full">
+          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium leading-tight">Page Views</CardTitle>
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resource Clicks</CardTitle>
+        <Card className="h-full">
+          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium leading-tight">Resource Clicks</CardTitle>
             <MousePointerClick className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalClicks.toLocaleString()}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Email Signups</CardTitle>
+        <Card className="h-full">
+          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium leading-tight">Email Signups</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalSignups.toLocaleString()}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Subscribers</CardTitle>
+        <Card className="h-full">
+          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium leading-tight">Total Subscribers</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -288,7 +288,7 @@ export default async function AnalyticsPage() {
             {fanfletStats.map((f) => (
               <div
                 key={f.id}
-                className="flex items-center gap-4 p-4 bg-slate-50 rounded-lg border"
+                className="grid gap-3 rounded-lg border bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
               >
                 <div className="flex-1 min-w-0">
                   <Link
@@ -299,22 +299,22 @@ export default async function AnalyticsPage() {
                   </Link>
                   <p className="text-xs text-muted-foreground">{f.event_name}</p>
                 </div>
-                <div className="flex items-center gap-6 text-sm text-muted-foreground shrink-0">
-                  <div className="text-center">
+                <div className="grid grid-cols-3 gap-4 text-sm text-muted-foreground md:gap-6 md:justify-items-center">
+                  <div className="text-left md:text-center">
                     <p className="font-semibold text-slate-900">{f.views}</p>
                     <p className="text-xs">Views</p>
                   </div>
-                  <div className="text-center">
+                  <div className="text-left md:text-center">
                     <p className="font-semibold text-slate-900">{f.clicks}</p>
                     <p className="text-xs">Clicks</p>
                   </div>
-                  <div className="text-center">
+                  <div className="text-left md:text-center">
                     <p className="font-semibold text-slate-900">{f.subscribers}</p>
                     <p className="text-xs">Subs</p>
                   </div>
                 </div>
                 <div
-                  className={`text-xs font-medium px-2 py-1 rounded ${
+                  className={`justify-self-start md:justify-self-end text-xs font-medium px-2 py-1 rounded ${
                     f.status === "published"
                       ? "bg-green-100 text-green-700"
                       : "bg-slate-200 text-slate-600"

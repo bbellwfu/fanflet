@@ -176,6 +176,7 @@ export function QRDownload({
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-600">
           <p>• Display this QR code for at least 60 seconds on your slides</p>
+          <p>• Let your audience know at the beginning of the talk that you will be sharing a Fanflet later, so they can focus on the session!</p>
           <p>
             • Tell your audience: &quot;Scan this to get all resources from
             today&apos;s talk&quot;

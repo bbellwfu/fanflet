@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Loader2, Mail, Check } from 'lucide-react'
@@ -21,7 +20,6 @@ import { signup, signInWithGoogle } from './actions'
 const REFERRAL_STORAGE_KEY = 'fanflet_ref'
 
 export default function SignupPage() {
-  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -30,8 +28,10 @@ export default function SignupPage() {
 
   // Capture referral param from URL and persist in localStorage
   // (localStorage survives the OAuth redirect round-trip)
+  // Uses window.location instead of useSearchParams to avoid Suspense boundary requirement
   useEffect(() => {
-    const ref = searchParams.get('ref')
+    const params = new URLSearchParams(window.location.search)
+    const ref = params.get('ref')
     if (ref) {
       localStorage.setItem(REFERRAL_STORAGE_KEY, ref)
       setReferralId(ref)
@@ -39,7 +39,7 @@ export default function SignupPage() {
       const stored = localStorage.getItem(REFERRAL_STORAGE_KEY)
       if (stored) setReferralId(stored)
     }
-  }, [searchParams])
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()

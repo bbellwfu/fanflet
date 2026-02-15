@@ -1,0 +1,36 @@
+name: Security Review
+
+on:
+  pull_request:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - uses: anthropics/claude-code-security-review@main
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          custom-security-scan-instructions: |
+            This is a Next.js 16 app with Supabase (PostgreSQL + RLS + Auth).
+
+            Pay special attention to:
+            - Supabase service role key exposure in client-side code or NEXT_PUBLIC_* env vars
+            - Missing RLS policies on database tables (all 4 CRUD operations needed)
+            - Server Actions or API routes missing Zod input validation
+            - Auth bypass patterns (missing middleware checks, direct Supabase client misuse)
+            - XSS via unsanitized user input rendered in React components
+            - IDOR vulnerabilities (accessing other users' fanflets/resources via ID manipulation)
+            - Secrets or API keys committed in code or config files
+
+            Reference ENGINEERING_GUIDELINES_MEMO_v2.md Section 4 (Security Hardening) for full standards.

@@ -1,14 +1,17 @@
 name: Claude Code Review
 
+# Disabled — re-enable by uncommenting the triggers below
+# on:
+#   pull_request:
+#     types: [opened, synchronize]
+#   pull_request_review:
+#     types: [submitted]
+#   pull_request_review_comment:
+#     types: [created]
+#   issue_comment:
+#     types: [created]
 on:
-  pull_request:
-    types: [opened, synchronize]
-  pull_request_review:
-    types: [submitted]
-  pull_request_review_comment:
-    types: [created]
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
 
 jobs:
   review:

@@ -1,7 +1,10 @@
 name: Security Review
 
+# Disabled — re-enable by uncommenting the trigger below
+# on:
+#   pull_request:
 on:
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   pull-requests: write

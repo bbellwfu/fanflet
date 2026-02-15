@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/config";
 import { redirect, notFound } from "next/navigation";
 import { FanfletEditor } from "@/components/fanflet-builder/fanflet-editor";
 
@@ -56,7 +57,7 @@ export default async function FanfletEditorPage({
     .eq("speaker_id", speaker.id)
     .order("created_at", { ascending: true });
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3002";
+  const baseUrl = getSiteUrl();
   const publicUrl =
     fanflet.status === "published" && speaker.slug
       ? `${baseUrl}/${speaker.slug}/${fanflet.slug}`

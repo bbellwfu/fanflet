@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/config";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export default async function FanfletsPage() {
     .order("created_at", { ascending: false });
 
   const fanfletIds = fanflets?.map((f) => f.id) ?? [];
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3002";
+  const baseUrl = getSiteUrl();
 
   const pageViewsMap: Record<string, number> = {};
   const subscribersMap: Record<string, number> = {};

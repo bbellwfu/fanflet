@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSiteUrl } from "@/lib/config";
 import { redirect, notFound } from "next/navigation";
 import { QRDownload } from "@/components/fanflet-builder/qr-download";
 
@@ -30,7 +31,7 @@ export default async function FanfletQRPageRoute({
 
   if (!fanflet) notFound();
 
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3002";
+  const baseUrl = getSiteUrl();
   const publicUrl =
     fanflet.status === "published" && speaker.slug
       ? `${baseUrl}/${speaker.slug}/${fanflet.slug}`

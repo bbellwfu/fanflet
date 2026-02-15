@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import QRCode from 'qrcode'
 import sharp from 'sharp'
 import { createClient } from '@/lib/supabase/server'
+import { getSiteUrl } from '@/lib/config'
 import path from 'path'
 import { readFile } from 'fs/promises'
 
@@ -41,7 +42,7 @@ export async function GET(
     return NextResponse.json({ error: 'Fanflet not found' }, { status: 404 })
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3002'
+  const siteUrl = getSiteUrl()
   const fanfletUrl = `${siteUrl}/${speaker.slug}/${fanflet.slug}`
 
   const format = request.nextUrl.searchParams.get('format') || 'png'

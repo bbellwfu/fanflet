@@ -11,31 +11,41 @@ Digital resource platform for speakers — attendees scan a QR code and get inst
 - **Validation:** Zod 4
 - **Forms:** React Hook Form
 
-## Repository Structure
+## Repository Structure (Turborepo Monorepo)
 
 ```
-application/           # Next.js app (all source code lives here)
-  app/                 # App Router pages and API routes
-    (auth)/            # Auth pages (login, signup, forgot-password)
-    (demo)/            # Demo/preview pages
-    (marketing)/       # Marketing/landing pages
-    [speakerSlug]/     # Public speaker pages (dynamic routes)
-    api/               # API routes (qr, survey, track)
-    auth/              # Auth callbacks (callback, confirm, signout)
-    dashboard/         # Authenticated dashboard (fanflets, analytics, resources, settings, surveys)
-  components/          # Shared React components
-  lib/                 # Utilities, config, Supabase clients, themes
-  middleware.ts        # Auth middleware
+apps/
+  web/                 # Speaker-facing Next.js app
+    app/               # App Router pages and API routes
+      (auth)/          # Auth pages (login, signup, forgot-password)
+      (demo)/          # Demo/preview pages
+      (marketing)/     # Marketing/landing pages
+      [speakerSlug]/   # Public speaker pages (dynamic routes)
+      api/             # API routes (qr, survey, track)
+      auth/            # Auth callbacks (callback, confirm, signout)
+      dashboard/       # Authenticated dashboard
+    components/        # Web-specific React components
+    lib/               # Web-specific utilities, themes
+    middleware.ts      # Auth middleware (speaker dashboard)
+  admin/               # Admin back-office Next.js app
+    app/               # Admin pages (overview, accounts, features)
+    components/        # Admin-specific components
+    middleware.ts      # Admin auth middleware (platform_admin only)
+packages/
+  db/                  # Shared Supabase clients (server, browser, service-role, middleware)
+  types/               # Generated Supabase types + shared interfaces
+  ui/                  # Shared shadcn/ui components (button, card, input, etc.)
+  config/              # Shared TypeScript and lint configs
 ```
 
 ## Key Architectural Patterns
 
 - **Server Components by default.** Only use `"use client"` when you need browser APIs, event handlers, or hooks.
-- **Supabase SSR pattern:** Use `createClient()` from `lib/supabase/server.ts` for server components and API routes. Use `createBrowserClient()` from `lib/supabase/client.ts` for client components.
-- **Service role client:** Only in server-side API routes for admin operations. Never import in client code.
+- **Supabase SSR pattern:** Use `createClient()` from `@fanflet/db/server` (or `@/lib/supabase/server` in web app) for server components and API routes. Use `createBrowserClient()` from `@fanflet/db/client` for client components.
+- **Service role client:** Use `createServiceClient()` from `@fanflet/db/service`. Only in server-side admin operations. Never import in client code.
 - **RLS enforced at database level.** Never rely on application-level tenant filtering as the primary safety mechanism.
 - **Zod validation on all API inputs.** Validate before processing — never trust client data.
-- **Site URL centralized** in `lib/config.ts` via `NEXT_PUBLIC_SITE_URL`.
+- **Site URL centralized** via `getSiteUrl()` from `@fanflet/db/config`.
 
 ## Coding Conventions
 

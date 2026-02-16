@@ -5,6 +5,10 @@ node_modules/
 .next/
 out/
 build/
+dist/
+
+# Turborepo
+.turbo
 
 # Environment files (contain secrets)
 .env

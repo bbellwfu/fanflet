@@ -16,6 +16,7 @@ export async function updateSpeakerProfile(formData: FormData) {
   const bio = formData.get('bio') as string
   const slug = formData.get('slug') as string
   const photoUrl = formData.get('photo_url') as string | null
+  const removePhoto = formData.get('remove_photo') === 'true'
   const linkedin = formData.get('linkedin') as string
   const twitter = formData.get('twitter') as string
   const website = formData.get('website') as string
@@ -49,21 +50,29 @@ export async function updateSpeakerProfile(formData: FormData) {
     ? defaultThemePreset
     : DEFAULT_THEME_ID
 
+  // Build social_links, preserving or clearing photo_frame based on remove flag
+  const { photo_frame: _dropFrame, ...socialLinksWithoutFrame } = existingSocialLinks as Record<string, unknown>
+  const socialLinks: Record<string, unknown> = {
+    ...socialLinksWithoutFrame,
+    linkedin: ensureUrl(linkedin),
+    twitter: ensureUrl(twitter),
+    website: ensureUrl(website),
+    default_theme_preset: safeThemePreset,
+  }
+  if (!removePhoto && existingPhotoFrame) {
+    socialLinks.photo_frame = existingPhotoFrame
+  }
+
   const updateData: Record<string, unknown> = {
     name,
     bio,
     slug,
-    social_links: {
-      ...existingSocialLinks,
-      linkedin: ensureUrl(linkedin),
-      twitter: ensureUrl(twitter),
-      website: ensureUrl(website),
-      default_theme_preset: safeThemePreset,
-      ...(existingPhotoFrame ? { photo_frame: existingPhotoFrame } : {}),
-    },
+    social_links: socialLinks,
   }
 
-  if (photoUrl) {
+  if (removePhoto) {
+    updateData.photo_url = null
+  } else if (photoUrl) {
     updateData.photo_url = photoUrl
   }
 

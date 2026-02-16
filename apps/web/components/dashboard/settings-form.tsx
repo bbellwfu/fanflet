@@ -308,15 +308,27 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
               Upload Photo
             </Button>
             {displayPhotoUrl && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleAdjustPhoto}
-                disabled={cropModalOpen}
-                className="border-[#e2e8f0] text-[#1B365D] hover:bg-slate-100"
-              >
-                Adjust photo
-              </Button>
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAdjustPhoto}
+                  disabled={cropModalOpen}
+                  className="border-[#e2e8f0] text-[#1B365D] hover:bg-slate-100"
+                >
+                  Adjust photo
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleRemovePhoto}
+                  disabled={cropModalOpen}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Remove photo
+                </Button>
+              </>
             )}
             <PhotoCropModal
               open={cropModalOpen}

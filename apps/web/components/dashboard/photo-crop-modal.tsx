@@ -218,6 +218,16 @@ export function PhotoCropModal({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  // Reset crop state when a new file is provided so the modal starts fresh
+  useEffect(() => {
+    if (file) {
+      setImageLoaded(false);
+      setZoom(1);
+      setOffset({ x: 0, y: 0 });
+      prevZoomRef.current = 1;
+    }
+  }, [file]);
+
   const imageSrc = imageUrl ?? existingPhotoUrl ?? "";
   const hasImage = Boolean(imageSrc);
 

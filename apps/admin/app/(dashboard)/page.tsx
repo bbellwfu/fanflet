@@ -11,9 +11,9 @@ interface StatCardProps {
 
 function StatCard({ title, value, description, icon: Icon }: StatCardProps) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+    <Card className="min-w-0">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground break-words min-w-0">
           {title}
         </CardTitle>
         <Icon className="w-4 h-4 text-muted-foreground" />
@@ -85,16 +85,18 @@ export default async function AdminOverviewPage() {
     .limit(5);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Platform Overview</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          Platform Overview
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Key metrics across the Fanflet platform
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
         <StatCard
           title="Total Speakers"
           value={totalSpeakers}
@@ -129,7 +131,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Recent Activity */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         {/* Recent Speakers */}
         <Card>
           <CardHeader>

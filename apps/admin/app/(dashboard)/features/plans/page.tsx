@@ -36,22 +36,24 @@ export default async function PlansPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
         <Link
           href="/features"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Features
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Subscription Plans</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          Subscription Plans
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Define plan tiers, pricing, limits, and feature assignments
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         {plans.map((plan) => {
           const planFlagIds = planFeatureMap.get(plan.id) ?? new Set();
           const subscriberCount = planSubscriberCounts.get(plan.id) ?? 0;
@@ -62,11 +64,11 @@ export default async function PlansPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-indigo-600" />
+                    <Package className="w-5 h-5 text-primary" />
                     <CardTitle className="text-lg">{plan.display_name}</CardTitle>
                   </div>
                   {!plan.is_active && (
-                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded font-medium">
                       Inactive
                     </span>
                   )}
@@ -136,8 +138,8 @@ export default async function PlansPage() {
                           <span
                             className={
                               included
-                                ? "text-emerald-600"
-                                : "text-slate-300"
+                                ? "text-emerald-400"
+                                : "text-slate-600"
                             }
                           >
                             {included ? "+" : "-"}

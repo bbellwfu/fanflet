@@ -60,21 +60,21 @@ export default async function AccountDetailPage({
   const subscription = subscriptionResult.data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div>
         <Link
           href="/accounts"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Accounts
         </Link>
       </div>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+          <div className="w-14 h-14 rounded-full bg-muted flex shrink-0 items-center justify-center overflow-hidden">
             {speaker.photo_url ? (
               <img
                 src={speaker.photo_url}
@@ -86,10 +86,10 @@ export default async function AccountDetailPage({
             )}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {speaker.name || "Unnamed Speaker"}
             </h1>
-            <p className="text-muted-foreground">{speaker.email}</p>
+            <p className="text-sm text-muted-foreground">{speaker.email}</p>
             {speaker.slug && (
               <p className="text-xs font-mono text-muted-foreground mt-0.5">
                 /{speaker.slug}
@@ -173,11 +173,11 @@ export default async function AccountDetailPage({
 
       {/* Suspension Info (if suspended) */}
       {speaker.status === "suspended" && (
-        <Card className="border-amber-200 bg-amber-50">
+        <Card className="border-amber-500/30 bg-amber-500/10">
           <CardHeader>
-            <CardTitle className="text-base text-amber-800">Suspension Details</CardTitle>
+            <CardTitle className="text-base text-amber-400">Suspension Details</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-amber-700">
+          <CardContent className="text-sm text-amber-400">
             <p>
               <strong>Suspended at:</strong>{" "}
               {speaker.suspended_at
@@ -241,15 +241,15 @@ export default async function AccountDetailPage({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-emerald-100 text-emerald-700",
-    suspended: "bg-amber-100 text-amber-700",
-    deactivated: "bg-red-100 text-red-700",
+    active: "bg-emerald-500/20 text-emerald-400",
+    suspended: "bg-amber-500/20 text-amber-400",
+    deactivated: "bg-red-500/20 text-red-400",
   };
 
   return (
     <span
       className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-        styles[status] ?? "bg-gray-100 text-gray-700"
+        styles[status] ?? "bg-muted text-muted-foreground"
       }`}
     >
       {status}
@@ -259,15 +259,15 @@ function StatusBadge({ status }: { status: string }) {
 
 function FanfletStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    published: "bg-emerald-100 text-emerald-700",
-    draft: "bg-slate-100 text-slate-600",
-    archived: "bg-gray-100 text-gray-500",
+    published: "bg-emerald-500/20 text-emerald-400",
+    draft: "bg-slate-500/20 text-slate-400",
+    archived: "bg-muted text-muted-foreground",
   };
 
   return (
     <span
       className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-        styles[status] ?? "bg-gray-100 text-gray-500"
+        styles[status] ?? "bg-muted text-muted-foreground"
       }`}
     >
       {status}

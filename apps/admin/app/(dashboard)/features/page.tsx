@@ -37,17 +37,19 @@ export default async function FeaturesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Features & Plans</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            Features & Plans
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Manage feature flags and subscription plan assignments
           </p>
         </div>
         <Link
           href="/features/plans"
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+          className="inline-flex shrink-0 items-center justify-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
         >
           <Package className="w-4 h-4" />
           Manage Plans
@@ -55,22 +57,22 @@ export default async function FeaturesPage() {
       </div>
 
       {/* Feature Flags */}
-      <Card>
-        <CardHeader>
+      <Card className="gap-4">
+        <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
-            <ToggleLeft className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-base">Feature Flags</CardTitle>
+            <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Feature Flags</CardTitle>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
+        <CardContent className="pt-0">
+          <div className="divide-y divide-border">
             {flags.map((flag) => (
               <div
                 key={flag.id}
-                className="flex items-center justify-between py-3 border-b last:border-0"
+                className="flex items-center justify-between gap-4 py-2.5 first:pt-0"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-1.5">
                     <p className="text-sm font-medium">{flag.display_name}</p>
                     <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
                       {flag.key}
@@ -81,9 +83,9 @@ export default async function FeaturesPage() {
                       {flag.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     {flag.is_global ? (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-medium">
                         Global
                       </span>
                     ) : (
@@ -91,7 +93,7 @@ export default async function FeaturesPage() {
                         {(featurePlanMap.get(flag.id) ?? []).map((planName) => (
                           <span
                             key={planName}
-                            className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium"
+                            className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-medium"
                           >
                             {planName}
                           </span>

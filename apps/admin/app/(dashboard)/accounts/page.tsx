@@ -1,6 +1,7 @@
 import { createServiceClient } from "@fanflet/db/service";
 import { Card, CardContent, CardHeader, CardTitle } from "@fanflet/ui/card";
 import Link from "next/link";
+import { AccountsFilterForm } from "./accounts-filter-form";
 
 interface SpeakerWithCounts {
   id: string;
@@ -70,70 +71,52 @@ export default async function AccountsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Accounts</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          Accounts
+        </h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
           Manage speaker accounts across the platform
         </p>
       </div>
 
       {/* Search & Filter */}
-      <Card>
-        <CardContent className="pt-6">
-          <form className="flex flex-col sm:flex-row gap-3">
-            <input
-              name="search"
-              type="text"
-              placeholder="Search by name or email..."
-              defaultValue={params.search ?? ""}
-              className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-            />
-            <select
-              name="status"
-              defaultValue={params.status ?? "all"}
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="deactivated">Deactivated</option>
-            </select>
-            <button
-              type="submit"
-              className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-            >
-              Filter
-            </button>
-          </form>
+      <Card className="gap-4">
+        <CardContent className="pt-4">
+          <AccountsFilterForm
+            key={`${params.search ?? ""}-${params.status ?? "all"}`}
+            defaultSearch={params.search ?? ""}
+            defaultStatus={params.status ?? "all"}
+          />
         </CardContent>
       </Card>
 
       {/* Accounts Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
+      <Card className="gap-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">
             {speakersWithCounts.length} Speaker{speakersWithCounts.length !== 1 ? "s" : ""}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left">
-                  <th className="pb-3 font-medium text-muted-foreground">Name</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Email</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Slug</th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">Fanflets</th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">Subscribers</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Joined</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground">Name</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground">Email</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground">Slug</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground text-center">Fanflets</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground text-center">Subscribers</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground">Status</th>
+                  <th className="pb-2 pt-0 font-medium text-muted-foreground">Joined</th>
                 </tr>
               </thead>
               <tbody>
                 {speakersWithCounts.map((speaker) => (
                   <tr key={speaker.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3">
+                    <td className="py-2">
                       <Link
                         href={`/accounts/${speaker.id}`}
                         className="font-medium text-primary hover:underline"
@@ -141,23 +124,23 @@ export default async function AccountsPage({
                         {speaker.name || "Unnamed"}
                       </Link>
                     </td>
-                    <td className="py-3 text-muted-foreground">{speaker.email}</td>
-                    <td className="py-3 text-muted-foreground font-mono text-xs">
+                    <td className="py-2 text-muted-foreground">{speaker.email}</td>
+                    <td className="py-2 text-muted-foreground font-mono text-xs">
                       {speaker.slug ?? "—"}
                     </td>
-                    <td className="py-3 text-center">{speaker.fanflet_count}</td>
-                    <td className="py-3 text-center">{speaker.subscriber_count}</td>
-                    <td className="py-3">
+                    <td className="py-2 text-center">{speaker.fanflet_count}</td>
+                    <td className="py-2 text-center">{speaker.subscriber_count}</td>
+                    <td className="py-2">
                       <StatusBadge status={speaker.status} />
                     </td>
-                    <td className="py-3 text-muted-foreground text-xs">
+                    <td className="py-2 text-muted-foreground text-xs">
                       {new Date(speaker.created_at).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}
                 {speakersWithCounts.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="py-6 text-center text-muted-foreground">
                       No accounts found
                     </td>
                   </tr>
@@ -173,15 +156,15 @@ export default async function AccountsPage({
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-emerald-100 text-emerald-700",
-    suspended: "bg-amber-100 text-amber-700",
-    deactivated: "bg-red-100 text-red-700",
+    active: "bg-emerald-500/20 text-emerald-400",
+    suspended: "bg-amber-500/20 text-amber-400",
+    deactivated: "bg-red-500/20 text-red-400",
   };
 
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-        styles[status] ?? "bg-gray-100 text-gray-700"
+        styles[status] ?? "bg-muted text-muted-foreground"
       }`}
     >
       {status}

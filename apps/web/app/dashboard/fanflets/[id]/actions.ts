@@ -3,6 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { ensureUrl } from '@/lib/utils'
+import {
+  computeExpirationDate,
+  parseExpirationFromForm,
+  resolveExpirationDate,
+} from '@/lib/expiration'
 
 async function verifyOwnership(supabase: Awaited<ReturnType<typeof createClient>>, fanfletId: string) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -64,21 +69,41 @@ export async function updateFanfletDetails(
     return { error: 'You already have a Fanflet with this URL slug' }
   }
 
-  const { error } = await supabase
-    .from('fanflets')
-    .update({
-      title,
-      description: description || null,
-      event_name,
-      event_date: event_date || null,
-      slug,
-      survey_question_id: survey_question_id || null,
-      theme_config,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+  const basePayload: Record<string, unknown> = {
+    title,
+    description: description || null,
+    event_name,
+    event_date: event_date || null,
+    slug,
+    survey_question_id: survey_question_id || null,
+    theme_config,
+    updated_at: new Date().toISOString(),
+  }
 
-  if (error) return { error: error.message }
+  const expiration = parseExpirationFromForm(formData)
+  const { data: currentFanflet } = await supabase
+    .from('fanflets')
+    .select('published_at')
+    .eq('id', id)
+    .single()
+  const referenceDate = currentFanflet?.published_at
+    ? new Date(currentFanflet.published_at)
+    : new Date()
+  const expiration_date = resolveExpirationDate(expiration, referenceDate)
+
+  const fullPayload = {
+    ...basePayload,
+    expiration_date: expiration_date ?? null,
+    expiration_preset: expiration.preset,
+    show_expiration_notice: expiration.showExpirationNotice,
+  }
+
+  let result = await supabase.from('fanflets').update(fullPayload).eq('id', id)
+  if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || result.error.message?.includes('schema cache'))) {
+    result = await supabase.from('fanflets').update(basePayload).eq('id', id)
+  }
+
+  if (result.error) return { error: result.error.message }
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath(`/dashboard/fanflets/${id}/qr`)
@@ -97,16 +122,37 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
     .eq('speaker_id', ownership.fanflet!.speaker_id)
     .eq('status', 'published')
 
-  const { error } = await supabase
-    .from('fanflets')
-    .update({
-      status: 'published',
-      published_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+  const publishedAt = new Date()
+  const basePayload: Record<string, unknown> = {
+    status: 'published',
+    published_at: publishedAt.toISOString(),
+    updated_at: publishedAt.toISOString(),
+  }
 
-  if (error) return { error: error.message }
+  const { data: current, error: presetErr } = await supabase
+    .from('fanflets')
+    .select('expiration_preset')
+    .eq('id', id)
+    .single()
+
+  if (!presetErr) {
+    const preset = current?.expiration_preset as string | undefined
+    if (preset === '30d' || preset === '60d' || preset === '90d') {
+      basePayload.expiration_date = computeExpirationDate(
+        preset as '30d' | '60d' | '90d',
+        null,
+        publishedAt
+      )
+    }
+  }
+
+  let result = await supabase.from('fanflets').update(basePayload).eq('id', id)
+  if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || result.error.message?.includes('schema cache'))) {
+    const { expiration_date: _drop, ...safePayload } = basePayload
+    result = await supabase.from('fanflets').update(safePayload).eq('id', id)
+  }
+
+  if (result.error) return { error: result.error.message }
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')

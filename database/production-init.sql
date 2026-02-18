@@ -43,11 +43,15 @@ CREATE TABLE public.fanflets (
   updated_at timestamptz DEFAULT now() NOT NULL,
   published_at timestamptz,
   description text,
+  expiration_date date,
+  expiration_preset text NOT NULL DEFAULT 'none' CHECK (expiration_preset IN ('30d', '60d', '90d', 'none', 'custom')),
+  show_expiration_notice boolean NOT NULL DEFAULT true,
   UNIQUE(speaker_id, slug)
 );
 
 CREATE INDEX idx_fanflets_speaker ON public.fanflets(speaker_id);
 CREATE INDEX idx_fanflets_status ON public.fanflets(status);
+CREATE INDEX idx_fanflets_expiration_date ON public.fanflets(expiration_date);
 
 -- RESOURCE BLOCKS
 CREATE TABLE public.resource_blocks (
@@ -317,3 +321,14 @@ CREATE POLICY "Resources are publicly readable"
 -- =============================================================================
 -- Done! Production database is fully initialized.
 -- =============================================================================
+
+-- =============================================================================
+-- MIGRATION: Content expiration (run only if fanflets table already exists
+-- without expiration columns)
+-- =============================================================================
+-- ALTER TABLE public.fanflets ADD COLUMN IF NOT EXISTS expiration_date date;
+-- ALTER TABLE public.fanflets ADD COLUMN IF NOT EXISTS expiration_preset text NOT NULL DEFAULT 'none';
+-- ALTER TABLE public.fanflets ADD CONSTRAINT fanflets_expiration_preset_check
+--   CHECK (expiration_preset IN ('30d', '60d', '90d', 'none', 'custom'));
+-- ALTER TABLE public.fanflets ADD COLUMN IF NOT EXISTS show_expiration_notice boolean NOT NULL DEFAULT true;
+-- CREATE INDEX IF NOT EXISTS idx_fanflets_expiration_date ON public.fanflets(expiration_date);

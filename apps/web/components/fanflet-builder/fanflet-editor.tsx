@@ -46,6 +46,11 @@ import { ResourceBlockCard } from "./resource-block-card";
 import { AddBlockForm } from "./add-block-form";
 import { ThemePicker } from "./theme-picker";
 import { resolveThemeId, DEFAULT_THEME_ID } from "@/lib/themes";
+import {
+  type ExpirationPreset,
+  computeExpirationDate,
+  todayUtcDateOnly,
+} from "@/lib/expiration";
 
 type Fanflet = {
   id: string;
@@ -57,6 +62,10 @@ type Fanflet = {
   status: string;
   survey_question_id: string | null;
   theme_config: Record<string, unknown> | null;
+  expiration_date: string | null;
+  expiration_preset: string;
+  show_expiration_notice: boolean;
+  published_at: string | null;
 };
 
 type SurveyQuestion = {
@@ -129,7 +138,33 @@ export function FanfletEditor({
   const [selectedThemeId, setSelectedThemeId] = useState(
     resolveThemeId(fanflet.theme_config)
   );
+  const [expirationPreset, setExpirationPreset] = useState<ExpirationPreset>(
+    (fanflet.expiration_preset as ExpirationPreset) || "none"
+  );
+  const [expirationCustomDate, setExpirationCustomDate] = useState(
+    fanflet.expiration_date ? fanflet.expiration_date.slice(0, 10) : ""
+  );
+  const [showExpirationNotice, setShowExpirationNotice] = useState(
+    fanflet.show_expiration_notice ?? true
+  );
   const [activeShortcutId, setActiveShortcutId] = useState("fanflet-details-section");
+
+  const referenceDate = fanflet.published_at
+    ? new Date(fanflet.published_at)
+    : new Date();
+  const today = todayUtcDateOnly();
+  const presetWouldBePast = (preset: "30d" | "60d" | "90d") => {
+    const exp = computeExpirationDate(preset, null, referenceDate);
+    return exp ? exp < today : false;
+  };
+  const computedExpirationDate =
+    expirationPreset !== "none"
+      ? computeExpirationDate(
+          expirationPreset,
+          expirationPreset === "custom" ? expirationCustomDate || null : null,
+          referenceDate
+        )
+      : null;
 
   const slugChanged = slug !== fanflet.slug;
 
@@ -196,6 +231,12 @@ export function FanfletEditor({
           : { preset: selectedThemeId }
       )
     );
+    formData.set("expiration_preset", expirationPreset);
+    formData.set(
+      "expiration_custom_date",
+      expirationPreset === "custom" ? expirationCustomDate : ""
+    );
+    formData.set("show_expiration_notice", showExpirationNotice ? "true" : "false");
 
     const result = await updateFanfletDetails(fanflet.id, formData);
     setSaving(false);
@@ -476,6 +517,80 @@ export function FanfletEditor({
                     Changing the slug will invalidate any previously shared QR codes and links.
                   </p>
                 )}
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <Label className="text-[#1B365D]">Content expiration</Label>
+                <p className="text-sm text-muted-foreground">
+                  Limit how long this Fanflet is publicly available. Presets are from{" "}
+                  {fanflet.published_at
+                    ? "first publish date"
+                    : "when you publish"}
+                  .
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(["30d", "60d", "90d", "none", "custom"] as const).map((preset) => {
+                    const isPast = (preset === "30d" || preset === "60d" || preset === "90d") && presetWouldBePast(preset);
+                    return (
+                      <Button
+                        key={preset}
+                        type="button"
+                        variant={expirationPreset === preset ? "default" : "outline"}
+                        size="sm"
+                        disabled={isPast}
+                        className={
+                          expirationPreset === preset
+                            ? "bg-[#1B365D] hover:bg-[#152b4d]"
+                            : "border-[#e2e8f0]"
+                        }
+                        onClick={() => !isPast && setExpirationPreset(preset)}
+                      >
+                        {preset === "none"
+                          ? "Doesn't expire"
+                          : preset === "custom"
+                            ? "Custom date"
+                            : `${preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
+                      </Button>
+                    );
+                  })}
+                </div>
+                {expirationPreset === "custom" && (
+                  <div className="space-y-1">
+                    <Label htmlFor="expiration_custom_date_edit" className="text-sm">
+                      Expiration date
+                    </Label>
+                    <Input
+                      id="expiration_custom_date_edit"
+                      type="date"
+                      value={expirationCustomDate}
+                      onChange={(e) => setExpirationCustomDate(e.target.value)}
+                      className="border-[#e2e8f0] max-w-[200px]"
+                    />
+                  </div>
+                )}
+                {computedExpirationDate && (
+                  <p className="text-sm text-muted-foreground">
+                    Expires on{" "}
+                    {new Date(computedExpirationDate + "T12:00:00Z").toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                    .
+                  </p>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="show_expiration_notice_edit"
+                    checked={showExpirationNotice}
+                    onChange={(e) => setShowExpirationNotice(e.target.checked)}
+                    className="h-4 w-4 rounded border-[#e2e8f0]"
+                  />
+                  <Label htmlFor="show_expiration_notice_edit" className="text-sm font-normal cursor-pointer">
+                    Show &quot;This content available until [date]&quot; to visitors
+                  </Label>
+                </div>
               </div>
 
               {/* Slug change confirmation dialog */}

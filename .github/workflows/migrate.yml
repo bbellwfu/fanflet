@@ -38,9 +38,16 @@ jobs:
         run: |
           # Get local migration versions from filenames
           LOCAL_VERSIONS=$(ls supabase/migrations/*.sql 2>/dev/null | sed 's/.*\///' | sed 's/_.*//' | sort)
+          echo "Local versions:"
+          echo "$LOCAL_VERSIONS"
 
-          # Get remote migration versions
-          REMOTE_VERSIONS=$(supabase migration list 2>/dev/null | grep -oE '^[0-9]{14}' | sort || true)
+          # Get remote migration versions (table output — extract 14-digit numbers)
+          RAW=$(supabase migration list 2>&1 || true)
+          echo "Raw migration list output:"
+          echo "$RAW"
+          REMOTE_VERSIONS=$(echo "$RAW" | grep -oE '[0-9]{14}' | sort -u || true)
+          echo "Remote versions:"
+          echo "$REMOTE_VERSIONS"
 
           # Find remote versions that have no local file — mark them as reverted
           ORPHANS=""

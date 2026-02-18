@@ -1,95 +1,55 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "@fanflet/db/server";
+import { LoginForm } from "./login-form";
 
-import { useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
-import { Button } from "@fanflet/ui/button";
-import { Input } from "@fanflet/ui/input";
-import { Label } from "@fanflet/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@fanflet/ui/card";
-import { Shield } from "lucide-react";
+export default async function AdminLoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const code = typeof params.code === "string" ? params.code : null;
+  const next = typeof params.next === "string" ? params.next : "/";
+  const errorParam = typeof params.error === "string" ? params.error : null;
 
-export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (authError) {
-      setError("Invalid credentials");
-      setLoading(false);
-      return;
-    }
-
-    // Middleware will verify admin role on redirect
-    window.location.href = "/";
+  // If Supabase redirected here with a code (shouldn't normally happen, but handle it),
+  // send it to the Route Handler which CAN set cookies.
+  if (code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(next)}`);
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <Card className="w-full max-w-sm border-slate-800 bg-slate-900 text-white">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <Shield className="w-10 h-10 text-indigo-400" />
-          </div>
-          <CardTitle className="text-xl text-white">Fanflet Admin</CardTitle>
-          <CardDescription className="text-slate-400">
-            Platform administration access
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-300">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                placeholder="admin@fanflet.com"
-                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-300">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                placeholder="Enter password"
-                className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-              />
-            </div>
-            {error && (
-              <p className="text-sm text-red-400">{error}</p>
-            )}
-            <Button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-              disabled={loading}
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const supabase = await createClient();
+
+  // If user is signed in but lacks admin access, sign them out to break the redirect loop.
+  if (errorParam === "admin_required") {
+    await supabase.auth.signOut();
+    return <LoginForm error={errorParam} />;
+  }
+
+  // If the user is already signed in as an admin, redirect to the dashboard
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const role = (user.app_metadata as Record<string, unknown> | undefined)?.role;
+      if (role === "platform_admin") {
+        redirect("/");
+      }
+      const { data: roleRow } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("auth_user_id", user.id)
+        .eq("role", "platform_admin")
+        .maybeSingle();
+      if (roleRow) {
+        redirect("/");
+      }
+    }
+  } catch (err) {
+    // redirect() throws a special error -- rethrow it
+    if (err && typeof err === "object" && "digest" in err) {
+      throw err;
+    }
+  }
+
+  return <LoginForm error={errorParam} />;
 }

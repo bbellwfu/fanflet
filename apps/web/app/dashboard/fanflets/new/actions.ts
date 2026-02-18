@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { getStoredDefaultThemePreset } from '@/lib/speaker-preferences'
+import { parseExpirationFromForm, resolveExpirationDate } from '@/lib/expiration'
 
 export async function createFanflet(formData: FormData) {
   const supabase = await createClient()
@@ -40,21 +41,41 @@ export async function createFanflet(formData: FormData) {
       ? { preset: speakerDefaultTheme }
       : {}
 
-  const { data: fanflet, error } = await supabase
+  const expiration = parseExpirationFromForm(formData)
+  const referenceDate = new Date()
+  const expiration_date = resolveExpirationDate(expiration, referenceDate)
+
+  const baseInsert: Record<string, unknown> = {
+    speaker_id: speaker.id,
+    title,
+    event_name,
+    event_date: event_date || null,
+    slug,
+    status: 'draft',
+    theme_config: themeConfig,
+  }
+
+  let result = await supabase
     .from('fanflets')
     .insert({
-      speaker_id: speaker.id,
-      title,
-      event_name,
-      event_date: event_date || null,
-      slug,
-      status: 'draft',
-      theme_config: themeConfig,
+      ...baseInsert,
+      expiration_date: expiration_date ?? null,
+      expiration_preset: expiration.preset,
+      show_expiration_notice: expiration.showExpirationNotice,
     })
     .select('id')
     .single()
 
-  if (error) return { error: error.message }
+  if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || result.error.message?.includes('schema cache'))) {
+    result = await supabase
+      .from('fanflets')
+      .insert(baseInsert)
+      .select('id')
+      .single()
+  }
+
+  if (result.error) return { error: result.error.message }
+  const fanflet = result.data
 
   redirect(`/dashboard/fanflets/${fanflet.id}`)
 }

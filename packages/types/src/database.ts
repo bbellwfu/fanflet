@@ -69,8 +69,11 @@ export type Database = {
           description: string | null
           event_date: string | null
           event_name: string
+          expiration_date: string | null
+          expiration_preset: string
           id: string
           published_at: string | null
+          show_expiration_notice: boolean
           slug: string
           speaker_id: string
           status: string
@@ -84,8 +87,11 @@ export type Database = {
           description?: string | null
           event_date?: string | null
           event_name?: string
+          expiration_date?: string | null
+          expiration_preset?: string
           id?: string
           published_at?: string | null
+          show_expiration_notice?: boolean
           slug: string
           speaker_id: string
           status?: string
@@ -99,8 +105,11 @@ export type Database = {
           description?: string | null
           event_date?: string | null
           event_name?: string
+          expiration_date?: string | null
+          expiration_preset?: string
           id?: string
           published_at?: string | null
+          show_expiration_notice?: boolean
           slug?: string
           speaker_id?: string
           status?: string

@@ -44,7 +44,7 @@ export function SuspendButton({ speakerId, currentStatus }: SuspendButtonProps) 
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Suspension reason (optional)"
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] w-64"
+          className="h-9 rounded-lg border border-border-subtle bg-page px-3 text-[13px] text-fg outline-none placeholder:text-fg-muted focus-visible:border-primary focus-visible:ring-primary/40 focus-visible:ring-[3px] w-64"
         />
         <Button
           variant="destructive"

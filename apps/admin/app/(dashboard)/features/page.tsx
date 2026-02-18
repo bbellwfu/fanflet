@@ -1,31 +1,21 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { Card, CardContent, CardHeader, CardTitle } from "@fanflet/ui/card";
 import Link from "next/link";
-import { ToggleLeft, Package } from "lucide-react";
+import { ToggleLeftIcon, SettingsIcon } from "lucide-react";
 import { FeatureToggle } from "./feature-toggle";
 
 export default async function FeaturesPage() {
   const supabase = createServiceClient();
 
   const [flagsResult, plansResult, planFeaturesResult] = await Promise.all([
-    supabase
-      .from("feature_flags")
-      .select("*")
-      .order("display_name"),
-    supabase
-      .from("plans")
-      .select("*")
-      .order("sort_order"),
-    supabase
-      .from("plan_features")
-      .select("plan_id, feature_flag_id"),
+    supabase.from("feature_flags").select("*").order("display_name"),
+    supabase.from("plans").select("*").order("sort_order"),
+    supabase.from("plan_features").select("plan_id, feature_flag_id"),
   ]);
 
   const flags = flagsResult.data ?? [];
   const plans = plansResult.data ?? [];
   const planFeatures = planFeaturesResult.data ?? [];
 
-  // Build a map: feature_flag_id -> [plan names]
   const featurePlanMap = new Map<string, string[]>();
   for (const pf of planFeatures) {
     const plan = plans.find((p) => p.id === pf.plan_id);
@@ -36,68 +26,89 @@ export default async function FeaturesPage() {
     }
   }
 
+  const planColors: Record<string, string> = {
+    Pro: "bg-primary-muted text-primary-soft",
+    Business: "bg-info/10 text-info",
+    Global: "bg-success/10 text-success",
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Features & Plans</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-semibold text-fg tracking-tight">
+            Features & Plans
+          </h1>
+          <p className="text-sm text-fg-secondary mt-1">
             Manage feature flags and subscription plan assignments
           </p>
         </div>
         <Link
           href="/features/plans"
-          className="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-fg text-[13px] font-medium rounded-lg hover:bg-primary/90 transition-colors"
         >
-          <Package className="w-4 h-4" />
+          <SettingsIcon className="w-4 h-4" />
           Manage Plans
         </Link>
       </div>
 
-      {/* Feature Flags */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ToggleLeft className="w-5 h-5 text-muted-foreground" />
-            <CardTitle className="text-base">Feature Flags</CardTitle>
+      {/* Feature Flags Card */}
+      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+        {/* Card Header */}
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-primary-muted flex items-center justify-center">
+            <ToggleLeftIcon className="w-4 h-4 text-primary-soft" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {flags.map((flag) => (
+          <h2 className="text-sm font-semibold text-fg">Feature Flags</h2>
+          <span className="text-[12px] text-fg-muted ml-1">
+            {flags.length} features
+          </span>
+        </div>
+
+        {/* Feature List */}
+        <div className="divide-y divide-border-subtle">
+          {flags.map((flag) => {
+            const flagPlans = featurePlanMap.get(flag.id) ?? [];
+            return (
               <div
                 key={flag.id}
-                className="flex items-center justify-between py-3 border-b last:border-0"
+                className="px-5 py-4 flex items-center justify-between"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium">{flag.display_name}</p>
-                    <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
+                <div className="min-w-0 flex-1 mr-6">
+                  <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+                    <h3 className="text-[13px] font-semibold text-fg">
+                      {flag.display_name}
+                    </h3>
+                    <code className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-fg-muted">
                       {flag.key}
                     </code>
                   </div>
                   {flag.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="text-[12px] text-fg-secondary mb-2">
                       {flag.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5">
                     {flag.is_global ? (
-                      <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-medium">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-success/10 text-success">
                         Global
                       </span>
                     ) : (
                       <>
-                        {(featurePlanMap.get(flag.id) ?? []).map((planName) => (
+                        {flagPlans.map((planName) => (
                           <span
                             key={planName}
-                            className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium"
+                            className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              planColors[planName] ??
+                              "bg-surface-elevated text-fg-muted"
+                            }`}
                           >
                             {planName}
                           </span>
                         ))}
-                        {(featurePlanMap.get(flag.id) ?? []).length === 0 && (
-                          <span className="text-[10px] text-muted-foreground">
+                        {flagPlans.length === 0 && (
+                          <span className="text-[10px] text-fg-muted">
                             No plans assigned
                           </span>
                         )}
@@ -105,17 +116,20 @@ export default async function FeaturesPage() {
                     )}
                   </div>
                 </div>
+
                 <FeatureToggle flagId={flag.id} isGlobal={flag.is_global} />
               </div>
-            ))}
-            {flags.length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">
+            );
+          })}
+          {flags.length === 0 && (
+            <div className="px-5 py-10 text-center">
+              <p className="text-[13px] text-fg-muted">
                 No feature flags configured
               </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

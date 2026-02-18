@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Plus, FileText, Pencil, ExternalLink } from "lucide-react";
+import { getExpirationStatus } from "@/lib/expiration";
 
 export default async function FanfletsPage() {
   const supabase = await createClient();
@@ -24,11 +25,25 @@ export default async function FanfletsPage() {
     redirect("/dashboard/settings");
   }
 
-  const { data: fanflets } = await supabase
+  type FanfletRow = { id: string; title: string; event_name: string; event_date: string | null; slug: string; status: string; created_at: string; expiration_date?: string | null };
+
+  const { data: withExpiration, error: errWith } = await supabase
     .from("fanflets")
-    .select("id, title, event_name, event_date, slug, status, created_at")
+    .select("id, title, event_name, event_date, slug, status, created_at, expiration_date")
     .eq("speaker_id", speaker.id)
     .order("created_at", { ascending: false });
+
+  let fanflets: FanfletRow[] | null = null;
+  if (!errWith && withExpiration) {
+    fanflets = withExpiration as FanfletRow[];
+  } else {
+    const { data: withoutExpiration } = await supabase
+      .from("fanflets")
+      .select("id, title, event_name, event_date, slug, status, created_at")
+      .eq("speaker_id", speaker.id)
+      .order("created_at", { ascending: false });
+    fanflets = withoutExpiration?.map((f) => ({ ...f, expiration_date: null })) ?? null;
+  }
 
   const fanfletIds = fanflets?.map((f) => f.id) ?? [];
   const baseUrl = getSiteUrl();
@@ -66,27 +81,42 @@ export default async function FanfletsPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "published":
-        return (
-          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
-            Live
-          </span>
-        );
-      case "archived":
-        return (
-          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
-            Archived
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600">
-            Draft
-          </span>
-        );
+  const getStatusBadge = (
+    status: string,
+    expirationDate: string | null
+  ) => {
+    if (status === "archived") {
+      return (
+        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
+          Archived
+        </span>
+      );
     }
+    if (status !== "published") {
+      return (
+        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600">
+          Draft
+        </span>
+      );
+    }
+    const expStatus = getExpirationStatus(expirationDate);
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">
+          Live
+        </span>
+        {expStatus === "expiring_soon" && (
+          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">
+            Expiring soon
+          </span>
+        )}
+        {expStatus === "expired" && (
+          <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-200 text-slate-600">
+            Expired
+          </span>
+        )}
+      </div>
+    );
   };
 
   const formatDate = (d: string | null) => {
@@ -166,7 +196,7 @@ export default async function FanfletsPage() {
                           ` • ${formatDate(fanflet.event_date)}`}
                       </p>
                     </div>
-                    {getStatusBadge(fanflet.status)}
+                    {getStatusBadge(fanflet.status, fanflet.expiration_date ?? null)}
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">

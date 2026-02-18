@@ -2,9 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing/landing-page";
+import { ExpiredFanfletPage } from "@/components/landing/expired-fanflet-page";
 import { AnalyticsScript } from "@/components/landing/analytics-script";
 import { SurveyPrompt } from "@/components/landing/survey-prompt";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
+import { isExpired } from "@/lib/expiration";
 
 export const revalidate = 3600; // Cache for 1 hour
 
@@ -26,25 +28,47 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Fanflet Not Found" };
   }
 
-  const { data: fanflet } = await supabase
+  const { data: fanflet, error: fanfletErr } = await supabase
     .from("fanflets")
-    .select("title, event_name, event_date")
+    .select("title, event_name, event_date, expiration_date")
     .eq("speaker_id", speaker.id)
     .eq("slug", fanfletSlug)
     .eq("status", "published")
     .single();
 
-  if (!fanflet) {
+  let resolvedFanflet = fanflet;
+  if (fanfletErr && (fanfletErr.code === "42703" || fanfletErr.code === "PGRST204" || fanfletErr.message?.includes("schema cache"))) {
+    const { data: fallback } = await supabase
+      .from("fanflets")
+      .select("title, event_name, event_date")
+      .eq("speaker_id", speaker.id)
+      .eq("slug", fanfletSlug)
+      .eq("status", "published")
+      .single();
+    resolvedFanflet = fallback ? { ...fallback, expiration_date: null } : null;
+  }
+
+  if (!resolvedFanflet) {
     return { title: "Fanflet Not Found" };
   }
 
-  const eventContext = fanflet.event_name
-    ? `${fanflet.event_name}${fanflet.event_date ? ` · ${new Date(fanflet.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}`
+  const expired = isExpired(resolvedFanflet.expiration_date ?? null);
+
+  if (expired) {
+    return {
+      title: "Content No Longer Available | Fanflet",
+      description: `This Fanflet from ${speaker.name} is no longer available.`,
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const eventContext = resolvedFanflet.event_name
+    ? `${resolvedFanflet.event_name}${resolvedFanflet.event_date ? ` · ${new Date(resolvedFanflet.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}`
     : "Presentation resources";
 
   return {
-    title: `${fanflet.title} | ${speaker.name}`,
-    description: `${fanflet.title} by ${speaker.name}. ${eventContext}.`,
+    title: `${resolvedFanflet.title} | ${speaker.name}`,
+    description: `${resolvedFanflet.title} by ${speaker.name}. ${eventContext}.`,
   };
 }
 
@@ -69,6 +93,20 @@ export default async function AudienceLandingPage({ params }: Props) {
     .single();
 
   if (!fanflet) notFound();
+
+  const expired = isExpired(fanflet.expiration_date ?? null);
+  if (expired) {
+    return (
+      <ExpiredFanfletPage
+        speaker={{
+          id: speaker.id,
+          name: speaker.name,
+          photo_url: speaker.photo_url,
+          social_links: speaker.social_links,
+        }}
+      />
+    );
+  }
 
   const { data: rawBlocks } = await supabase
     .from("resource_blocks")

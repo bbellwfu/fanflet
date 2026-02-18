@@ -65,8 +65,8 @@ export function PhotoCropModal({
       if (z1 > 0 && z2 !== z1) {
         const ratio = z2 / z1;
         setOffset((prev) => ({
-          x: PREVIEW_SIZE / 2 - (PREVIEW_SIZE / 2 - prev.x) * ratio,
-          y: PREVIEW_SIZE / 2 - (PREVIEW_SIZE / 2 - prev.y) * ratio,
+          x: prev.x * ratio,
+          y: prev.y * ratio,
         }));
       }
       prevZoomRef.current = newZoom;

@@ -1,7 +1,6 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { Card, CardContent, CardHeader, CardTitle } from "@fanflet/ui/card";
 import Link from "next/link";
-import { ArrowLeft, Package } from "lucide-react";
+import { ArrowLeft, PackageIcon, CheckIcon, MinusIcon } from "lucide-react";
 
 export default async function PlansPage() {
   const supabase = createServiceClient();
@@ -9,7 +8,10 @@ export default async function PlansPage() {
   const [plansResult, flagsResult, planFeaturesResult, subscriptionCountsResult] =
     await Promise.all([
       supabase.from("plans").select("*").order("sort_order"),
-      supabase.from("feature_flags").select("id, key, display_name").order("display_name"),
+      supabase
+        .from("feature_flags")
+        .select("id, key, display_name")
+        .order("display_name"),
       supabase.from("plan_features").select("plan_id, feature_flag_id"),
       supabase.from("speaker_subscriptions").select("plan_id"),
     ]);
@@ -19,7 +21,6 @@ export default async function PlansPage() {
   const planFeatures = planFeaturesResult.data ?? [];
   const subscriptions = subscriptionCountsResult.data ?? [];
 
-  // Build maps
   const planFeatureMap = new Map<string, Set<string>>();
   for (const pf of planFeatures) {
     const set = planFeatureMap.get(pf.plan_id) ?? new Set();
@@ -36,117 +37,127 @@ export default async function PlansPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <Link
           href="/features"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+          className="inline-flex items-center gap-1 text-sm text-fg-secondary hover:text-fg transition-colors mb-3"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Features
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900">Subscription Plans</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-semibold text-fg tracking-tight">
+          Subscription Plans
+        </h1>
+        <p className="text-sm text-fg-secondary mt-1">
           Define plan tiers, pricing, limits, and feature assignments
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         {plans.map((plan) => {
           const planFlagIds = planFeatureMap.get(plan.id) ?? new Set();
           const subscriberCount = planSubscriberCounts.get(plan.id) ?? 0;
           const limits = (plan.limits ?? {}) as Record<string, number>;
 
           return (
-            <Card key={plan.id} className={!plan.is_active ? "opacity-60" : ""}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            <div
+              key={plan.id}
+              className={`bg-surface rounded-lg border border-border-subtle overflow-hidden ${
+                !plan.is_active ? "opacity-60" : ""
+              }`}
+            >
+              {/* Plan Header */}
+              <div className="px-5 py-4 border-b border-border-subtle">
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-indigo-600" />
-                    <CardTitle className="text-lg">{plan.display_name}</CardTitle>
+                    <PackageIcon className="w-5 h-5 text-primary-soft" />
+                    <h3 className="text-[15px] font-semibold text-fg">
+                      {plan.display_name}
+                    </h3>
                   </div>
                   {!plan.is_active && (
-                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-medium">
+                    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-elevated text-fg-muted">
                       Inactive
                     </span>
                   )}
                 </div>
                 {plan.description && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-[12px] text-fg-secondary">
                     {plan.description}
                   </p>
                 )}
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+
+              {/* Plan Body */}
+              <div className="px-5 py-4 space-y-5">
                 {/* Pricing */}
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-fg-muted mb-1">
                     Pricing
                   </p>
                   {plan.price_monthly_cents ? (
-                    <p className="text-lg font-bold">
+                    <p className="text-xl font-semibold text-fg tracking-tight">
                       ${(plan.price_monthly_cents / 100).toFixed(2)}
-                      <span className="text-sm font-normal text-muted-foreground">
+                      <span className="text-[13px] font-normal text-fg-secondary">
                         /mo
                       </span>
                     </p>
                   ) : (
-                    <p className="text-lg font-bold">Free</p>
+                    <p className="text-xl font-semibold text-fg tracking-tight">
+                      Free
+                    </p>
                   )}
                 </div>
 
                 {/* Limits */}
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-fg-muted mb-1">
                     Limits
                   </p>
-                  <div className="space-y-1 text-sm">
+                  <div className="space-y-1 text-[13px] text-fg-secondary">
                     <p>
                       Fanflets:{" "}
-                      <strong>
+                      <span className="font-medium text-fg">
                         {limits.max_fanflets === -1
                           ? "Unlimited"
                           : limits.max_fanflets ?? "—"}
-                      </strong>
+                      </span>
                     </p>
                     <p>
                       Resources/fanflet:{" "}
-                      <strong>
+                      <span className="font-medium text-fg">
                         {limits.max_resources_per_fanflet === -1
                           ? "Unlimited"
                           : limits.max_resources_per_fanflet ?? "—"}
-                      </strong>
+                      </span>
                     </p>
                   </div>
                 </div>
 
                 {/* Features */}
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-fg-muted mb-1.5">
                     Features Included
                   </p>
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     {flags.map((flag) => {
                       const included = planFlagIds.has(flag.id);
                       return (
                         <div
                           key={flag.id}
-                          className="flex items-center gap-2 text-sm"
+                          className="flex items-center gap-2 text-[13px]"
                         >
+                          {included ? (
+                            <CheckIcon className="w-3.5 h-3.5 text-success shrink-0" />
+                          ) : (
+                            <MinusIcon className="w-3.5 h-3.5 text-fg-muted shrink-0" />
+                          )}
                           <span
                             className={
                               included
-                                ? "text-emerald-600"
-                                : "text-slate-300"
-                            }
-                          >
-                            {included ? "+" : "-"}
-                          </span>
-                          <span
-                            className={
-                              included
-                                ? "text-foreground"
-                                : "text-muted-foreground line-through"
+                                ? "text-fg"
+                                : "text-fg-muted line-through"
                             }
                           >
                             {flag.display_name}
@@ -156,15 +167,16 @@ export default async function PlansPage() {
                     })}
                   </div>
                 </div>
+              </div>
 
-                {/* Stats */}
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-muted-foreground">
-                    {subscriberCount} active subscriber{subscriberCount !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+              {/* Plan Footer */}
+              <div className="px-5 py-3 border-t border-border-subtle">
+                <p className="text-[12px] text-fg-muted">
+                  {subscriberCount} active subscriber
+                  {subscriberCount !== 1 ? "s" : ""}
+                </p>
+              </div>
+            </div>
           );
         })}
       </div>

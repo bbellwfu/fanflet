@@ -13,6 +13,8 @@
     "dev:admin": "turbo dev --filter=@fanflet/admin",
     "build:web": "turbo build --filter=@fanflet/web",
     "build:admin": "turbo build --filter=@fanflet/admin",
+    "db:login": "npx supabase login",
+    "db:link": "npx supabase link",
     "db:migration:new": "npx supabase migration new",
     "db:push": "npx supabase db push",
     "db:status": "npx supabase migration list"

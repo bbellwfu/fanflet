@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9,6 +10,17 @@ import { Download, ExternalLink, Mail, Linkedin, Twitter, Globe, ChevronRight, S
 export default function DemoPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
+      {/* Back-to-Fanflet banner — same pattern as preview banner */}
+      <div className="bg-[#1B365D] text-white text-center py-2.5 px-4 text-sm font-medium sticky top-0 z-50">
+        Demo — See how a Fanflet looks to your audience.{" "}
+        <Link
+          href="/"
+          className="underline font-semibold hover:text-white/90"
+        >
+          Back to Fanflet
+        </Link>
+      </div>
+
       {/* Header / Hero — mobile-first, clean & engaging */}
       <div className="relative overflow-hidden">
         {/* Background gradient with brand feel */}

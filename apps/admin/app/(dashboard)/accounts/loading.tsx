@@ -1,45 +1,40 @@
-import { Card, CardContent, CardHeader } from "@fanflet/ui/card";
 import { Skeleton } from "@fanflet/ui/skeleton";
 
 export default function AccountsLoading() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <Skeleton className="h-8 w-32" />
-        <Skeleton className="h-4 w-72 mt-2" />
+        <Skeleton className="h-7 w-32 bg-surface-elevated" />
+        <Skeleton className="h-4 w-64 mt-2 bg-surface-elevated" />
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Skeleton className="flex-1 h-9" />
-            <Skeleton className="h-9 w-full sm:w-[180px]" />
-            <Skeleton className="h-9 w-20" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-surface rounded-lg border border-border-subtle p-5">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Skeleton className="flex-1 h-9 bg-surface-elevated" />
+          <Skeleton className="h-9 w-full sm:w-[180px] bg-surface-elevated" />
+          <Skeleton className="h-9 w-20 bg-surface-elevated" />
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-5 w-24" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex gap-4 border-b pb-3">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <Skeleton key={i} className="h-4 flex-1 min-w-0" />
-              ))}
+      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-2.5">
+          <Skeleton className="h-7 w-7 rounded-lg bg-surface-elevated" />
+          <Skeleton className="h-4 w-24 bg-surface-elevated" />
+        </div>
+        <div className="divide-y divide-border-subtle">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-5 py-3.5 flex items-center gap-4">
+              <Skeleton className="h-4 w-28 bg-surface-elevated" />
+              <Skeleton className="h-4 w-40 bg-surface-elevated" />
+              <Skeleton className="h-4 w-16 bg-surface-elevated" />
+              <Skeleton className="h-4 w-8 bg-surface-elevated" />
+              <Skeleton className="h-4 w-8 bg-surface-elevated" />
+              <Skeleton className="h-4 w-16 rounded-full bg-surface-elevated" />
+              <Skeleton className="h-4 w-20 bg-surface-elevated" />
             </div>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex gap-4 py-3 border-b last:border-0">
-                {Array.from({ length: 7 }).map((_, j) => (
-                  <Skeleton key={j} className="h-4 flex-1 min-w-0" />
-                ))}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

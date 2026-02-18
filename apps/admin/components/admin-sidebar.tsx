@@ -2,62 +2,60 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import {
-  LayoutDashboard,
-  Users,
-  ToggleLeft,
-  CreditCard,
-  LogOut,
-  Shield,
-  Menu,
-  Sun,
-  Moon,
+  LayoutDashboardIcon,
+  UsersIcon,
+  ToggleLeftIcon,
+  CreditCardIcon,
+  LogOutIcon,
+  SparklesIcon,
+  MenuIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
 
-const THEME_KEY = "fanflet-admin-theme";
-
-function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-
-  useEffect(() => {
-    const stored = typeof window !== "undefined" ? localStorage.getItem(THEME_KEY) : null;
-    const preferred = stored === "light" || stored === "dark" ? stored : "dark";
-    setTheme(preferred);
-    if (preferred === "light") document.documentElement.setAttribute("data-theme", "light");
-    else document.documentElement.removeAttribute("data-theme");
-  }, []);
-
-  function toggle() {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    if (typeof window !== "undefined") localStorage.setItem(THEME_KEY, next);
-    if (next === "light") document.documentElement.setAttribute("data-theme", "light");
-    else document.documentElement.removeAttribute("data-theme");
-  }
-
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="h-8 w-8 shrink-0"
-      onClick={toggle}
-      aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
-  );
+interface NavItem {
+  id: string;
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  badge?: string;
 }
 
-const navItems = [
-  { icon: LayoutDashboard, label: "Overview", href: "/" },
-  { icon: Users, label: "Accounts", href: "/accounts" },
-  { icon: ToggleLeft, label: "Features & Plans", href: "/features" },
-  { icon: CreditCard, label: "Subscriptions", href: "/subscriptions", disabled: true },
+const navItems: NavItem[] = [
+  {
+    id: "overview",
+    href: "/",
+    label: "Overview",
+    icon: <LayoutDashboardIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "accounts",
+    href: "/accounts",
+    label: "Accounts",
+    icon: <UsersIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "features",
+    href: "/features",
+    label: "Features & Plans",
+    icon: <ToggleLeftIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "subscriptions",
+    href: "/subscriptions",
+    label: "Subscriptions",
+    icon: <CreditCardIcon className="w-[18px] h-[18px]" />,
+    disabled: true,
+    badge: "Soon",
+  },
 ];
+
+function isActive(pathname: string, item: NavItem): boolean {
+  if (item.href === "/") return pathname === "/";
+  return pathname === item.href || pathname.startsWith(item.href + "/");
+}
 
 interface NavContentProps {
   pathname: string;
@@ -65,64 +63,88 @@ interface NavContentProps {
 }
 
 function NavContent({ pathname, email }: NavContentProps) {
+  const initial = email.charAt(0).toUpperCase();
+
   return (
-    <div className="h-full flex flex-col bg-card text-card-foreground border-r border-border">
-      <div className="p-6 flex items-center gap-3">
-        <Shield className="w-7 h-7 text-primary" />
-        <div>
-          <span className="text-lg font-bold tracking-tight">Fanflet</span>
-          <span className="ml-1.5 text-xs font-medium bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+    <div className="h-full flex flex-col bg-sidebar border-r border-border-subtle">
+      {/* Brand */}
+      <div className="px-5 pt-6 pb-8">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary-muted flex items-center justify-center">
+            <SparklesIcon className="w-4 h-4 text-primary-soft" />
+          </div>
+          <span className="text-[15px] font-semibold text-fg tracking-tight">
+            Fanflet
+          </span>
+          <span className="text-[10px] font-medium tracking-wider uppercase px-1.5 py-0.5 rounded bg-primary-muted text-primary-soft ml-0.5">
             Admin
           </span>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.disabled ? "#" : item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                item.disabled
-                  ? "text-muted-foreground/70 cursor-not-allowed"
-                  : isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-              aria-disabled={item.disabled}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-              {item.disabled && (
-                <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                  Soon
+      {/* Navigation */}
+      <nav className="flex-1 px-3">
+        <div className="space-y-0.5">
+          {navItems.map((item) => {
+            const active = isActive(pathname, item);
+            return (
+              <Link
+                key={item.id}
+                href={item.disabled ? "#" : item.href}
+                aria-current={active ? "page" : undefined}
+                aria-disabled={item.disabled}
+                className={`
+                  w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium
+                  transition-all duration-150 relative group
+                  ${active
+                    ? "bg-primary-muted text-fg"
+                    : item.disabled
+                    ? "text-fg-muted cursor-not-allowed"
+                    : "text-fg-secondary hover:text-fg hover:bg-surface-elevated"
+                  }
+                `}
+                onClick={item.disabled ? (e) => e.preventDefault() : undefined}
+              >
+                {/* Active indicator bar */}
+                {active && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
+                )}
+
+                <span className={active ? "text-primary-soft" : ""}>
+                  {item.icon}
                 </span>
-              )}
-            </Link>
-          );
-        })}
+                <span>{item.label}</span>
+
+                {item.badge && (
+                  <span className="ml-auto text-[10px] font-medium tracking-wide uppercase text-fg-muted">
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-border space-y-3">
-        <div className="flex items-center gap-2 px-3">
-          <ThemeToggle />
-          <p className="text-xs text-muted-foreground truncate min-w-0">{email}</p>
+      {/* Footer */}
+      <div className="px-3 pb-5">
+        <div className="border-t border-border-subtle pt-4 mb-3">
+          <div className="px-3 mb-3">
+            <p className="text-[12px] text-fg-muted truncate">{email}</p>
+          </div>
+          <form action="/api/auth/signout" method="POST">
+            <button
+              type="submit"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-fg-secondary hover:text-fg hover:bg-surface-elevated transition-all duration-150"
+            >
+              <div className="w-6 h-6 rounded-full bg-surface-elevated flex items-center justify-center text-[11px] font-semibold text-fg-secondary">
+                {initial}
+              </div>
+              <span>Sign out</span>
+              <LogOutIcon className="w-3.5 h-3.5 ml-auto text-fg-muted" />
+            </button>
+          </form>
         </div>
-        <form action="/api/auth/signout" method="POST" className="w-full">
-          <Button
-            type="submit"
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign out
-          </Button>
-        </form>
       </div>
     </div>
   );
@@ -137,33 +159,40 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="flex min-h-screen bg-page">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
+      <aside className="hidden md:block fixed top-0 left-0 bottom-0 w-60 z-30">
         <NavContent pathname={pathname} email={email} />
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
+      <main className="flex-1 md:ml-60 min-h-screen flex flex-col">
         {/* Mobile Header */}
-        <header className="md:hidden h-14 bg-card border-b border-border flex items-center px-4 justify-between sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-primary" />
-            <span className="font-bold text-foreground">Admin</span>
+        <header className="md:hidden h-14 bg-sidebar border-b border-border-subtle flex items-center px-4 justify-between sticky top-0 z-40">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-primary-muted flex items-center justify-center">
+              <SparklesIcon className="w-3.5 h-3.5 text-primary-soft" />
+            </div>
+            <span className="text-[14px] font-semibold text-fg tracking-tight">
+              Fanflet
+            </span>
+            <span className="text-[9px] font-medium tracking-wider uppercase px-1 py-0.5 rounded bg-primary-muted text-primary-soft">
+              Admin
+            </span>
           </div>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MenuIcon className="w-5 h-5 text-fg-secondary" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 border-r border-border bg-card w-64 text-card-foreground">
+            <SheetContent side="left" className="p-0 w-60 border-r border-border-subtle bg-sidebar">
               <NavContent pathname={pathname} email={email} />
             </SheetContent>
           </Sheet>
         </header>
 
-        <div className="flex-1 p-4 md:p-6">{children}</div>
+        <div className="flex-1 p-6 md:p-8 lg:p-10 max-w-6xl">{children}</div>
       </main>
     </div>
   );

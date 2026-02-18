@@ -2,19 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, SparklesIcon } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@fanflet/ui/card";
 import { Input } from "@fanflet/ui/input";
 import { Label } from "@fanflet/ui/label";
-import { Shield } from "lucide-react";
 import { login, signInWithGoogle } from "./actions";
 
 const FANFLET_WEB_URL = "https://fanflet.com";
@@ -63,31 +54,41 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-6 sm:p-8 md:p-10">
-      <Card className="w-full max-w-md border-border shadow-xl">
-        <CardHeader className="space-y-4 text-center">
+    <div className="min-h-screen flex items-center justify-center bg-page p-6 sm:p-8 md:p-10">
+      <div className="w-full max-w-md bg-surface rounded-lg border border-border-subtle shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="px-6 pt-8 pb-6 text-center space-y-4">
           <div className="flex justify-center">
-            <Shield className="w-10 h-10 text-primary" />
+            <div className="w-12 h-12 rounded-xl bg-primary-muted flex items-center justify-center">
+              <SparklesIcon className="w-6 h-6 text-primary-soft" />
+            </div>
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-xl font-bold">Fanflet Admin</CardTitle>
-            <CardDescription>
+            <h1 className="text-xl font-semibold text-fg tracking-tight">
+              Fanflet Admin
+            </h1>
+            <p className="text-sm text-fg-secondary">
               Platform administration access
-            </CardDescription>
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+
+        {/* Content */}
+        <div className="px-6 pb-6 space-y-4">
           {error && (
             <div
-              className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-[13px] text-error"
               role="alert"
             >
               {error}
             </div>
           )}
+
           <form action={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-[13px] font-medium text-fg">
+                Email
+              </Label>
               <Input
                 id="email"
                 name="email"
@@ -97,14 +98,17 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
                 autoFocus
                 autoComplete="email"
                 disabled={isLoading}
+                className="h-9 bg-page border-border-subtle text-fg placeholder:text-fg-muted"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-[13px] font-medium text-fg">
+                  Password
+                </Label>
                 <Link
                   href={`${FANFLET_WEB_URL}/login/forgot-password`}
-                  className="text-xs text-primary hover:text-primary/80 hover:underline"
+                  className="text-[12px] font-medium text-primary-soft hover:text-primary transition-colors"
                 >
                   Forgot your password?
                 </Link>
@@ -116,11 +120,12 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
                 required
                 autoComplete="current-password"
                 disabled={isLoading}
+                className="h-9 bg-page border-border-subtle text-fg"
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              className="w-full h-9 bg-primary text-primary-fg text-[13px] font-medium hover:bg-primary/90"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -133,20 +138,22 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
               )}
             </Button>
           </form>
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
+              <span className="w-full border-t border-border-subtle" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
+            <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
+              <span className="bg-surface px-2 text-fg-muted">
                 Or continue with
               </span>
             </div>
           </div>
+
           <Button
             type="button"
             variant="outline"
-            className="w-full border-border hover:bg-accent hover:border-primary/30"
+            className="w-full h-9 bg-surface border-border-subtle text-fg text-[13px] font-medium hover:bg-surface-elevated transition-colors"
             disabled={isGoogleLoading}
             onClick={handleGoogleSignIn}
           >
@@ -176,13 +183,15 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
               </span>
             )}
           </Button>
-        </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-border-subtle text-center">
+          <p className="text-[12px] text-fg-muted">
             Use your Fanflet platform admin credentials.
           </p>
-        </CardFooter>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

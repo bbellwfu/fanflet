@@ -1,0 +1,41 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Select project ref
+        id: project
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "ref=${{ secrets.SUPABASE_PROD_PROJECT_REF }}" >> "$GITHUB_OUTPUT"
+            echo "env=production" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ secrets.SUPABASE_DEV_PROJECT_REF }}" >> "$GITHUB_OUTPUT"
+            echo "env=staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Link Supabase project
+        run: supabase link --project-ref ${{ steps.project.outputs.ref }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Apply migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Summary
+        run: echo "✅ Migrations applied to **${{ steps.project.outputs.env }}** (${{ steps.project.outputs.ref }})" >> "$GITHUB_STEP_SUMMARY"

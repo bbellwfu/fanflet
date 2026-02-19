@@ -2,10 +2,13 @@
  * Fanflet content expiration: date-only, evaluated at end-of-day UTC.
  */
 
-export const EXPIRATION_PRESETS = ['30d', '60d', '90d', 'none', 'custom'] as const
+export const EXPIRATION_PRESETS = ['14d', '30d', '60d', '90d', 'none', 'custom'] as const
 export type ExpirationPreset = (typeof EXPIRATION_PRESETS)[number]
 
-const PRESET_DAYS: Record<string, number> = { '30d': 30, '60d': 60, '90d': 90 }
+/** Preset options for free tier (no custom_expiration feature). */
+export const FREE_TIER_EXPIRATION_PRESETS: ExpirationPreset[] = ['none', '14d']
+
+const PRESET_DAYS: Record<string, number> = { '14d': 14, '30d': 30, '60d': 60, '90d': 90 }
 
 /** Format YYYY-MM-DD for date-only storage (UTC date). */
 function toDateOnly(d: Date): string {

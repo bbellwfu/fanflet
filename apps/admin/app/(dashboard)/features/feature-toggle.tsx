@@ -36,7 +36,8 @@ export function FeatureToggle({ flagId, isGlobal }: FeatureToggleProps) {
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label="Toggle feature"
+      aria-label={checked ? "Feature is global (everyone); click to restrict to plans" : "Feature is plan-based; click to enable globally"}
+      title={checked ? "Global: everyone has this feature. Click to restrict to specific plans." : "Plan-based: only assigned plans have this feature. Click to enable for everyone."}
       onClick={handleToggle}
       disabled={loading}
       className={`

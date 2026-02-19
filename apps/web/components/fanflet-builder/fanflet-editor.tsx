@@ -48,6 +48,8 @@ import { ThemePicker } from "./theme-picker";
 import { resolveThemeId, DEFAULT_THEME_ID } from "@/lib/themes";
 import {
   type ExpirationPreset,
+  EXPIRATION_PRESETS,
+  FREE_TIER_EXPIRATION_PRESETS,
   computeExpirationDate,
   todayUtcDateOnly,
 } from "@/lib/expiration";
@@ -109,6 +111,14 @@ interface FanfletEditorProps {
   authUserId: string;
   surveyQuestions?: SurveyQuestion[];
   libraryItems?: LibraryItem[];
+  /** When false, only the base theme is selectable (free tier). */
+  allowMultipleThemes?: boolean;
+  /** When false, hide or disable feedback/survey section. */
+  hasSurveys?: boolean;
+  /** When false, only 14d and none expiration options. */
+  allowCustomExpiration?: boolean;
+  /** When false, hide sponsor block type. */
+  allowSponsorVisibility?: boolean;
 }
 
 export function FanfletEditor({
@@ -120,6 +130,10 @@ export function FanfletEditor({
   authUserId,
   surveyQuestions = [],
   libraryItems = [],
+  allowMultipleThemes = true,
+  hasSurveys = true,
+  allowCustomExpiration = true,
+  allowSponsorVisibility = true,
 }: FanfletEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -138,8 +152,11 @@ export function FanfletEditor({
   const [selectedThemeId, setSelectedThemeId] = useState(
     resolveThemeId(fanflet.theme_config)
   );
+  const rawPreset = (fanflet.expiration_preset as ExpirationPreset) || "none";
   const [expirationPreset, setExpirationPreset] = useState<ExpirationPreset>(
-    (fanflet.expiration_preset as ExpirationPreset) || "none"
+    !allowCustomExpiration && rawPreset !== "none" && rawPreset !== "14d"
+      ? "14d"
+      : rawPreset
   );
   const [expirationCustomDate, setExpirationCustomDate] = useState(
     fanflet.expiration_date ? fanflet.expiration_date.slice(0, 10) : ""
@@ -153,7 +170,7 @@ export function FanfletEditor({
     ? new Date(fanflet.published_at)
     : new Date();
   const today = todayUtcDateOnly();
-  const presetWouldBePast = (preset: "30d" | "60d" | "90d") => {
+  const presetWouldBePast = (preset: "14d" | "30d" | "60d" | "90d") => {
     const exp = computeExpirationDate(preset, null, referenceDate);
     return exp ? exp < today : false;
   };
@@ -529,8 +546,8 @@ export function FanfletEditor({
                   .
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {(["30d", "60d", "90d", "none", "custom"] as const).map((preset) => {
-                    const isPast = (preset === "30d" || preset === "60d" || preset === "90d") && presetWouldBePast(preset);
+                  {(allowCustomExpiration ? EXPIRATION_PRESETS : FREE_TIER_EXPIRATION_PRESETS).map((preset) => {
+                    const isPast = (preset === "14d" || preset === "30d" || preset === "60d" || preset === "90d") && presetWouldBePast(preset);
                     return (
                       <Button
                         key={preset}
@@ -549,12 +566,12 @@ export function FanfletEditor({
                           ? "Doesn't expire"
                           : preset === "custom"
                             ? "Custom date"
-                            : `${preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
+                            : `${preset === "14d" ? "14" : preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
                       </Button>
                     );
                   })}
                 </div>
-                {expirationPreset === "custom" && (
+                {expirationPreset === "custom" && allowCustomExpiration && (
                   <div className="space-y-1">
                     <Label htmlFor="expiration_custom_date_edit" className="text-sm">
                       Expiration date
@@ -637,6 +654,8 @@ export function FanfletEditor({
           <ThemePicker
             selectedThemeId={selectedThemeId}
             onChange={setSelectedThemeId}
+            allowMultipleThemes={allowMultipleThemes}
+            upgradeHref="/dashboard/settings#subscription"
           />
         </CardContent>
       </Card>
@@ -649,11 +668,22 @@ export function FanfletEditor({
             Feedback Question
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Optionally display a quick feedback question when visitors open this Fanflet.
+            {hasSurveys
+              ? "Optionally display a quick feedback question when visitors open this Fanflet."
+              : "Upgrade your plan to add session feedback questions to your Fanflets."}
           </p>
         </CardHeader>
         <CardContent>
-          {surveyQuestions.length === 0 ? (
+          {!hasSurveys ? (
+            <p className="text-sm text-muted-foreground py-4">
+              <Link
+                href="/dashboard/settings#subscription"
+                className="text-amber-600 hover:underline font-medium"
+              >
+                Upgrade to use surveys and feedback
+              </Link>
+            </p>
+          ) : surveyQuestions.length === 0 ? (
             <div className="text-sm text-muted-foreground py-4">
               No survey questions yet.{" "}
               <Link
@@ -725,6 +755,7 @@ export function FanfletEditor({
             authUserId={authUserId}
             onAdded={() => {}}
             libraryItems={libraryItems}
+            allowSponsorVisibility={allowSponsorVisibility}
           />
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { hasFeature } from '@fanflet/db'
+import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { ensureUrl } from '@/lib/utils'
 import {
   computeExpirationDate,
@@ -46,7 +48,10 @@ export async function updateFanfletDetails(
   const event_name = formData.get('event_name') as string
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
-  const survey_question_id = formData.get('survey_question_id') as string || null
+  const hasSurveys = await hasFeature(ownership.fanflet!.speaker_id, 'surveys_session_feedback')
+  const survey_question_id_raw = formData.get('survey_question_id') as string || null
+  const survey_question_id = hasSurveys ? survey_question_id_raw : null
+
   const theme_config_raw = formData.get('theme_config') as string || null
   let theme_config: Record<string, unknown> = {}
   if (theme_config_raw) {
@@ -55,6 +60,11 @@ export async function updateFanfletDetails(
     } catch {
       // Keep default empty object
     }
+  }
+
+  const allowMultipleThemes = await hasFeature(ownership.fanflet!.speaker_id, 'multiple_theme_colors')
+  if (!allowMultipleThemes) {
+    theme_config = { preset: DEFAULT_THEME_ID }
   }
 
   const { data: existing } = await supabase
@@ -80,7 +90,12 @@ export async function updateFanfletDetails(
     updated_at: new Date().toISOString(),
   }
 
-  const expiration = parseExpirationFromForm(formData)
+  let expiration = parseExpirationFromForm(formData)
+  const allowCustomExpiration = await hasFeature(ownership.fanflet!.speaker_id, 'custom_expiration')
+  if (!allowCustomExpiration && expiration.preset !== 'none' && expiration.preset !== '14d') {
+    expiration = { ...expiration, preset: '14d' as const, customDate: null }
+  }
+
   const { data: currentFanflet } = await supabase
     .from('fanflets')
     .select('published_at')
@@ -197,6 +212,11 @@ export async function addResourceBlock(
   const supabase = await createClient()
   const ownership = await verifyOwnership(supabase, fanfletId)
   if ('error' in ownership) return { error: ownership.error }
+
+  if (data.type === 'sponsor') {
+    const allowSponsor = await hasFeature(ownership.fanflet!.speaker_id, 'sponsor_visibility')
+    if (!allowSponsor) return { error: 'Sponsor blocks require a higher plan. Upgrade in Settings.' }
+  }
 
   const { data: maxOrder } = await supabase
     .from('resource_blocks')

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { hasFeature } from '@fanflet/db'
 import { ensureUrl } from '@/lib/utils'
 
 async function getSpeakerId() {
@@ -67,6 +68,10 @@ export async function createLibraryResource(data: {
   if (!data.title?.trim()) return { error: 'Title is required' }
   if (!['link', 'file', 'text', 'sponsor'].includes(data.type)) {
     return { error: 'Invalid resource type' }
+  }
+  if (data.type === 'sponsor') {
+    const allowSponsor = await hasFeature(speakerId, 'sponsor_visibility')
+    if (!allowSponsor) return { error: 'Sponsor resources require a higher plan. Upgrade in Settings.' }
   }
 
   const { data: item, error } = await supabase

@@ -71,9 +71,12 @@ const blockTypes = [
 interface ResourceLibraryProps {
   resources: LibraryResource[];
   authUserId: string;
+  /** When false, sponsor type is hidden (gated by plan). */
+  allowSponsorVisibility?: boolean;
 }
 
-export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps) {
+export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility = true }: ResourceLibraryProps) {
+  const resourceTypes = allowSponsorVisibility ? blockTypes : blockTypes.filter((t) => t.type !== "sponsor");
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -325,7 +328,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
             </div>
             <p className="text-xs text-white/70">Choose a resource type</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {blockTypes.map(({ type, label, icon: Icon }) => (
+              {resourceTypes.map(({ type, label, icon: Icon }) => (
                 <button
                   key={type}
                   type="button"
@@ -358,7 +361,7 @@ export function ResourceLibrary({ resources, authUserId }: ResourceLibraryProps)
               <div className="flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[#3BA5D9]" />
                 <h3 className="text-sm font-semibold text-white">
-                  Add {blockTypes.find((b) => b.type === selectedType)?.label} to Library
+                  Add {resourceTypes.find((b) => b.type === selectedType)?.label} to Library
                 </h3>
               </div>
               <Button

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { hasFeature } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import { ResourceLibrary } from "@/components/dashboard/resource-library";
 
@@ -20,6 +21,8 @@ export default async function ResourceLibraryPage() {
     redirect("/dashboard/settings");
   }
 
+  const allowSponsorVisibility = await hasFeature(speaker.id, "sponsor_visibility");
+
   const { data: resources } = await supabase
     .from("resource_library")
     .select("*")
@@ -37,7 +40,11 @@ export default async function ResourceLibraryPage() {
         </p>
       </div>
 
-      <ResourceLibrary resources={resources ?? []} authUserId={user.id} />
+      <ResourceLibrary
+        resources={resources ?? []}
+        authUserId={user.id}
+        allowSponsorVisibility={allowSponsorVisibility}
+      />
     </div>
   );
 }

@@ -353,6 +353,8 @@ This ensures:
 
 **Forward-only in production.** Migrations are applied sequentially and never edited after being applied. To change something, create a new migration.
 
+**Idempotent migrations.** Every migration must be safe to run more than once. Migrations may be applied via CI (`supabase db push`), via Supabase MCP, or re-run after a partial failure; the same SQL must not fail if objects already exist. Use `CREATE TABLE IF NOT EXISTS`; `DROP POLICY IF EXISTS` before `CREATE POLICY`; `CREATE INDEX IF NOT EXISTS`; `ADD COLUMN IF NOT EXISTS`; `DROP CONSTRAINT IF EXISTS` before adding constraints. See `supabase/migrations/README.md` for patterns. Non-idempotent migrations break CI and multi-path deployment.
+
 **Down migrations:** Every forward migration should have a corresponding rollback script, even if it's just a stub explaining manual steps. Without rollback scripts, reverting a broken migration is an emergency improvisation.
 
 ### Schema Conventions

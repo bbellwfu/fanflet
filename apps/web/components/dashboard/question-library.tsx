@@ -103,9 +103,11 @@ const TEMPLATE_CATEGORIES = ["Speaker", "Audience", "Sponsor", "Event"];
 
 interface QuestionLibraryProps {
   questions: SurveyQuestion[];
+  /** When false, hide create/template buttons and add form (gated by plan). */
+  allowCreate?: boolean;
 }
 
-export function QuestionLibrary({ questions }: QuestionLibraryProps) {
+export function QuestionLibrary({ questions, allowCreate = true }: QuestionLibraryProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -211,7 +213,7 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
           <MessageSquare className="w-5 h-5" />
           Your Questions
         </CardTitle>
-        {!showAddForm && !showTemplatePicker && (
+        {allowCreate && !showAddForm && !showTemplatePicker && (
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -235,7 +237,7 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Template picker */}
-        {showTemplatePicker && (
+        {allowCreate && showTemplatePicker && (
           <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-white/15">
               <div className="flex items-center gap-2">
@@ -289,7 +291,7 @@ export function QuestionLibrary({ questions }: QuestionLibraryProps) {
         )}
 
         {/* Add form */}
-        {showAddForm && (
+        {allowCreate && showAddForm && (
           <div id="survey-add-form" className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
             <div className="flex items-center gap-2 pb-3 border-b border-white/15">
               <Plus className="w-4 h-4 text-[#3BA5D9]" />

@@ -170,11 +170,17 @@ export default async function PlansPage() {
               </div>
 
               {/* Plan Footer */}
-              <div className="px-5 py-3 border-t border-border-subtle">
+              <div className="px-5 py-3 border-t border-border-subtle flex items-center justify-between">
                 <p className="text-[12px] text-fg-muted">
                   {subscriberCount} active subscriber
                   {subscriberCount !== 1 ? "s" : ""}
                 </p>
+                <Link
+                  href={`/features/plans/${plan.id}`}
+                  className="text-[12px] font-medium text-primary-soft hover:text-primary transition-colors"
+                >
+                  Edit plan
+                </Link>
               </div>
             </div>
           );

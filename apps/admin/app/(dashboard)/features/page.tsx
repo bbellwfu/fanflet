@@ -27,8 +27,10 @@ export default async function FeaturesPage() {
   }
 
   const planColors: Record<string, string> = {
+    Free: "bg-slate-100 text-slate-700",
+    "Early Access": "bg-violet-100 text-violet-700",
     Pro: "bg-primary-muted text-primary-soft",
-    Business: "bg-info/10 text-info",
+    Enterprise: "bg-amber-100 text-amber-800",
     Global: "bg-success/10 text-success",
   };
 
@@ -51,6 +53,22 @@ export default async function FeaturesPage() {
           <SettingsIcon className="w-4 h-4" />
           Manage Plans
         </Link>
+      </div>
+
+      {/* How to read this page */}
+      <div className="rounded-lg border border-border-subtle bg-surface-elevated/50 px-4 py-3 text-[13px] text-fg-secondary">
+        <p className="font-medium text-fg mb-1">How to read this page</p>
+        <ul className="list-disc list-inside space-y-0.5 text-[12px]">
+          <li>
+            <strong>Plan tags</strong> (e.g. Free, Pro, Enterprise) under each feature show which subscription plans currently include that feature. Speakers on those plans get the feature in the web app.
+          </li>
+          <li>
+            <strong>Toggle (right):</strong> On = feature is <strong>Global</strong> (everyone gets it, regardless of plan). Off = feature is given only to plans that have it assigned (use <strong>Manage Plans</strong> to change which plans get which features).
+          </li>
+          <li>
+            <strong>Manage Plans</strong> opens the plan-centric view where you edit each plan’s name, limits, and feature checkboxes.
+          </li>
+        </ul>
       </div>
 
       {/* Feature Flags Card */}

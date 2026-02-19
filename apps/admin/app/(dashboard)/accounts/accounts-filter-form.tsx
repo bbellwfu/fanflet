@@ -14,11 +14,14 @@ import {
 interface AccountsFilterFormProps {
   defaultSearch: string;
   defaultStatus: string;
+  /** Preserve drill-down filter (e.g. "30" for New Signups 30d). */
+  defaultCreatedSince?: string;
 }
 
 export function AccountsFilterForm({
   defaultSearch,
   defaultStatus,
+  defaultCreatedSince = "",
 }: AccountsFilterFormProps) {
   const [status, setStatus] = useState(defaultStatus);
 
@@ -32,6 +35,9 @@ export function AccountsFilterForm({
         className="flex-1 h-9 bg-page border-border-subtle text-fg placeholder:text-fg-muted"
       />
       <input type="hidden" name="status" value={status} />
+      {defaultCreatedSince ? (
+        <input type="hidden" name="created_since" value={defaultCreatedSince} />
+      ) : null}
       <Select value={status} onValueChange={setStatus}>
         <SelectTrigger size="default" className="h-9 w-full sm:w-[180px] bg-page border-border-subtle">
           <SelectValue placeholder="All Statuses" />

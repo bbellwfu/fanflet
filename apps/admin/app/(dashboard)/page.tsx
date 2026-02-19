@@ -35,6 +35,8 @@ interface StatCardProps {
   subtitle?: string;
   icon: React.ReactNode;
   accentColor?: AccentColor;
+  /** When set, the whole card is a link to this href for drill-down. */
+  href?: string;
 }
 
 function StatCard({
@@ -43,17 +45,17 @@ function StatCard({
   subtitle,
   icon,
   accentColor = "violet",
+  href,
 }: StatCardProps) {
-  return (
-    <div
-      className={`bg-surface rounded-lg border border-border-subtle border-t-2 ${accentBorder[accentColor]} p-5 min-w-0 flex flex-col`}
-    >
+  const cardClassName = `bg-surface rounded-lg border border-border-subtle border-t-2 ${accentBorder[accentColor]} p-5 min-w-0 flex flex-col ${href ? "hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group" : ""}`;
+  const content = (
+    <>
       <div className="flex items-start justify-between mb-4">
         <p className="text-[12px] font-medium uppercase tracking-wider text-fg-secondary">
           {title}
         </p>
         <div
-          className={`w-8 h-8 rounded-lg flex items-center justify-center ${accentIconBg[accentColor]}`}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center ${accentIconBg[accentColor]} ${href ? "group-hover:scale-105 transition-transform" : ""}`}
         >
           {icon}
         </div>
@@ -62,8 +64,23 @@ function StatCard({
       {subtitle && (
         <p className="text-[12px] text-fg-muted mt-1.5">{subtitle}</p>
       )}
-    </div>
+      {href && (
+        <p className="text-[11px] font-medium text-primary-soft mt-2 flex items-center gap-1">
+          View list
+          <ArrowUpRightIcon className="w-3 h-3" />
+        </p>
+      )}
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClassName} title={`View ${title}`}>
+        {content}
+      </Link>
+    );
+  }
+  return <div className={cardClassName}>{content}</div>;
 }
 
 function SignupRow({
@@ -177,13 +194,14 @@ export default async function AdminOverviewPage() {
         </p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid — click a card to drill into the list */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           title="Total Speakers"
           value={totalSpeakers}
           icon={<UsersIcon className="w-4 h-4" />}
           accentColor="violet"
+          href="/accounts"
         />
         <StatCard
           title="Total Fanflets"
@@ -191,12 +209,14 @@ export default async function AdminOverviewPage() {
           subtitle={`${publishedCount} published, ${draftCount} draft`}
           icon={<FileTextIcon className="w-4 h-4" />}
           accentColor="sky"
+          href="/fanflets"
         />
         <StatCard
           title="Total Subscribers"
           value={totalSubscribers}
           icon={<MailIcon className="w-4 h-4" />}
           accentColor="emerald"
+          href="/subscribers"
         />
         <StatCard
           title="Page Views"
@@ -209,6 +229,7 @@ export default async function AdminOverviewPage() {
           value={recentSignups}
           icon={<TrendingUpIcon className="w-4 h-4" />}
           accentColor="violet"
+          href="/accounts?created_since=30"
         />
         <StatCard
           title="Active Fanflets (7d)"

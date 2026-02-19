@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { hasFeature } from '@fanflet/db'
 
 async function getSpeakerId() {
   const supabase = await createClient()
@@ -47,6 +48,8 @@ export async function createSurveyQuestion(
   if (!['nps', 'yes_no', 'rating'].includes(questionType)) {
     return { error: 'Invalid question type' }
   }
+  const canCreateSurveys = await hasFeature(speakerId, 'surveys_session_feedback')
+  if (!canCreateSurveys) return { error: 'Survey questions require a higher plan. Upgrade in Settings.' }
 
   const { data, error } = await supabase
     .from('survey_questions')

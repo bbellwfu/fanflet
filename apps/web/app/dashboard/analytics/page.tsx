@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { hasFeature } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { BarChart3, Eye, MousePointerClick, Users, TrendingUp } from "lucide-react";
 import { ResourceClickBreakdown } from "@/components/analytics/resource-click-breakdown";
 import { SurveyResults, type SurveyResultData } from "@/components/analytics/survey-results";
@@ -24,6 +26,35 @@ export default async function AnalyticsPage() {
     .single();
 
   if (!speaker) redirect("/dashboard/settings");
+
+  const [hasBasicStats, hasClickAnalytics] = await Promise.all([
+    hasFeature(speaker.id, "basic_engagement_stats"),
+    hasFeature(speaker.id, "click_through_analytics"),
+  ]);
+  const canSeeAnalytics = hasBasicStats || hasClickAnalytics;
+
+  if (!canSeeAnalytics) {
+    return (
+      <div className="max-w-5xl mx-auto space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Analytics</h1>
+          <p className="text-muted-foreground">Track engagement across your Fanflets.</p>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <BarChart3 className="w-12 h-12 text-slate-300 mb-4" />
+            <h3 className="text-lg font-semibold text-slate-700">Upgrade to view analytics</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+              Basic engagement stats and click-through analytics are available on higher plans.
+            </p>
+            <Button asChild className="mt-6">
+              <Link href="/dashboard/settings#subscription">View plans and upgrade</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Get all fanflets for this speaker
   const { data: fanflets } = await supabase

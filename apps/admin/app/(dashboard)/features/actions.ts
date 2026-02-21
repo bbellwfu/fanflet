@@ -165,7 +165,7 @@ export async function updatePlanWithFeatures(
   const featuresResult = await updatePlanFeatures(planId, featureFlagIds);
   if (featuresResult.error) return featuresResult;
 
-  redirect(`/features/plans?updated=${planId}`);
+  redirect(`/features?tab=plans`);
 }
 
 /** Form action wrapper that returns void for use in plan edit form (avoids passing inline functions to Client Components). */
@@ -174,4 +174,121 @@ export async function submitPlanEditForm(
   formData: FormData
 ): Promise<void> {
   await updatePlanWithFeatures(planId, formData);
+}
+
+/** Create a new plan with optional description, limits, and feature assignments. */
+export async function createPlanWithFeatures(formData: FormData) {
+  const userSupabase = await createClient();
+  const {
+    data: { user },
+  } = await userSupabase.auth.getUser();
+
+  if (!user || user.app_metadata?.role !== "platform_admin") {
+    return { error: "Not authorized" };
+  }
+
+  const nameRaw = formData.get("name");
+  const display_name = formData.get("display_name");
+  const description = formData.get("description");
+  const maxFanfletsRaw = formData.get("max_fanflets");
+  const maxResourcesRaw = formData.get("max_resources_per_fanflet");
+  const featureFlagIds = formData.getAll("feature_flag_id") as string[];
+
+  if (
+    typeof nameRaw !== "string" ||
+    !nameRaw.trim() ||
+    typeof display_name !== "string" ||
+    !display_name.trim()
+  ) {
+    return { error: "Plan key and display name are required" };
+  }
+
+  const name = nameRaw.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+  if (!name) {
+    return { error: "Plan key must contain at least one letter or number" };
+  }
+
+  const limits: Record<string, number> = {
+    max_fanflets: 5,
+    max_resources_per_fanflet: 20,
+  };
+  if (maxFanfletsRaw !== null && maxFanfletsRaw !== "") {
+    const n = Number(maxFanfletsRaw);
+    limits.max_fanflets = Number.isFinite(n) ? n : 5;
+  }
+  if (maxResourcesRaw !== null && maxResourcesRaw !== "") {
+    const n = Number(maxResourcesRaw);
+    limits.max_resources_per_fanflet = Number.isFinite(n) ? n : 20;
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: maxSort } = await supabase
+    .from("plans")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .single();
+
+  const sort_order = (maxSort?.sort_order ?? 0) + 10;
+
+  const { data: newPlan, error: insertPlanError } = await supabase
+    .from("plans")
+    .insert({
+      name,
+      display_name: (display_name as string).trim(),
+      description:
+        typeof description === "string" && description.trim()
+          ? description.trim()
+          : null,
+      sort_order,
+      is_active: true,
+      price_monthly_cents: null,
+      limits,
+    })
+    .select("id")
+    .single();
+
+  if (insertPlanError) {
+    if (insertPlanError.code === "23505") {
+      return { error: "A plan with this key already exists" };
+    }
+    return { error: "Failed to create plan" };
+  }
+
+  if (!newPlan?.id) {
+    return { error: "Failed to create plan" };
+  }
+
+  if (featureFlagIds.length > 0) {
+    const { error: insertFeaturesError } = await supabase
+      .from("plan_features")
+      .insert(
+        featureFlagIds.map((feature_flag_id) => ({
+          plan_id: newPlan.id,
+          feature_flag_id,
+        }))
+      );
+
+    if (insertFeaturesError) {
+      return { error: "Failed to assign features to plan" };
+    }
+  }
+
+  revalidatePath("/features");
+  redirect(`/features?tab=plans`);
+}
+
+/** Form action wrapper for create plan form (useActionState signature). */
+export async function submitPlanCreateFormAction(
+  _prev: { error?: string } | null,
+  formData: FormData
+): Promise<{ error?: string } | null> {
+  const result = await createPlanWithFeatures(formData);
+  return result ?? null;
+}
+
+/** Plain form action wrapper for the new plan page. */
+export async function submitPlanCreateForm(formData: FormData): Promise<void> {
+  await createPlanWithFeatures(formData);
 }

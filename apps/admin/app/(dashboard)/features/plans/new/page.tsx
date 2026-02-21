@@ -1,40 +1,18 @@
 import { createServiceClient } from "@fanflet/db/service";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft, PackageIcon } from "lucide-react";
-import { submitPlanEditForm } from "../../actions";
+import { ArrowLeft, PlusIcon } from "lucide-react";
+import { submitPlanCreateForm } from "../../actions";
 import { LimitField } from "../../limit-field";
 
-interface PlanEditPageProps {
-  params: Promise<{ planId: string }>;
-}
-
-export default async function PlanEditPage({ params }: PlanEditPageProps) {
-  const { planId } = await params;
+export default async function NewPlanPage() {
   const supabase = createServiceClient();
 
-  const [planResult, flagsResult, planFeaturesResult] = await Promise.all([
-    supabase.from("plans").select("*").eq("id", planId).single(),
-    supabase
-      .from("feature_flags")
-      .select("id, key, display_name")
-      .order("display_name"),
-    supabase
-      .from("plan_features")
-      .select("feature_flag_id")
-      .eq("plan_id", planId),
-  ]);
+  const flagsResult = await supabase
+    .from("feature_flags")
+    .select("id, key, display_name")
+    .order("display_name");
 
-  const plan = planResult.data;
   const flags = flagsResult.data ?? [];
-  const planFeatures = planFeaturesResult.data ?? [];
-
-  if (!plan || planResult.error) {
-    notFound();
-  }
-
-  const limits = (plan.limits ?? {}) as Record<string, number>;
-  const planFlagIds = new Set(planFeatures.map((pf) => pf.feature_flag_id));
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -47,19 +25,38 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
           Back to Plans
         </Link>
         <h1 className="text-2xl font-semibold text-fg tracking-tight flex items-center gap-2">
-          <PackageIcon className="w-6 h-6 text-primary-soft" />
-          Edit plan: {plan.display_name}
+          <PlusIcon className="w-6 h-6 text-primary-soft" />
+          New plan
         </h1>
         <p className="text-sm text-fg-secondary mt-1">
-          Update display name, description, limits, and feature assignments
+          Add a plan with display name, limits, and feature assignments
         </p>
       </div>
 
       <form
-        action={submitPlanEditForm.bind(null, planId)}
+        action={submitPlanCreateForm}
         className="space-y-6 bg-surface rounded-lg border border-border-subtle p-6"
       >
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <label
+              htmlFor="name"
+              className="block text-[13px] font-medium text-fg mb-1"
+            >
+              Plan key
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              placeholder="e.g. starter, pro_annual"
+              className="w-full rounded-md border border-border-subtle bg-surface-elevated px-3 py-2 text-[14px] text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <p className="text-[11px] text-fg-muted mt-1">
+              Unique identifier (lowercase, letters, numbers, underscores)
+            </p>
+          </div>
           <div className="sm:col-span-2">
             <label
               htmlFor="display_name"
@@ -71,7 +68,8 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
               id="display_name"
               name="display_name"
               type="text"
-              defaultValue={plan.display_name}
+              required
+              placeholder="e.g. Starter, Pro Annual"
               className="w-full rounded-md border border-border-subtle bg-surface-elevated px-3 py-2 text-[14px] text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -86,7 +84,7 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
               id="description"
               name="description"
               rows={3}
-              defaultValue={plan.description ?? ""}
+              placeholder="Optional"
               className="w-full rounded-md border border-border-subtle bg-surface-elevated px-3 py-2 text-[14px] text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -94,13 +92,13 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
             name="max_fanflets"
             label="Max fanflets"
             description="Number of fanflets a speaker can create on this plan"
-            defaultValue={limits.max_fanflets}
+            defaultValue={5}
           />
           <LimitField
             name="max_resources_per_fanflet"
             label="Max resources per fanflet"
             description="Max links/files per fanflet on this plan"
-            defaultValue={limits.max_resources_per_fanflet}
+            defaultValue={20}
           />
         </div>
 
@@ -118,7 +116,6 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
                   type="checkbox"
                   name="feature_flag_id"
                   value={flag.id}
-                  defaultChecked={planFlagIds.has(flag.id)}
                   className="rounded border-border-subtle text-primary focus:ring-primary"
                 />
                 <span className="text-fg">{flag.display_name}</span>
@@ -133,7 +130,7 @@ export default async function PlanEditPage({ params }: PlanEditPageProps) {
             type="submit"
             className="rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-primary-fg hover:bg-primary-hover transition-colors"
           >
-            Save changes
+            Create plan
           </button>
           <Link
             href="/features?tab=plans"

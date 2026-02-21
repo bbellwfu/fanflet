@@ -1,37 +1,132 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { Card, CardContent, CardHeader, CardTitle } from "@fanflet/ui/card";
-import { Users, FileText, BarChart3, Mail, TrendingUp, Activity } from "lucide-react";
+import {
+  UsersIcon,
+  FileTextIcon,
+  MailIcon,
+  BarChart3Icon,
+  TrendingUpIcon,
+  ActivityIcon,
+  ArrowUpRightIcon,
+} from "lucide-react";
+import Link from "next/link";
+
+/* ── Accent colour variants for stat cards ── */
+type AccentColor = "violet" | "sky" | "emerald" | "amber" | "rose";
+
+const accentBorder: Record<AccentColor, string> = {
+  violet: "border-t-primary/60",
+  sky: "border-t-info/60",
+  emerald: "border-t-success/60",
+  amber: "border-t-warning/60",
+  rose: "border-t-error/60",
+};
+
+const accentIconBg: Record<AccentColor, string> = {
+  violet: "bg-primary-muted text-primary-soft",
+  sky: "bg-info/10 text-info",
+  emerald: "bg-success/10 text-success",
+  amber: "bg-warning/10 text-warning",
+  rose: "bg-error/10 text-error",
+};
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  description?: string;
-  icon: React.ElementType;
+  subtitle?: string;
+  icon: React.ReactNode;
+  accentColor?: AccentColor;
+  /** When set, the whole card is a link to this href for drill-down. */
+  href?: string;
 }
 
-function StatCard({ title, value, description, icon: Icon }: StatCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  accentColor = "violet",
+  href,
+}: StatCardProps) {
+  const cardClassName = `bg-surface rounded-lg border border-border-subtle border-t-2 ${accentBorder[accentColor]} p-5 min-w-0 flex flex-col ${href ? "hover:border-primary/40 hover:shadow-sm transition-all cursor-pointer group" : ""}`;
+  const content = (
+    <>
+      <div className="flex items-start justify-between mb-4">
+        <p className="text-[12px] font-medium uppercase tracking-wider text-fg-secondary">
           {title}
-        </CardTitle>
-        <Icon className="w-4 h-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
-        )}
-      </CardContent>
-    </Card>
+        </p>
+        <div
+          className={`w-8 h-8 rounded-lg flex items-center justify-center ${accentIconBg[accentColor]} ${href ? "group-hover:scale-105 transition-transform" : ""}`}
+        >
+          {icon}
+        </div>
+      </div>
+      <p className="text-3xl font-semibold text-fg tracking-tight">{value}</p>
+      {subtitle && (
+        <p className="text-[12px] text-fg-muted mt-1.5">{subtitle}</p>
+      )}
+      {href && (
+        <p className="text-[11px] font-medium text-primary-soft mt-2 flex items-center gap-1">
+          View list
+          <ArrowUpRightIcon className="w-3 h-3" />
+        </p>
+      )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={cardClassName} title={`View ${title}`}>
+        {content}
+      </Link>
+    );
+  }
+  return <div className={cardClassName}>{content}</div>;
+}
+
+function SignupRow({
+  name,
+  email,
+  date,
+}: {
+  name: string;
+  email: string;
+  date: string;
+}) {
+  return (
+    <div className="px-5 py-3.5 flex items-center justify-between">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center shrink-0">
+          <span className="text-[11px] font-semibold text-fg-secondary">
+            {name.charAt(0).toUpperCase()}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-fg truncate">{name}</p>
+          <p className="text-[12px] text-fg-muted truncate">{email}</p>
+        </div>
+      </div>
+      <span className="text-[12px] text-fg-muted shrink-0 ml-4">{date}</span>
+    </div>
+  );
+}
+
+function PublishedRow({ title, date }: { title: string; date: string }) {
+  return (
+    <div className="px-5 py-3.5 flex items-center justify-between">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center shrink-0">
+          <FileTextIcon className="w-3.5 h-3.5 text-info" />
+        </div>
+        <p className="text-[13px] font-medium text-fg truncate">{title}</p>
+      </div>
+      <span className="text-[12px] text-fg-muted shrink-0 ml-4">{date}</span>
+    </div>
   );
 }
 
 export default async function AdminOverviewPage() {
   const supabase = createServiceClient();
 
-  // Fetch all platform metrics in parallel
   const [
     speakersResult,
     fanfletsResult,
@@ -50,11 +145,17 @@ export default async function AdminOverviewPage() {
     supabase
       .from("speakers")
       .select("id", { count: "exact", head: true })
-      .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      .gte(
+        "created_at",
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      ),
     supabase
       .from("analytics_events")
       .select("fanflet_id", { count: "exact", head: true })
-      .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+      .gte(
+        "created_at",
+        new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      ),
   ]);
 
   const totalSpeakers = speakersResult.count ?? 0;
@@ -64,19 +165,16 @@ export default async function AdminOverviewPage() {
   const recentSignups = recentSignupsResult.count ?? 0;
   const activeFanflets7d = activeFanfletsResult.count ?? 0;
 
-  // Count fanflets by status
   const fanflets = fanfletsResult.data ?? [];
   const publishedCount = fanflets.filter((f) => f.status === "published").length;
   const draftCount = fanflets.filter((f) => f.status === "draft").length;
 
-  // Recent speakers
   const { data: recentSpeakers } = await supabase
     .from("speakers")
     .select("id, name, email, created_at")
     .order("created_at", { ascending: false })
     .limit(5);
 
-  // Recent published fanflets
   const { data: recentFanflets } = await supabase
     .from("fanflets")
     .select("id, title, status, published_at, speaker_id")
@@ -86,106 +184,129 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-8">
+      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Platform Overview</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-semibold text-fg tracking-tight">
+          Platform Overview
+        </h1>
+        <p className="text-sm text-fg-secondary mt-1">
           Key metrics across the Fanflet platform
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* Stats Grid — click a card to drill into the list */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           title="Total Speakers"
           value={totalSpeakers}
-          icon={Users}
+          icon={<UsersIcon className="w-4 h-4" />}
+          accentColor="violet"
+          href="/accounts"
         />
         <StatCard
           title="Total Fanflets"
           value={totalFanflets}
-          description={`${publishedCount} published, ${draftCount} draft`}
-          icon={FileText}
+          subtitle={`${publishedCount} published, ${draftCount} draft`}
+          icon={<FileTextIcon className="w-4 h-4" />}
+          accentColor="sky"
+          href="/fanflets"
         />
         <StatCard
           title="Total Subscribers"
           value={totalSubscribers}
-          icon={Mail}
+          icon={<MailIcon className="w-4 h-4" />}
+          accentColor="emerald"
+          href="/subscribers"
         />
         <StatCard
           title="Page Views"
           value={totalPageViews.toLocaleString()}
-          icon={BarChart3}
+          icon={<BarChart3Icon className="w-4 h-4" />}
+          accentColor="amber"
         />
         <StatCard
           title="New Signups (30d)"
           value={recentSignups}
-          icon={TrendingUp}
+          icon={<TrendingUpIcon className="w-4 h-4" />}
+          accentColor="violet"
+          href="/accounts?created_since=30"
         />
         <StatCard
           title="Active Fanflets (7d)"
           value={activeFanflets7d}
-          icon={Activity}
+          icon={<ActivityIcon className="w-4 h-4" />}
+          accentColor="sky"
         />
       </div>
 
       {/* Recent Activity */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Recent Speakers */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Signups</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        {/* Recent Signups */}
+        <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-fg">Recent Signups</h2>
+            <Link
+              href="/accounts"
+              className="text-[12px] font-medium text-primary-soft hover:text-primary transition-colors flex items-center gap-1"
+            >
+              View all
+              <ArrowUpRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-border-subtle">
             {recentSpeakers && recentSpeakers.length > 0 ? (
-              <div className="space-y-3">
-                {recentSpeakers.map((speaker) => (
-                  <div key={speaker.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {speaker.name || "Unnamed"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {speaker.email}
-                      </p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(speaker.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              recentSpeakers.map((speaker) => (
+                <SignupRow
+                  key={speaker.id}
+                  name={speaker.name || "Unnamed"}
+                  email={speaker.email}
+                  date={new Date(speaker.created_at).toLocaleDateString()}
+                />
+              ))
             ) : (
-              <p className="text-sm text-muted-foreground">No speakers yet</p>
+              <div className="px-5 py-10 text-center">
+                <p className="text-[13px] text-fg-muted">No speakers yet</p>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Recent Published Fanflets */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recently Published</CardTitle>
-          </CardHeader>
-          <CardContent>
+        {/* Recently Published */}
+        <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-fg">
+              Recently Published
+            </h2>
+            <Link
+              href="/features"
+              className="text-[12px] font-medium text-primary-soft hover:text-primary transition-colors flex items-center gap-1"
+            >
+              View all
+              <ArrowUpRightIcon className="w-3 h-3" />
+            </Link>
+          </div>
+          <div className="divide-y divide-border-subtle">
             {recentFanflets && recentFanflets.length > 0 ? (
-              <div className="space-y-3">
-                {recentFanflets.map((fanflet) => (
-                  <div key={fanflet.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{fanflet.title}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {fanflet.published_at
-                        ? new Date(fanflet.published_at).toLocaleDateString()
-                        : "N/A"}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              recentFanflets.map((fanflet) => (
+                <PublishedRow
+                  key={fanflet.id}
+                  title={fanflet.title}
+                  date={
+                    fanflet.published_at
+                      ? new Date(fanflet.published_at).toLocaleDateString()
+                      : "N/A"
+                  }
+                />
+              ))
             ) : (
-              <p className="text-sm text-muted-foreground">No published fanflets yet</p>
+              <div className="px-5 py-10 text-center">
+                <p className="text-[13px] text-fg-muted">
+                  No published fanflets yet
+                </p>
+              </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

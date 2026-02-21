@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createFanflet } from "./actions";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import {
+  type ExpirationPreset,
+  EXPIRATION_PRESETS,
+  FREE_TIER_EXPIRATION_PRESETS,
+  computeExpirationDate,
+} from "@/lib/expiration";
 
 function slugify(text: string): string {
   return text
@@ -22,16 +28,32 @@ function slugify(text: string): string {
 
 interface NewFanfletFormProps {
   speakerSlug: string | null;
+  /** When false, only 14d and none expiration options (free tier). */
+  allowCustomExpiration?: boolean;
 }
 
-export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
+export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: NewFanfletFormProps) {
   const searchParams = useSearchParams();
   const [title, setTitle] = useState("");
   const [eventName, setEventName] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [slug, setSlug] = useState("");
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [expirationPreset, setExpirationPreset] = useState<ExpirationPreset>("none");
+  const [expirationCustomDate, setExpirationCustomDate] = useState("");
+  const [showExpirationNotice, setShowExpirationNotice] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  const referenceDate = new Date();
+  const computedExpirationDate = useMemo(
+    () =>
+      computeExpirationDate(
+        expirationPreset,
+        expirationCustomDate || null,
+        referenceDate
+      ),
+    [expirationPreset, expirationCustomDate]
+  );
 
   useEffect(() => {
     if (!slugManuallyEdited && title) {
@@ -88,6 +110,9 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
     formData.set("event_name", eventName.trim());
     formData.set("event_date", eventDate || "");
     formData.set("slug", slug.trim());
+    formData.set("expiration_preset", expirationPreset);
+    formData.set("expiration_custom_date", expirationPreset === "custom" ? expirationCustomDate : "");
+    formData.set("show_expiration_notice", showExpirationNotice ? "true" : "false");
 
     const result = await createFanflet(formData);
 
@@ -172,6 +197,72 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
             <p className="text-xs text-muted-foreground">
               Auto-generated from title. Lowercase, hyphens only.
             </p>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-[#1B365D]">Content expiration</Label>
+            <p className="text-sm text-muted-foreground">
+              Optionally limit how long this Fanflet is publicly available. You can change this anytime.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {(allowCustomExpiration ? EXPIRATION_PRESETS : FREE_TIER_EXPIRATION_PRESETS).map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  variant={expirationPreset === preset ? "default" : "outline"}
+                  size="sm"
+                  className={
+                    expirationPreset === preset
+                      ? "bg-[#1B365D] hover:bg-[#152b4d]"
+                      : "border-[#e2e8f0]"
+                  }
+                  onClick={() => setExpirationPreset(preset)}
+                >
+                  {preset === "none"
+                    ? "Doesn't expire"
+                    : preset === "custom"
+                      ? "Custom date"
+                      : `${preset === "14d" ? "14" : preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
+                </Button>
+              ))}
+            </div>
+            {expirationPreset === "custom" && allowCustomExpiration && (
+              <div className="space-y-1">
+                <Label htmlFor="expiration_custom_date" className="text-sm">
+                  Expiration date
+                </Label>
+                <Input
+                  id="expiration_custom_date"
+                  type="date"
+                  value={expirationCustomDate}
+                  onChange={(e) => setExpirationCustomDate(e.target.value)}
+                  className="border-[#e2e8f0] max-w-[200px]"
+                />
+              </div>
+            )}
+            {(expirationPreset !== "none" && computedExpirationDate) && (
+              <p className="text-sm text-muted-foreground">
+                This Fanflet will expire on{" "}
+                {new Date(computedExpirationDate + "T12:00:00Z").toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+                .
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="show_expiration_notice"
+                checked={showExpirationNotice}
+                onChange={(e) => setShowExpirationNotice(e.target.checked)}
+                className="h-4 w-4 rounded border-[#e2e8f0]"
+              />
+              <Label htmlFor="show_expiration_notice" className="text-sm font-normal cursor-pointer">
+                Show &quot;This content available until [date]&quot; to visitors
+              </Label>
+            </div>
           </div>
 
           <Button

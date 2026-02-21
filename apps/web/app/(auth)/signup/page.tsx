@@ -84,17 +84,21 @@ export default function SignupPage() {
       <Card className="w-full max-w-md border-[#e2e8f0] bg-white shadow-xl shadow-[#1B365D]/5 rounded-2xl">
         <div className="flex flex-col items-center text-center px-10 py-12 sm:px-12">
           {/* Branding */}
-          <div className="flex items-center justify-center gap-2.5 mb-8">
+          <Link
+            href="/"
+            className="flex items-center justify-center gap-2.5 mb-8 hover:opacity-90 transition-opacity"
+            aria-label="Fanflet – home"
+          >
             <Image
               src="/logo.png"
-              alt="Fanflet"
+              alt=""
               width={32}
               height={32}
               priority
               className="h-8 w-8"
             />
             <span className="text-xl font-bold tracking-tight text-[#1B365D]">Fanflet</span>
-          </div>
+          </Link>
 
           {/* Large checkmark */}
           <div className="w-20 h-20 rounded-full bg-[#A8D5BA]/40 flex items-center justify-center mb-6">
@@ -145,16 +149,21 @@ export default function SignupPage() {
   return (
     <Card className="w-full max-w-md border-[#e2e8f0] bg-white shadow-xl shadow-[#1B365D]/5">
       <CardHeader className="space-y-4 text-center">
-        <div className="flex justify-center">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2.5 hover:opacity-90 transition-opacity"
+          aria-label="Fanflet – home"
+        >
           <Image
             src="/logo.png"
-            alt="Fanflet"
+            alt=""
             width={48}
             height={48}
             priority
             className="h-12 w-12"
           />
-        </div>
+          <span className="text-2xl font-bold tracking-tight text-[#1B365D]">Fanflet</span>
+        </Link>
         <div className="space-y-1">
           <CardTitle className="text-2xl font-bold text-[#1B365D]">
             Create your account

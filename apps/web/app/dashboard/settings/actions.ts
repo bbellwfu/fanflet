@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { hasFeature } from '@fanflet/db'
 import type { PhotoFrame } from '@/lib/photo-frame'
 import { DEFAULT_THEME_ID, THEME_PRESETS } from '@/lib/themes'
 import { toSocialLinksRecord } from '@/lib/speaker-preferences'
@@ -11,6 +12,13 @@ export async function updateSpeakerProfile(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  const { data: speaker } = await supabase
+    .from('speakers')
+    .select('id')
+    .eq('auth_user_id', user.id)
+    .single()
+  if (!speaker) return { error: 'Speaker profile not found' }
 
   const name = formData.get('name') as string
   const bio = formData.get('bio') as string
@@ -46,9 +54,11 @@ export async function updateSpeakerProfile(formData: FormData) {
       ? existingSocialLinks.photo_frame
       : null
   const validThemePresetIds = new Set(THEME_PRESETS.map((theme) => theme.id))
-  const safeThemePreset = validThemePresetIds.has(defaultThemePreset)
-    ? defaultThemePreset
-    : DEFAULT_THEME_ID
+  const allowMultipleThemes = await hasFeature(speaker.id, 'multiple_theme_colors')
+  const safeThemePreset =
+    allowMultipleThemes && validThemePresetIds.has(defaultThemePreset)
+      ? defaultThemePreset
+      : DEFAULT_THEME_ID
 
   // Build social_links, preserving or clearing photo_frame based on remove flag
   const { photo_frame: _dropFrame, ...socialLinksWithoutFrame } = existingSocialLinks as Record<string, unknown>

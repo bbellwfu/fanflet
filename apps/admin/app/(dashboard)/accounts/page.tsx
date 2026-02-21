@@ -1,6 +1,7 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { Card, CardContent, CardHeader, CardTitle } from "@fanflet/ui/card";
 import Link from "next/link";
+import { UsersIcon } from "lucide-react";
+import { AccountsFilterForm } from "./accounts-filter-form";
 
 interface SpeakerWithCounts {
   id: string;
@@ -16,12 +17,11 @@ interface SpeakerWithCounts {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; created_since?: string }>;
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
 
-  // Fetch speakers
   let query = supabase
     .from("speakers")
     .select("id, name, email, slug, status, created_at")
@@ -37,17 +37,22 @@ export default async function AccountsPage({
     query = query.eq("status", params.status);
   }
 
+  const createdSinceDays = params.created_since ? parseInt(params.created_since, 10) : 0;
+  if (Number.isFinite(createdSinceDays) && createdSinceDays > 0) {
+    const since = new Date(Date.now() - createdSinceDays * 24 * 60 * 60 * 1000).toISOString();
+    query = query.gte("created_at", since);
+  }
+
   const { data: speakers, error } = await query;
 
   if (error) {
     return (
-      <div className="text-destructive">
+      <div className="bg-error/10 text-error rounded-lg p-4 text-sm">
         Failed to load accounts: {error.message}
       </div>
     );
   }
 
-  // Fetch counts for each speaker
   const speakersWithCounts: SpeakerWithCounts[] = await Promise.all(
     (speakers ?? []).map(async (speaker) => {
       const [fanfletResult, subscriberResult] = await Promise.all([
@@ -70,118 +75,139 @@ export default async function AccountsPage({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Accounts</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-semibold text-fg tracking-tight">
+          Accounts
+        </h1>
+        <p className="text-sm text-fg-secondary mt-1">
           Manage speaker accounts across the platform
         </p>
       </div>
 
+      {/* Drill-down note when filtering by signup date */}
+      {createdSinceDays > 0 && (
+        <div className="rounded-lg border border-primary/20 bg-primary-muted/30 px-4 py-2.5 text-[13px] text-fg-secondary">
+          Showing accounts created in the last <strong className="text-fg">{createdSinceDays} days</strong>.
+          <Link href="/accounts" className="ml-2 font-medium text-primary-soft hover:text-primary">
+            Show all accounts
+          </Link>
+        </div>
+      )}
+
       {/* Search & Filter */}
-      <Card>
-        <CardContent className="pt-6">
-          <form className="flex flex-col sm:flex-row gap-3">
-            <input
-              name="search"
-              type="text"
-              placeholder="Search by name or email..."
-              defaultValue={params.search ?? ""}
-              className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-            />
-            <select
-              name="status"
-              defaultValue={params.status ?? "all"}
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
-            >
-              <option value="all">All Statuses</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="deactivated">Deactivated</option>
-            </select>
-            <button
-              type="submit"
-              className="h-9 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90"
-            >
-              Filter
-            </button>
-          </form>
-        </CardContent>
-      </Card>
+      <div className="bg-surface rounded-lg border border-border-subtle p-5">
+        <AccountsFilterForm
+          key={`${params.search ?? ""}-${params.status ?? "all"}-${params.created_since ?? ""}`}
+          defaultSearch={params.search ?? ""}
+          defaultStatus={params.status ?? "all"}
+          defaultCreatedSince={params.created_since ?? ""}
+        />
+      </div>
 
       {/* Accounts Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {speakersWithCounts.length} Speaker{speakersWithCounts.length !== 1 ? "s" : ""}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-3 font-medium text-muted-foreground">Name</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Email</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Slug</th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">Fanflets</th>
-                  <th className="pb-3 font-medium text-muted-foreground text-center">Subscribers</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 font-medium text-muted-foreground">Joined</th>
-                </tr>
-              </thead>
-              <tbody>
-                {speakersWithCounts.map((speaker) => (
-                  <tr key={speaker.id} className="border-b last:border-0 hover:bg-muted/50">
-                    <td className="py-3">
-                      <Link
-                        href={`/accounts/${speaker.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {speaker.name || "Unnamed"}
-                      </Link>
-                    </td>
-                    <td className="py-3 text-muted-foreground">{speaker.email}</td>
-                    <td className="py-3 text-muted-foreground font-mono text-xs">
-                      {speaker.slug ?? "—"}
-                    </td>
-                    <td className="py-3 text-center">{speaker.fanflet_count}</td>
-                    <td className="py-3 text-center">{speaker.subscriber_count}</td>
-                    <td className="py-3">
-                      <StatusBadge status={speaker.status} />
-                    </td>
-                    <td className="py-3 text-muted-foreground text-xs">
-                      {new Date(speaker.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
-                {speakersWithCounts.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
-                      No accounts found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-primary-muted flex items-center justify-center">
+            <UsersIcon className="w-4 h-4 text-primary-soft" />
           </div>
-        </CardContent>
-      </Card>
+          <h2 className="text-sm font-semibold text-fg">
+            {speakersWithCounts.length} Speaker
+            {speakersWithCounts.length !== 1 ? "s" : ""}
+          </h2>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Name
+                </th>
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Email
+                </th>
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Slug
+                </th>
+                <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Fanflets
+                </th>
+                <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Subs
+                </th>
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Status
+                </th>
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                  Joined
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {speakersWithCounts.map((speaker) => (
+                <tr
+                  key={speaker.id}
+                  className="hover:bg-surface-elevated/50 transition-colors"
+                >
+                  <td className="px-5 py-3.5">
+                    <Link
+                      href={`/accounts/${speaker.id}`}
+                      className="font-medium text-fg hover:text-primary transition-colors"
+                    >
+                      {speaker.name || "Unnamed"}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-3.5 text-fg-secondary">
+                    {speaker.email}
+                  </td>
+                  <td className="px-5 py-3.5 text-fg-muted font-mono text-[11px]">
+                    {speaker.slug ?? "—"}
+                  </td>
+                  <td className="px-5 py-3.5 text-center text-fg">
+                    {speaker.fanflet_count}
+                  </td>
+                  <td className="px-5 py-3.5 text-center text-fg">
+                    {speaker.subscriber_count}
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <StatusBadge status={speaker.status} />
+                  </td>
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                    {new Date(speaker.created_at).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+              {speakersWithCounts.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-5 py-10 text-center text-[13px] text-fg-muted"
+                  >
+                    No accounts found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-emerald-100 text-emerald-700",
-    suspended: "bg-amber-100 text-amber-700",
-    deactivated: "bg-red-100 text-red-700",
+    active: "bg-success/10 text-success",
+    suspended: "bg-warning/10 text-warning",
+    deactivated: "bg-error/10 text-error",
   };
 
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-        styles[status] ?? "bg-gray-100 text-gray-700"
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+        styles[status] ?? "bg-surface-elevated text-fg-muted"
       }`}
     >
       {status}

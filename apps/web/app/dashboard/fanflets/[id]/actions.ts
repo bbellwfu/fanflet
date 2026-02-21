@@ -2,7 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { hasFeature } from '@fanflet/db'
+import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { ensureUrl } from '@/lib/utils'
+import {
+  computeExpirationDate,
+  parseExpirationFromForm,
+  resolveExpirationDate,
+} from '@/lib/expiration'
 
 async function verifyOwnership(supabase: Awaited<ReturnType<typeof createClient>>, fanfletId: string) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -41,7 +48,10 @@ export async function updateFanfletDetails(
   const event_name = formData.get('event_name') as string
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
-  const survey_question_id = formData.get('survey_question_id') as string || null
+  const hasSurveys = await hasFeature(ownership.fanflet!.speaker_id, 'surveys_session_feedback')
+  const survey_question_id_raw = formData.get('survey_question_id') as string || null
+  const survey_question_id = hasSurveys ? survey_question_id_raw : null
+
   const theme_config_raw = formData.get('theme_config') as string || null
   let theme_config: Record<string, unknown> = {}
   if (theme_config_raw) {
@@ -50,6 +60,11 @@ export async function updateFanfletDetails(
     } catch {
       // Keep default empty object
     }
+  }
+
+  const allowMultipleThemes = await hasFeature(ownership.fanflet!.speaker_id, 'multiple_theme_colors')
+  if (!allowMultipleThemes) {
+    theme_config = { preset: DEFAULT_THEME_ID }
   }
 
   const { data: existing } = await supabase
@@ -64,21 +79,46 @@ export async function updateFanfletDetails(
     return { error: 'You already have a Fanflet with this URL slug' }
   }
 
-  const { error } = await supabase
-    .from('fanflets')
-    .update({
-      title,
-      description: description || null,
-      event_name,
-      event_date: event_date || null,
-      slug,
-      survey_question_id: survey_question_id || null,
-      theme_config,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+  const basePayload: Record<string, unknown> = {
+    title,
+    description: description || null,
+    event_name,
+    event_date: event_date || null,
+    slug,
+    survey_question_id: survey_question_id || null,
+    theme_config,
+    updated_at: new Date().toISOString(),
+  }
 
-  if (error) return { error: error.message }
+  let expiration = parseExpirationFromForm(formData)
+  const allowCustomExpiration = await hasFeature(ownership.fanflet!.speaker_id, 'custom_expiration')
+  if (!allowCustomExpiration && expiration.preset !== 'none' && expiration.preset !== '14d') {
+    expiration = { ...expiration, preset: '14d' as const, customDate: null }
+  }
+
+  const { data: currentFanflet } = await supabase
+    .from('fanflets')
+    .select('published_at')
+    .eq('id', id)
+    .single()
+  const referenceDate = currentFanflet?.published_at
+    ? new Date(currentFanflet.published_at)
+    : new Date()
+  const expiration_date = resolveExpirationDate(expiration, referenceDate)
+
+  const fullPayload = {
+    ...basePayload,
+    expiration_date: expiration_date ?? null,
+    expiration_preset: expiration.preset,
+    show_expiration_notice: expiration.showExpirationNotice,
+  }
+
+  let result = await supabase.from('fanflets').update(fullPayload).eq('id', id)
+  if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || result.error.message?.includes('schema cache'))) {
+    result = await supabase.from('fanflets').update(basePayload).eq('id', id)
+  }
+
+  if (result.error) return { error: result.error.message }
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath(`/dashboard/fanflets/${id}/qr`)
@@ -97,16 +137,37 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
     .eq('speaker_id', ownership.fanflet!.speaker_id)
     .eq('status', 'published')
 
-  const { error } = await supabase
-    .from('fanflets')
-    .update({
-      status: 'published',
-      published_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+  const publishedAt = new Date()
+  const basePayload: Record<string, unknown> = {
+    status: 'published',
+    published_at: publishedAt.toISOString(),
+    updated_at: publishedAt.toISOString(),
+  }
 
-  if (error) return { error: error.message }
+  const { data: current, error: presetErr } = await supabase
+    .from('fanflets')
+    .select('expiration_preset')
+    .eq('id', id)
+    .single()
+
+  if (!presetErr) {
+    const preset = current?.expiration_preset as string | undefined
+    if (preset === '30d' || preset === '60d' || preset === '90d') {
+      basePayload.expiration_date = computeExpirationDate(
+        preset as '30d' | '60d' | '90d',
+        null,
+        publishedAt
+      )
+    }
+  }
+
+  let result = await supabase.from('fanflets').update(basePayload).eq('id', id)
+  if (result.error && (result.error.code === '42703' || result.error.code === 'PGRST204' || result.error.message?.includes('schema cache'))) {
+    const { expiration_date: _drop, ...safePayload } = basePayload
+    result = await supabase.from('fanflets').update(safePayload).eq('id', id)
+  }
+
+  if (result.error) return { error: result.error.message }
 
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
@@ -151,6 +212,11 @@ export async function addResourceBlock(
   const supabase = await createClient()
   const ownership = await verifyOwnership(supabase, fanfletId)
   if ('error' in ownership) return { error: ownership.error }
+
+  if (data.type === 'sponsor') {
+    const allowSponsor = await hasFeature(ownership.fanflet!.speaker_id, 'sponsor_visibility')
+    if (!allowSponsor) return { error: 'Sponsor blocks require a higher plan. Upgrade in Settings.' }
+  }
 
   const { data: maxOrder } = await supabase
     .from('resource_blocks')

@@ -51,16 +51,21 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-md border-[#e2e8f0] bg-white shadow-xl shadow-[#1B365D]/5">
       <CardHeader className="space-y-4 text-center">
-        <div className="flex justify-center">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2.5 hover:opacity-90 transition-opacity"
+          aria-label="Fanflet – home"
+        >
           <Image
             src="/logo.png"
-            alt="Fanflet"
+            alt=""
             width={48}
             height={48}
             priority
             className="h-12 w-12"
           />
-        </div>
+          <span className="text-2xl font-bold tracking-tight text-[#1B365D]">Fanflet</span>
+        </Link>
         <div className="space-y-1">
           <CardTitle className="text-2xl font-bold text-[#1B365D]">
             Welcome back

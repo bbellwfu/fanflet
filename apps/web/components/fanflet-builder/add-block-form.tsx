@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-const blockTypes = [
+const ALL_BLOCK_TYPES = [
   { type: "link", label: "Link", icon: Link2 },
   { type: "file", label: "File Upload", icon: FileDown },
   { type: "text", label: "Text", icon: Type },
@@ -50,6 +50,8 @@ interface AddBlockFormProps {
   authUserId: string;
   onAdded: () => void;
   libraryItems?: LibraryItem[];
+  /** When false, sponsor block type is hidden (gated by plan). */
+  allowSponsorVisibility?: boolean;
 }
 
 export function AddBlockForm({
@@ -57,7 +59,11 @@ export function AddBlockForm({
   authUserId,
   onAdded,
   libraryItems = [],
+  allowSponsorVisibility = true,
 }: AddBlockFormProps) {
+  const blockTypes = allowSponsorVisibility
+    ? ALL_BLOCK_TYPES
+    : ALL_BLOCK_TYPES.filter((b) => b.type !== "sponsor");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [showLibraryPicker, setShowLibraryPicker] = useState(false);

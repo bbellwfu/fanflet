@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/config";
+import { hasFeature } from "@fanflet/db";
 import { redirect, notFound } from "next/navigation";
 import { FanfletEditor } from "@/components/fanflet-builder/fanflet-editor";
 
@@ -63,6 +64,14 @@ export default async function FanfletEditorPage({
       ? `${baseUrl}/${speaker.slug}/${fanflet.slug}`
       : null;
 
+  const [allowMultipleThemes, hasSurveys, allowCustomExpiration, allowSponsorVisibility] =
+    await Promise.all([
+      hasFeature(speaker.id, "multiple_theme_colors"),
+      hasFeature(speaker.id, "surveys_session_feedback"),
+      hasFeature(speaker.id, "custom_expiration"),
+      hasFeature(speaker.id, "sponsor_visibility"),
+    ]);
+
   return (
     <FanfletEditor
       fanflet={fanflet}
@@ -73,6 +82,10 @@ export default async function FanfletEditorPage({
       authUserId={user.id}
       surveyQuestions={surveyQuestions ?? []}
       libraryItems={libraryItems ?? []}
+      allowMultipleThemes={allowMultipleThemes}
+      hasSurveys={hasSurveys}
+      allowCustomExpiration={allowCustomExpiration}
+      allowSponsorVisibility={allowSponsorVisibility}
     />
   );
 }

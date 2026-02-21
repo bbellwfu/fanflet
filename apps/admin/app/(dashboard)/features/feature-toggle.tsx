@@ -22,7 +22,7 @@ export function FeatureToggle({ flagId, isGlobal }: FeatureToggleProps) {
     setLoading(false);
 
     if (result.error) {
-      setChecked(!newValue); // Revert on error
+      setChecked(!newValue);
       toast.error(result.error);
     } else {
       toast.success(
@@ -36,16 +36,24 @@ export function FeatureToggle({ flagId, isGlobal }: FeatureToggleProps) {
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={checked ? "Feature is global (everyone); click to restrict to plans" : "Feature is plan-based; click to enable globally"}
+      title={checked ? "Global: everyone has this feature. Click to restrict to specific plans." : "Plan-based: only assigned plans have this feature. Click to enable for everyone."}
       onClick={handleToggle}
       disabled={loading}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? "bg-indigo-600" : "bg-slate-200"
-      }`}
+      className={`
+        relative inline-flex h-6 w-11 items-center rounded-full shrink-0
+        transition-colors duration-200 ease-in-out
+        focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-page
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${checked ? "bg-primary" : "bg-surface-hover"}
+      `}
     >
       <span
-        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-transform ${
-          checked ? "translate-x-5" : "translate-x-0"
-        }`}
+        className={`
+          inline-block h-4 w-4 rounded-full bg-white shadow-sm
+          transition-transform duration-200 ease-in-out
+          ${checked ? "translate-x-6" : "translate-x-1"}
+        `}
       />
     </button>
   );

@@ -62,6 +62,8 @@ type Fanflet = {
   event_date: string | null;
   resource_blocks: ResourceBlock[];
   theme_config?: Record<string, unknown> | null;
+  expiration_date?: string | null;
+  show_expiration_notice?: boolean;
 };
 
 type LandingPageProps = {
@@ -141,6 +143,16 @@ export function LandingPage({
                 {fanflet.event_name}
               </div>
             </div>
+          )}
+          {fanflet.show_expiration_notice !== false && fanflet.expiration_date && (
+            <p className="text-center text-xs text-[var(--theme-hero-text)]/80 mb-4">
+              This content available until{" "}
+              {new Date(fanflet.expiration_date + "T12:00:00Z").toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </p>
           )}
 
           {/* Speaker info */}

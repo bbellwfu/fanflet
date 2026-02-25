@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2, SparklesIcon } from "lucide-react";
+import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Input } from "@fanflet/ui/input";
 import { Label } from "@fanflet/ui/label";
@@ -59,9 +60,7 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
         {/* Header */}
         <div className="px-6 pt-8 pb-6 text-center space-y-4">
           <div className="flex justify-center">
-            <div className="w-12 h-12 rounded-xl bg-primary-muted flex items-center justify-center">
-              <SparklesIcon className="w-6 h-6 text-primary-soft" />
-            </div>
+            <Image src="/logo.png" alt="Fanflet Logo" width={48} height={48} className="w-12 h-12" />
           </div>
           <div className="space-y-1">
             <h1 className="text-xl font-semibold text-fg tracking-tight">

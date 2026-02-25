@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getSpeakerEntitlements } from '@fanflet/db'
+import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { ensureUrl } from '@/lib/utils'
 import {
   computeExpirationDate,
@@ -46,7 +48,11 @@ export async function updateFanfletDetails(
   const event_name = formData.get('event_name') as string
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
-  const survey_question_id = formData.get('survey_question_id') as string || null
+  const entitlements = await getSpeakerEntitlements(ownership.fanflet!.speaker_id)
+  const hasSurveys = entitlements.features.has('surveys_session_feedback')
+  const survey_question_id_raw = formData.get('survey_question_id') as string || null
+  const survey_question_id = hasSurveys ? survey_question_id_raw : null
+
   const theme_config_raw = formData.get('theme_config') as string || null
   let theme_config: Record<string, unknown> = {}
   if (theme_config_raw) {
@@ -55,6 +61,11 @@ export async function updateFanfletDetails(
     } catch {
       // Keep default empty object
     }
+  }
+
+  const allowMultipleThemes = entitlements.features.has('multiple_theme_colors')
+  if (!allowMultipleThemes) {
+    theme_config = { preset: DEFAULT_THEME_ID }
   }
 
   const { data: existing } = await supabase
@@ -80,7 +91,12 @@ export async function updateFanfletDetails(
     updated_at: new Date().toISOString(),
   }
 
-  const expiration = parseExpirationFromForm(formData)
+  let expiration = parseExpirationFromForm(formData)
+  const allowCustomExpiration = entitlements.features.has('custom_expiration')
+  if (!allowCustomExpiration && expiration.preset !== 'none' && expiration.preset !== '14d') {
+    expiration = { ...expiration, preset: '14d' as const, customDate: null }
+  }
+
   const { data: currentFanflet } = await supabase
     .from('fanflets')
     .select('published_at')
@@ -198,6 +214,36 @@ export async function addResourceBlock(
   const ownership = await verifyOwnership(supabase, fanfletId)
   if ('error' in ownership) return { error: ownership.error }
 
+  const speakerId = ownership.fanflet!.speaker_id
+
+  if (data.type === 'sponsor') {
+    const entitlements = await getSpeakerEntitlements(speakerId)
+    if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor blocks require a higher plan. Upgrade in Settings.' }
+  }
+
+  const sectionName = data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources')
+  const title = data.title?.trim() ?? ''
+
+  // All resources flow through the library (PRD §3.4). Create library entry first, then block with library_item_id.
+  const { data: libItem, error: libError } = await supabase
+    .from('resource_library')
+    .insert({
+      speaker_id: speakerId,
+      type: data.type,
+      title: title || 'Untitled',
+      description: data.description ?? null,
+      url: ensureUrl(data.url),
+      file_path: data.file_path ?? null,
+      image_url: data.image_url ?? null,
+      section_name: sectionName,
+      metadata: data.metadata ?? {},
+    })
+    .select('id')
+    .single()
+
+  if (libError) return { error: libError.message }
+  if (!libItem) return { error: 'Failed to create library resource' }
+
   const { data: maxOrder } = await supabase
     .from('resource_blocks')
     .select('display_order')
@@ -210,14 +256,15 @@ export async function addResourceBlock(
 
   const insertData: Record<string, unknown> = {
     fanflet_id: fanfletId,
+    library_item_id: libItem.id,
     type: data.type,
-    title: data.title ?? '',
+    title: title || '',
     description: data.description ?? null,
     url: ensureUrl(data.url),
-    file_path: data.file_path ?? null,
+    file_path: data.type === 'file' ? null : (data.file_path ?? null),
     image_url: data.image_url ?? null,
     display_order: nextOrder,
-    section_name: data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources'),
+    section_name: sectionName,
     metadata: data.metadata ?? {},
   }
 
@@ -227,9 +274,14 @@ export async function addResourceBlock(
     .select('id')
     .single()
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Rollback: remove the library entry we just created
+    await supabase.from('resource_library').delete().eq('id', libItem.id).eq('speaker_id', speakerId)
+    return { error: error.message }
+  }
 
   revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+  revalidatePath('/dashboard/resources')
   return { success: true, id: block.id }
 }
 
@@ -356,7 +408,9 @@ export async function addLibraryBlockToFanflet(
     revalidatePath(`/dashboard/fanflets/${fanfletId}`)
     return { success: true, id: block.id }
   } else {
-    // Dynamic link: store reference to library item
+    // Dynamic link: store reference to library item.
+    // For file-type resources, file_path is NOT copied — the download route
+    // resolves it via the library_item_id join.
     const { data: block, error } = await supabase
       .from('resource_blocks')
       .insert({
@@ -365,7 +419,7 @@ export async function addLibraryBlockToFanflet(
         title: libItem.title,
         description: libItem.description,
         url: libItem.url,
-        file_path: libItem.file_path,
+        file_path: libItem.type === 'file' ? null : libItem.file_path,
         image_url: libItem.image_url,
         display_order: nextOrder,
         section_name: libItem.section_name,

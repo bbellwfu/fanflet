@@ -46,6 +46,7 @@ packages/
 - **RLS enforced at database level.** Never rely on application-level tenant filtering as the primary safety mechanism.
 - **Zod validation on all API inputs.** Validate before processing — never trust client data.
 - **Site URL centralized** via `getSiteUrl()` from `@fanflet/db/config`.
+- **Idempotent database migrations.** Every migration in `supabase/migrations/` must be safe to run more than once (e.g. same migration applied via CI and via MCP, or re-runs after partial failure). Use `CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF EXISTS` before `CREATE POLICY`, `CREATE INDEX IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, etc. See `supabase/migrations/README.md`.
 
 ## Coding Conventions
 
@@ -75,6 +76,7 @@ packages/
 - Missing Zod validation on API route inputs
 - Direct DOM manipulation instead of React patterns
 - Hardcoding URLs instead of using centralized config
+- **Non-idempotent migrations** — `CREATE TABLE`/`CREATE POLICY`/`CREATE INDEX` without `IF NOT EXISTS` or a preceding `DROP ... IF EXISTS` (breaks CI when migrations are applied in more than one way or re-run)
 
 ## Review Focus Areas
 
@@ -83,3 +85,4 @@ When reviewing PRs, prioritize:
 2. **Correctness** — Error handling, edge cases, null checks on Supabase responses
 3. **Architecture** — Server vs. client component boundaries, data fetching patterns
 4. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
+5. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)

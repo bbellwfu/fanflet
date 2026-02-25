@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import { NewFanfletForm } from "./new-fanflet-form";
 
@@ -12,9 +13,13 @@ export default async function NewFanfletPage() {
 
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("slug")
+    .select("id, slug")
     .eq("auth_user_id", user.id)
     .single();
+
+  const allowCustomExpiration = speaker
+    ? (await getSpeakerEntitlements(speaker.id)).features.has("custom_expiration")
+    : false;
 
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
@@ -27,7 +32,10 @@ export default async function NewFanfletPage() {
         </p>
       </div>
 
-      <NewFanfletForm speakerSlug={speaker?.slug ?? null} />
+      <NewFanfletForm
+        speakerSlug={speaker?.slug ?? null}
+        allowCustomExpiration={allowCustomExpiration}
+      />
     </div>
   );
 }

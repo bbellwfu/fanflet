@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate event_type
-    const validTypes = ['page_view', 'resource_click', 'email_signup', 'qr_scan', 'referral_click']
+    const validTypes = ['page_view', 'resource_click', 'email_signup', 'qr_scan', 'referral_click', 'resource_download']
     if (!validTypes.includes(event_type)) {
       return NextResponse.json({ error: 'Invalid event type' }, { status: 400 })
     }

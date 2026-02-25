@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import {
   type ExpirationPreset,
   EXPIRATION_PRESETS,
+  FREE_TIER_EXPIRATION_PRESETS,
   computeExpirationDate,
 } from "@/lib/expiration";
 
@@ -27,9 +28,11 @@ function slugify(text: string): string {
 
 interface NewFanfletFormProps {
   speakerSlug: string | null;
+  /** When false, only 14d and none expiration options (free tier). */
+  allowCustomExpiration?: boolean;
 }
 
-export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
+export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: NewFanfletFormProps) {
   const searchParams = useSearchParams();
   const [title, setTitle] = useState("");
   const [eventName, setEventName] = useState("");
@@ -202,7 +205,7 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
               Optionally limit how long this Fanflet is publicly available. You can change this anytime.
             </p>
             <div className="flex flex-wrap gap-2">
-              {(['30d', '60d', '90d', 'none', 'custom'] as const).map((preset) => (
+              {(allowCustomExpiration ? EXPIRATION_PRESETS : FREE_TIER_EXPIRATION_PRESETS).map((preset) => (
                 <Button
                   key={preset}
                   type="button"
@@ -219,11 +222,11 @@ export function NewFanfletForm({ speakerSlug }: NewFanfletFormProps) {
                     ? "Doesn't expire"
                     : preset === "custom"
                       ? "Custom date"
-                      : `${preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
+                      : `${preset === "14d" ? "14" : preset === "30d" ? "30" : preset === "60d" ? "60" : "90"} days`}
                 </Button>
               ))}
             </div>
-            {expirationPreset === "custom" && (
+            {expirationPreset === "custom" && allowCustomExpiration && (
               <div className="space-y-1">
                 <Label htmlFor="expiration_custom_date" className="text-sm">
                   Expiration date

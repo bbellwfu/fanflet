@@ -1,6 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { getSpeakerEntitlements } from "@fanflet/db";
+import { getStorageQuota } from "@fanflet/db/storage";
 import { redirect } from "next/navigation";
 import { ResourceLibrary } from "@/components/dashboard/resource-library";
+import { listLibraryResources, getSpeakerStorageUsage } from "./actions";
 
 export default async function ResourceLibraryPage() {
   const supabase = await createClient();
@@ -20,14 +23,17 @@ export default async function ResourceLibraryPage() {
     redirect("/dashboard/settings");
   }
 
-  const { data: resources } = await supabase
-    .from("resource_library")
-    .select("*")
-    .eq("speaker_id", speaker.id)
-    .order("created_at", { ascending: true });
+  const [entitlements, resourcesResult, storageResult] = await Promise.all([
+    getSpeakerEntitlements(speaker.id),
+    listLibraryResources(),
+    getSpeakerStorageUsage(),
+  ]);
+
+  const allowSponsorVisibility = entitlements.features.has("sponsor_visibility");
+  const quota = getStorageQuota(entitlements.limits);
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="w-full min-w-0 space-y-8 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[#1B365D]">
           Resource Library
@@ -37,7 +43,14 @@ export default async function ResourceLibraryPage() {
         </p>
       </div>
 
-      <ResourceLibrary resources={resources ?? []} authUserId={user.id} />
+      <ResourceLibrary
+        resources={resourcesResult.data ?? []}
+        authUserId={user.id}
+        allowSponsorVisibility={allowSponsorVisibility}
+        storageUsedBytes={storageResult.usedBytes}
+        storageLimitMb={quota.storageMb}
+        maxFileMb={quota.maxFileMb}
+      />
     </div>
   );
 }

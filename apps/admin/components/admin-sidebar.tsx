@@ -2,13 +2,15 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   LayoutDashboardIcon,
   UsersIcon,
+  FileTextIcon,
+  MailIcon,
   ToggleLeftIcon,
   CreditCardIcon,
   LogOutIcon,
-  SparklesIcon,
   MenuIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
@@ -37,10 +39,28 @@ const navItems: NavItem[] = [
     icon: <UsersIcon className="w-[18px] h-[18px]" />,
   },
   {
+    id: "fanflets",
+    href: "/fanflets",
+    label: "Fanflets",
+    icon: <FileTextIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "subscribers",
+    href: "/subscribers",
+    label: "Subscribers",
+    icon: <MailIcon className="w-[18px] h-[18px]" />,
+  },
+  {
     id: "features",
     href: "/features",
     label: "Features & Plans",
     icon: <ToggleLeftIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "waiting-list",
+    href: "/waiting-list",
+    label: "Waiting List",
+    icon: <MailIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "subscriptions",
@@ -70,9 +90,7 @@ function NavContent({ pathname, email }: NavContentProps) {
       {/* Brand */}
       <div className="px-5 pt-6 pb-8">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary-muted flex items-center justify-center">
-            <SparklesIcon className="w-4 h-4 text-primary-soft" />
-          </div>
+          <Image src="/logo.png" alt="Fanflet Logo" width={32} height={32} className="w-8 h-8" />
           <span className="text-[15px] font-semibold text-fg tracking-tight">
             Fanflet
           </span>
@@ -170,9 +188,7 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
         {/* Mobile Header */}
         <header className="md:hidden h-14 bg-sidebar border-b border-border-subtle flex items-center px-4 justify-between sticky top-0 z-40">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-primary-muted flex items-center justify-center">
-              <SparklesIcon className="w-3.5 h-3.5 text-primary-soft" />
-            </div>
+            <Image src="/logo.png" alt="Fanflet Logo" width={28} height={28} className="w-7 h-7" />
             <span className="text-[14px] font-semibold text-fg tracking-tight">
               Fanflet
             </span>

@@ -63,9 +63,11 @@ interface SettingsFormProps {
   speaker: SpeakerProfile | null;
   authUserId: string;
   userEmail: string;
+  /** When false, only the base theme is selectable in ThemePicker (free tier). */
+  allowMultipleThemes?: boolean;
 }
 
-export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormProps) {
+export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThemes = true }: SettingsFormProps) {
   const searchParams = useSearchParams();
   const [name, setName] = useState(speaker?.name ?? "");
   const [bio, setBio] = useState(speaker?.bio ?? "");
@@ -438,6 +440,8 @@ export function SettingsForm({ speaker, authUserId, userEmail }: SettingsFormPro
           <ThemePicker
             selectedThemeId={defaultThemePreset}
             onChange={setDefaultThemePreset}
+            allowMultipleThemes={allowMultipleThemes}
+            upgradeHref="/dashboard/settings#subscription"
           />
         </CardContent>
       </Card>

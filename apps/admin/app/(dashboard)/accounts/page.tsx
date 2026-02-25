@@ -17,7 +17,7 @@ interface SpeakerWithCounts {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; created_since?: string }>;
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
@@ -35,6 +35,12 @@ export default async function AccountsPage({
 
   if (params.status && params.status !== "all") {
     query = query.eq("status", params.status);
+  }
+
+  const createdSinceDays = params.created_since ? parseInt(params.created_since, 10) : 0;
+  if (Number.isFinite(createdSinceDays) && createdSinceDays > 0) {
+    const since = new Date(Date.now() - createdSinceDays * 24 * 60 * 60 * 1000).toISOString();
+    query = query.gte("created_at", since);
   }
 
   const { data: speakers, error } = await query;
@@ -80,12 +86,23 @@ export default async function AccountsPage({
         </p>
       </div>
 
+      {/* Drill-down note when filtering by signup date */}
+      {createdSinceDays > 0 && (
+        <div className="rounded-lg border border-primary/20 bg-primary-muted/30 px-4 py-2.5 text-[13px] text-fg-secondary">
+          Showing accounts created in the last <strong className="text-fg">{createdSinceDays} days</strong>.
+          <Link href="/accounts" className="ml-2 font-medium text-primary-soft hover:text-primary">
+            Show all accounts
+          </Link>
+        </div>
+      )}
+
       {/* Search & Filter */}
       <div className="bg-surface rounded-lg border border-border-subtle p-5">
         <AccountsFilterForm
-          key={`${params.search ?? ""}-${params.status ?? "all"}`}
+          key={`${params.search ?? ""}-${params.status ?? "all"}-${params.created_since ?? ""}`}
           defaultSearch={params.search ?? ""}
           defaultStatus={params.status ?? "all"}
+          defaultCreatedSince={params.created_since ?? ""}
         />
       </div>
 

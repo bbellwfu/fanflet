@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,18 +20,30 @@ import {
   Type,
   Building2,
   X,
+  FileText,
+  FileSpreadsheet,
+  FileImage,
+  FileArchive,
+  Presentation,
+  LinkIcon,
+  Download,
 } from "lucide-react";
 import {
   createLibraryResource,
   updateLibraryResource,
   deleteLibraryResource,
 } from "@/app/dashboard/resources/actions";
+import {
+  requestUploadSlot,
+  confirmUpload,
+  cancelUploadSlot,
+} from "@/app/dashboard/resources/upload-actions";
 import { createClient } from "@/lib/supabase/client";
+import { STORAGE_BUCKET, isAllowedFileType, ALLOWED_EXTENSIONS, formatFileSize, extractFilename } from "@fanflet/db/storage";
+import { StorageQuotaBar } from "./storage-quota-bar";
 import { toast } from "sonner";
 
-function generateSafeFileName(ext: string): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
-}
+type LinkedFanflet = { id: string; title: string };
 
 type LibraryResource = {
   id: string;
@@ -40,12 +52,29 @@ type LibraryResource = {
   description: string | null;
   url: string | null;
   file_path: string | null;
+  file_size_bytes: number | null;
+  file_type: string | null;
   image_url: string | null;
   section_name: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  linked_fanflets_count: number;
+  linked_fanflets: LinkedFanflet[];
+  download_count: number;
 };
+
+function getFileIcon(fileType: string | null) {
+  if (!fileType) return FileDown;
+  const t = fileType.toLowerCase();
+  if (t.includes("pdf")) return FileText;
+  if (t.includes("presentation") || t.includes("powerpoint") || t.includes("ppt")) return Presentation;
+  if (t.includes("word") || t.includes("document") || t.includes("doc")) return FileText;
+  if (t.includes("spreadsheet") || t.includes("excel") || t.includes("csv")) return FileSpreadsheet;
+  if (t.includes("image") || t.includes("png") || t.includes("jpg") || t.includes("jpeg")) return FileImage;
+  if (t.includes("zip")) return FileArchive;
+  return FileDown;
+}
 
 const typeIcons: Record<string, typeof Link2> = {
   link: Link2,
@@ -61,6 +90,66 @@ const typeLabels: Record<string, string> = {
   sponsor: "Sponsor",
 };
 
+function isImageFileType(fileType: string | null, filePath: string | null): boolean {
+  if (!fileType && !filePath) return false;
+  const t = (fileType ?? "").toLowerCase();
+  if (t.startsWith("image/")) return true;
+  if (!filePath) return false;
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext);
+}
+
+/** Thumbnail for file resources: shows image preview for image files, icon otherwise. */
+function FileThumbnail({
+  filePath,
+  fileType,
+  title,
+  fallbackIcon: FallbackIcon,
+  className,
+}: {
+  filePath: string | null;
+  fileType: string | null;
+  title: string;
+  fallbackIcon: typeof FileDown;
+  className?: string;
+}) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const isImage = isImageFileType(fileType, filePath);
+
+  useEffect(() => {
+    if (!isImage || !filePath || filePath.startsWith("http")) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(filePath, 60)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setSignedUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isImage, filePath]);
+
+  if (signedUrl) {
+    return (
+      <div className={`shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white ${className ?? "w-12 h-12"}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={signedUrl}
+          alt={title || "File"}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+  return (
+    <div className={`rounded-lg bg-[#1B365D]/10 flex items-center justify-center shrink-0 text-[#1B365D] ${className ?? "w-10 h-10"}`}>
+      <FallbackIcon className="w-5 h-5" />
+    </div>
+  );
+}
+
 const blockTypes = [
   { type: "link", label: "Link", icon: Link2 },
   { type: "file", label: "File Upload", icon: FileDown },
@@ -71,11 +160,20 @@ const blockTypes = [
 interface ResourceLibraryProps {
   resources: LibraryResource[];
   authUserId: string;
-  /** When false, sponsor type is hidden (gated by plan). */
   allowSponsorVisibility?: boolean;
+  storageUsedBytes: number;
+  storageLimitMb: number;
+  maxFileMb: number;
 }
 
-export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility = true }: ResourceLibraryProps) {
+export function ResourceLibrary({
+  resources,
+  authUserId,
+  allowSponsorVisibility = true,
+  storageUsedBytes,
+  storageLimitMb,
+  maxFileMb,
+}: ResourceLibraryProps) {
   const resourceTypes = allowSponsorVisibility ? blockTypes : blockTypes.filter((t) => t.type !== "sponsor");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,15 +193,33 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
   const [imageUrl, setImageUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
-  const [filePath, setFilePath] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fileName, setFileName] = useState("");
+  const [uploadedLibraryItemId, setUploadedLibraryItemId] = useState<string | null>(null);
+  const [openLinkedId, setOpenLinkedId] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const linkedPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openLinkedId) {
+      linkedPopoverRef.current = null;
+      return;
+    }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (linkedPopoverRef.current && !linkedPopoverRef.current.contains(e.target as Node)) {
+        setOpenLinkedId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openLinkedId]);
 
   useEffect(() => {
     if (searchParams.get("focus") !== "example-link") return;
     if (resources.length > 0) return;
 
-    // Defer state updates to avoid cascading renders during effect
     setTimeout(() => {
       setShowAddForm(true);
       setSelectedType("link");
@@ -130,7 +246,7 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
   const [editImageUrl, setEditImageUrl] = useState("");
   const [editMetadata, setEditMetadata] = useState<Record<string, unknown>>({});
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setSelectedType(null);
     setTitle("");
     setDescription("");
@@ -139,9 +255,11 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
     setSectionName("Resources");
     setSponsorCta("Learn More");
     setImageUrl("");
-    setFilePath("");
+    setFileName("");
+    setUploadedLibraryItemId(null);
+    setUploadProgress(0);
     setShowAddForm(false);
-  };
+  }, []);
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -157,7 +275,7 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
     try {
       const supabase = createClient();
       const ext = file.name.split(".").pop() || "png";
-      const safeName = generateSafeFileName(ext);
+      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
       const path = `${authUserId}/library/images/${safeName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -183,37 +301,119 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!isAllowedFileType(file.name)) {
+      toast.error(`File type not supported. Accepted: ${ALLOWED_EXTENSIONS.join(", ")}`);
+      return;
+    }
+
+    const maxBytes = maxFileMb * 1024 * 1024;
+    if (file.size > maxBytes) {
+      toast.error(`File too large (max ${maxFileMb} MB)`);
+      return;
+    }
+
     setFileUploading(true);
+    setUploadProgress(0);
+    setFileName(file.name);
+
     try {
+      // Step 1: Request upload slot (server-side validation)
+      const slot = await requestUploadSlot({
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type || "application/octet-stream",
+        title: title || undefined,
+        description: description || undefined,
+        sectionName: sectionName || undefined,
+      });
+
+      if (!slot.allowed) {
+        toast.error(slot.error);
+        setFileUploading(false);
+        setFileName("");
+        return;
+      }
+
+      setUploadedLibraryItemId(slot.libraryItemId);
+
+      // Step 2: Upload directly to Supabase Storage (private bucket)
       const supabase = createClient();
-      const ext = file.name.split(".").pop() || "file";
-      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
-      const path = `${authUserId}/library/${safeName}`;
+      abortControllerRef.current = new AbortController();
 
       const { error: uploadError } = await supabase.storage
-        .from("resources")
-        .upload(path, file, { upsert: true });
+        .from(STORAGE_BUCKET)
+        .upload(slot.path, file, {
+          upsert: false,
+        });
 
       if (uploadError) {
         toast.error(uploadError.message || "File upload failed");
+        await cancelUploadSlot(slot.libraryItemId);
+        setFileUploading(false);
+        setFileName("");
+        setUploadedLibraryItemId(null);
+        return;
+      }
+
+      setUploadProgress(100);
+
+      // Step 3: Confirm upload (server-side finalization)
+      const confirm = await confirmUpload({
+        libraryItemId: slot.libraryItemId,
+        filePath: slot.path,
+        fileSizeBytes: file.size,
+        fileType: file.type || "application/octet-stream",
+        title: title || file.name,
+      });
+
+      if (confirm.error) {
+        toast.error(confirm.error);
         setFileUploading(false);
         return;
       }
 
-      const { data } = supabase.storage.from("resources").getPublicUrl(path);
-      setFilePath(data.publicUrl);
+      setFileUploading(false);
       if (!title) setTitle(file.name);
-      setFileUploading(false);
-      toast.success("File uploaded");
+      toast.success("File uploaded to your library");
     } catch {
-      toast.error("File upload failed");
+      toast.error("File upload failed — please try again");
+      if (uploadedLibraryItemId) {
+        await cancelUploadSlot(uploadedLibraryItemId);
+      }
       setFileUploading(false);
+      setFileName("");
+      setUploadedLibraryItemId(null);
     }
+  };
+
+  const handleCancelUpload = () => {
+    abortControllerRef.current?.abort();
+    if (uploadedLibraryItemId) {
+      void cancelUploadSlot(uploadedLibraryItemId);
+    }
+    setFileUploading(false);
+    setFileName("");
+    setUploadedLibraryItemId(null);
+    setUploadProgress(0);
   };
 
   const handleAdd = async () => {
     if (!selectedType) return;
-    if (!title.trim() && selectedType !== "file") {
+
+    // File type resources are handled entirely by the upload flow
+    if (selectedType === "file") {
+      if (!uploadedLibraryItemId) {
+        toast.error("Please upload a file first");
+        return;
+      }
+      // The resource was already created by requestUploadSlot + confirmUpload
+      resetForm();
+      router.refresh();
+      return;
+    }
+
+    if (!title.trim()) {
       toast.error("Title is required");
       return;
     }
@@ -236,9 +436,6 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
       payload.url = url || undefined;
       payload.description = description || undefined;
       payload.metadata = { cta_text: sponsorCta || "Learn More" };
-    } else if (selectedType === "file") {
-      payload.file_path = filePath || undefined;
-      payload.description = description || undefined;
     }
 
     const result = await createLibraryResource(payload);
@@ -283,8 +480,12 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
     router.refresh();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this library resource? Dynamically linked fanflet blocks will become standalone.")) return;
+  const handleDelete = async (id: string, resource: LibraryResource) => {
+    const linkedCount = resource.linked_fanflets_count;
+    const message = linkedCount > 0
+      ? `This resource is linked to ${linkedCount} fanflet${linkedCount > 1 ? "s" : ""}. Deleting it will remove it from those fanflets. Continue?`
+      : "Delete this library resource?";
+    if (!confirm(message)) return;
     setDeleting(id);
     const result = await deleteLibraryResource(id);
     setDeleting(null);
@@ -300,9 +501,11 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
   const showContent = selectedType === "text";
   const showFile = selectedType === "file";
 
+  const hasFileResources = resources.some((r) => r.type === "file" && r.file_size_bytes);
+
   return (
     <Card className="border-slate-200">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-[#1B365D] flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
           Your Resources
@@ -318,7 +521,17 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-4 sm:px-6">
+        {/* Storage Quota Bar */}
+        {(hasFileResources || storageUsedBytes > 0) && (
+          <div className="flex flex-col gap-1.5 px-1 sm:flex-row sm:items-center sm:gap-3">
+            <span className="text-xs font-medium text-slate-600 shrink-0">File Storage Used</span>
+            <div className="min-w-0 flex-1 w-full">
+              <StorageQuotaBar usedBytes={storageUsedBytes} limitMb={storageLimitMb} />
+            </div>
+          </div>
+        )}
+
         {/* Add form */}
         {showAddForm && !selectedType && (
           <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
@@ -374,18 +587,20 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
               </Button>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-white/90 font-medium">
-                {selectedType === "sponsor" ? "Sponsor Name" : "Title"}
-              </Label>
-              <Input
-                id="new-resource-title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={selectedType === "sponsor" ? "Acme Health" : "My Website"}
-                className="bg-white border-white/20 placeholder:text-slate-400"
-              />
-            </div>
+            {!showFile && (
+              <div className="space-y-2">
+                <Label className="text-white/90 font-medium">
+                  {selectedType === "sponsor" ? "Sponsor Name" : "Title"}
+                </Label>
+                <Input
+                  id="new-resource-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={selectedType === "sponsor" ? "Acme Health" : "My Website"}
+                  className="bg-white border-white/20 placeholder:text-slate-400"
+                />
+              </div>
+            )}
 
             {showUrl && (
               <div className="space-y-2">
@@ -489,35 +704,66 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
             {showFile && (
               <div className="space-y-2">
                 <Label className="text-white/90 font-medium">File</Label>
-                {filePath ? (
-                  <div className="flex items-center gap-3 p-2 rounded-lg border border-white/20 bg-white/10">
-                    <span className="text-xs text-emerald-400 font-medium flex-1 truncate">{filePath.split("/").pop()}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setFilePath("");
-                        if (fileInputRef.current) fileInputRef.current.value = "";
-                      }}
-                      className="text-xs text-white/60 hover:text-white hover:bg-white/10"
-                    >
-                      Remove
-                    </Button>
+                <p className="text-[11px] text-white/50">
+                  Max {maxFileMb} MB. Accepted: PDF, PPTX, DOCX, XLSX, CSV, images, ZIP
+                </p>
+                {uploadedLibraryItemId && fileName ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 rounded-lg border border-white/20 bg-white/10">
+                      <FileDown className="w-5 h-5 text-emerald-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs text-emerald-400 font-medium truncate block">{fileName}</span>
+                        {uploadProgress >= 100 && (
+                          <span className="text-[10px] text-white/50">Uploaded successfully</span>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setFileName("");
+                          setUploadedLibraryItemId(null);
+                          setUploadProgress(0);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                        className="text-xs text-white/60 hover:text-white hover:bg-white/10"
+                      >
+                        Remove
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="relative">
                     <Input
                       ref={fileInputRef}
                       type="file"
+                      accept={ALLOWED_EXTENSIONS.join(",")}
                       onChange={handleFileUpload}
                       disabled={fileUploading}
                       className="bg-white border-white/20"
                     />
                     {fileUploading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
-                        <span className="text-xs ml-2 text-muted-foreground">Uploading...</span>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 rounded-md gap-1">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
+                          <span className="text-xs text-muted-foreground">
+                            Uploading {fileName}...
+                          </span>
+                        </div>
+                        <div className="w-3/4 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#3BA5D9] rounded-full transition-all"
+                            style={{ width: `${Math.max(uploadProgress, 10)}%` }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelUpload}
+                          className="text-[10px] text-slate-500 hover:text-slate-700 mt-0.5"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     )}
                   </div>
@@ -527,25 +773,40 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
 
             {showFile && (
               <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Description (optional)</Label>
+                <Label className="text-white/90 font-medium">Title (optional)</Label>
                 <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. PDF - 4.2 MB"
+                  id="new-resource-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={fileName || "e.g. Conference Slide Deck"}
                   className="bg-white border-white/20 placeholder:text-slate-400"
                 />
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label className="text-white/90 font-medium">Section Name</Label>
-              <Input
-                value={sectionName}
-                onChange={(e) => setSectionName(e.target.value)}
-                placeholder="Resources"
-                className="bg-white border-white/20 placeholder:text-slate-400"
-              />
-            </div>
+            {showFile && (
+              <div className="space-y-2">
+                <Label className="text-white/90 font-medium">Description (optional)</Label>
+                <Input
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="e.g. Slides from my talk at..."
+                  className="bg-white border-white/20 placeholder:text-slate-400"
+                />
+              </div>
+            )}
+
+            {!showFile && (
+              <div className="space-y-2">
+                <Label className="text-white/90 font-medium">Section Name</Label>
+                <Input
+                  value={sectionName}
+                  onChange={(e) => setSectionName(e.target.value)}
+                  placeholder="Resources"
+                  className="bg-white border-white/20 placeholder:text-slate-400"
+                />
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <Button
@@ -575,7 +836,9 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
         )}
 
         {resources.map((r) => {
-          const Icon = typeIcons[r.type] ?? Link2;
+          const Icon = r.type === "file" && r.file_type
+            ? getFileIcon(r.file_type)
+            : typeIcons[r.type] ?? Link2;
 
           if (editingId === r.id) {
             return (
@@ -703,14 +966,25 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
           const preview =
             r.type === "text"
               ? (r.description ?? "").slice(0, 80) + ((r.description?.length ?? 0) > 80 ? "..." : "")
-              : r.description ?? r.url ?? r.file_path ?? "";
+              : r.type === "file"
+                ? (r.description ?? (r.file_path
+                    ? `${extractFilename(r.file_path)}${r.file_size_bytes != null && r.file_size_bytes > 0 ? ` · ${formatFileSize(r.file_size_bytes)}` : ""}`
+                    : ""))
+                : r.description ?? r.url ?? "";
 
           return (
             <div
               key={r.id}
               className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200 group"
             >
-              {r.image_url ? (
+              {r.type === "file" ? (
+                <FileThumbnail
+                  filePath={r.file_path}
+                  fileType={r.file_type}
+                  title={r.title || "File"}
+                  fallbackIcon={Icon}
+                />
+              ) : r.image_url ? (
                 <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -725,13 +999,23 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-[10px] font-semibold text-muted-foreground uppercase">
                     {typeLabels[r.type] ?? r.type}
                   </span>
                   {r.section_name && (
                     <span className="text-[10px] text-slate-400">
                       &bull; {r.section_name}
+                    </span>
+                  )}
+                  {r.file_size_bytes != null && r.file_size_bytes > 0 && (
+                    <span className="text-[10px] text-slate-400">
+                      &bull; {formatFileSize(r.file_size_bytes)}
+                    </span>
+                  )}
+                  {r.created_at && (
+                    <span className="text-[10px] text-slate-400" title="Upload date">
+                      &bull; {new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                     </span>
                   )}
                 </div>
@@ -741,28 +1025,78 @@ export function ResourceLibrary({ resources, authUserId, allowSponsorVisibility 
                     {preview}
                   </p>
                 )}
+                {/* Usage badges */}
+                <div className="flex items-center gap-3 mt-1.5">
+                  {r.linked_fanflets_count > 0 ? (
+                    <div
+                      className="relative"
+                      ref={(el) => {
+                        if (openLinkedId === r.id)
+                          (linkedPopoverRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenLinkedId(openLinkedId === r.id ? null : r.id)}
+                        className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3BA5D9] hover:underline cursor-pointer"
+                        aria-expanded={openLinkedId === r.id}
+                        aria-haspopup="true"
+                      >
+                        <LinkIcon className="w-3 h-3" />
+                        {r.linked_fanflets_count} fanflet{r.linked_fanflets_count !== 1 ? "s" : ""}
+                      </button>
+                      {openLinkedId === r.id && (r.linked_fanflets ?? []).length > 0 && (
+                        <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] max-w-[min(180px,calc(100vw-2rem))] rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                          <p className="px-2 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                            Linked to
+                          </p>
+                          {r.linked_fanflets.map((f) => (
+                            <Link
+                              key={f.id}
+                              href={`/dashboard/fanflets/${f.id}`}
+                              className="block px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 truncate"
+                              onClick={() => setOpenLinkedId(null)}
+                            >
+                              {f.title || "Untitled"}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">Unused</span>
+                  )}
+                  {r.download_count > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                      <Download className="w-3 h-3" />
+                      {r.download_count}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <div className="flex flex-wrap items-center gap-2 opacity-100 transition-opacity shrink-0 sm:opacity-0 sm:group-hover:opacity-100">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => handleStartEdit(r)}
-                  className="h-8 w-8 p-0"
+                  className="gap-2"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil className="w-4 h-4" />
+                  Edit
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  onClick={() => handleDelete(r.id)}
+                  onClick={() => handleDelete(r.id, r)}
                   disabled={deleting === r.id}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
                 >
                   {deleting === r.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   )}
+                  Delete
                 </Button>
               </div>
             </div>

@@ -208,7 +208,7 @@ export function QuestionLibrary({ questions, allowCreate = true }: QuestionLibra
 
   return (
     <Card className="border-slate-200">
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-3 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-[#1B365D] flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           Your Questions
@@ -235,7 +235,7 @@ export function QuestionLibrary({ questions, allowCreate = true }: QuestionLibra
           </div>
         )}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-4 sm:px-6">
         {/* Template picker */}
         {allowCreate && showTemplatePicker && (
           <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
@@ -408,27 +408,29 @@ export function QuestionLibrary({ questions, allowCreate = true }: QuestionLibra
                   {typeLabels[q.question_type] ?? q.question_type}
                 </p>
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <div className="flex flex-wrap items-center gap-2 opacity-100 transition-opacity shrink-0 sm:opacity-0 sm:group-hover:opacity-100">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => handleStartEdit(q)}
-                  className="h-8 w-8 p-0"
+                  className="gap-2"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
+                  <Pencil className="w-4 h-4" />
+                  Edit
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => handleDelete(q.id)}
                   disabled={deleting === q.id}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
                 >
                   {deleting === q.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-4 h-4" />
                   )}
+                  Delete
                 </Button>
               </div>
             </div>

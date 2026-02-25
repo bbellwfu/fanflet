@@ -88,6 +88,43 @@ export default async function NewPlanPage() {
               className="w-full rounded-md border border-border-subtle bg-surface-elevated px-3 py-2 text-[14px] text-fg placeholder:text-fg-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
+          <div className="sm:col-span-2 grid gap-4 sm:grid-cols-2">
+            <label className="flex items-start gap-3 rounded-lg border border-border-subtle p-4 cursor-pointer hover:bg-surface-elevated transition-colors">
+              <input
+                type="checkbox"
+                name="is_public"
+                value="true"
+                className="mt-0.5 rounded border-border-subtle text-primary focus:ring-primary"
+              />
+              <div>
+                <span className="block text-[13px] font-medium text-fg">
+                  Public
+                </span>
+                <span className="block text-[11px] text-fg-muted mt-0.5">
+                  Show on the public pricing page
+                </span>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-lg border border-border-subtle p-4 cursor-pointer hover:bg-surface-elevated transition-colors">
+              <input
+                type="checkbox"
+                name="is_active"
+                value="true"
+                defaultChecked
+                className="mt-0.5 rounded border-border-subtle text-primary focus:ring-primary"
+              />
+              <div>
+                <span className="block text-[13px] font-medium text-fg">
+                  Active
+                </span>
+                <span className="block text-[11px] text-fg-muted mt-0.5">
+                  Accept new subscriptions
+                </span>
+              </div>
+            </label>
+          </div>
+
           <LimitField
             name="max_fanflets"
             label="Max fanflets"
@@ -99,6 +136,24 @@ export default async function NewPlanPage() {
             label="Max resources per fanflet"
             description="Max links/files per fanflet on this plan"
             defaultValue={20}
+          />
+          <LimitField
+            name="storage_mb"
+            label="Storage (MB)"
+            description="Total file storage per speaker (MB) for content library"
+            defaultValue={100}
+          />
+          <LimitField
+            name="max_file_mb"
+            label="Max file size (MB)"
+            description="Maximum size per uploaded file (MB)"
+            defaultValue={10}
+          />
+          <LimitField
+            name="signed_url_minutes"
+            label="Signed URL duration (minutes)"
+            description="Download link validity in minutes"
+            defaultValue={15}
           />
         </div>
 

@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { hasFeature } from '@fanflet/db'
+import { getSpeakerEntitlements } from '@fanflet/db'
+import { STORAGE_BUCKET } from '@fanflet/db/storage'
 import { ensureUrl } from '@/lib/utils'
 
-async function getSpeakerId() {
+async function getSpeakerContext() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -16,8 +17,11 @@ async function getSpeakerId() {
     .eq('auth_user_id', user.id)
     .single()
 
-  return speaker?.id ?? null
+  if (!speaker) return null
+  return { supabase, user, speakerId: speaker.id }
 }
+
+export type LinkedFanflet = { id: string; title: string }
 
 export type LibraryResource = {
   id: string
@@ -26,29 +30,110 @@ export type LibraryResource = {
   description: string | null
   url: string | null
   file_path: string | null
+  file_size_bytes: number | null
+  file_type: string | null
   image_url: string | null
   section_name: string | null
   metadata: Record<string, unknown> | null
   created_at: string
   updated_at: string
+  linked_fanflets_count: number
+  linked_fanflets: LinkedFanflet[]
+  download_count: number
 }
 
 export async function listLibraryResources(): Promise<{
   data?: LibraryResource[]
   error?: string
 }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  const ctx = await getSpeakerContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase, speakerId } = ctx
 
-  const { data, error } = await supabase
+  const { data: items, error } = await supabase
     .from('resource_library')
-    .select('*')
+    .select('*, resource_blocks(id, fanflet_id, fanflets(id, title))')
     .eq('speaker_id', speakerId)
     .order('created_at', { ascending: true })
 
   if (error) return { error: error.message }
-  return { data: data ?? [] }
+
+  // Get download counts from analytics_events for all library items via their resource_blocks
+  const allBlockIds = (items ?? [])
+    .flatMap((item) => {
+      const blocks = item.resource_blocks as Array<{ id: string; fanflet_id: string }> | null
+      return blocks?.map((b) => b.id) ?? []
+    })
+
+  let downloadCounts: Record<string, number> = {}
+  if (allBlockIds.length > 0) {
+    const { data: downloads } = await supabase
+      .from('analytics_events')
+      .select('resource_block_id')
+      .eq('event_type', 'resource_download')
+      .in('resource_block_id', allBlockIds)
+
+    if (downloads) {
+      for (const d of downloads) {
+        if (d.resource_block_id) {
+          downloadCounts[d.resource_block_id] = (downloadCounts[d.resource_block_id] ?? 0) + 1
+        }
+      }
+    }
+  }
+
+  const enriched: LibraryResource[] = (items ?? []).map((item) => {
+    const blocks = item.resource_blocks as Array<{
+      id: string
+      fanflet_id: string
+      fanflets: { id: string; title: string } | null
+    }> | null
+    const blocksList = blocks ?? []
+    const uniqueFanfletsMap = new Map<string, string>()
+    for (const b of blocksList) {
+      const f = b.fanflets
+      if (f) uniqueFanfletsMap.set(f.id, f.title)
+    }
+    const linkedFanflets: LinkedFanflet[] = Array.from(uniqueFanfletsMap.entries()).map(
+      ([id, title]) => ({ id, title: title || 'Untitled' })
+    )
+    const itemDownloads = blocksList.reduce((sum, b) => sum + (downloadCounts[b.id] ?? 0), 0)
+
+    return {
+      id: item.id,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      url: item.url,
+      file_path: item.file_path,
+      file_size_bytes: item.file_size_bytes ?? null,
+      file_type: item.file_type ?? null,
+      image_url: item.image_url,
+      section_name: item.section_name,
+      metadata: item.metadata as Record<string, unknown> | null,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+      linked_fanflets_count: linkedFanflets.length,
+      linked_fanflets: linkedFanflets,
+      download_count: itemDownloads,
+    }
+  })
+
+  return { data: enriched }
+}
+
+export async function getSpeakerStorageUsage(): Promise<{
+  usedBytes: number
+  error?: string
+}> {
+  const ctx = await getSpeakerContext()
+  if (!ctx) return { usedBytes: 0, error: 'Not authenticated' }
+
+  const { data } = await ctx.supabase.rpc('speaker_storage_used_bytes', {
+    p_speaker_id: ctx.speakerId,
+  })
+
+  return { usedBytes: typeof data === 'number' ? data : 0 }
 }
 
 export async function createLibraryResource(data: {
@@ -61,17 +146,17 @@ export async function createLibraryResource(data: {
   section_name?: string
   metadata?: Record<string, unknown>
 }): Promise<{ error?: string; success?: boolean; id?: string }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  const ctx = await getSpeakerContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase, speakerId } = ctx
 
   if (!data.title?.trim()) return { error: 'Title is required' }
   if (!['link', 'file', 'text', 'sponsor'].includes(data.type)) {
     return { error: 'Invalid resource type' }
   }
   if (data.type === 'sponsor') {
-    const allowSponsor = await hasFeature(speakerId, 'sponsor_visibility')
-    if (!allowSponsor) return { error: 'Sponsor resources require a higher plan. Upgrade in Settings.' }
+    const entitlements = await getSpeakerEntitlements(speakerId)
+    if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor resources require a higher plan. Upgrade in Settings.' }
   }
 
   const { data: item, error } = await supabase
@@ -108,9 +193,9 @@ export async function updateLibraryResource(
     metadata?: Record<string, unknown>
   }
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  const ctx = await getSpeakerContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase, speakerId } = ctx
 
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
@@ -137,9 +222,17 @@ export async function updateLibraryResource(
 export async function deleteLibraryResource(
   id: string
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  const ctx = await getSpeakerContext()
+  if (!ctx) return { error: 'Not authenticated' }
+  const { supabase, speakerId } = ctx
+
+  // Fetch the item first to get the file_path for storage cleanup
+  const { data: item } = await supabase
+    .from('resource_library')
+    .select('file_path, type')
+    .eq('id', id)
+    .eq('speaker_id', speakerId)
+    .single()
 
   const { error } = await supabase
     .from('resource_library')
@@ -148,6 +241,11 @@ export async function deleteLibraryResource(
     .eq('speaker_id', speakerId)
 
   if (error) return { error: error.message }
+
+  // Clean up the file from storage if it's a file-type resource with a non-legacy path
+  if (item?.type === 'file' && item.file_path && !item.file_path.startsWith('http')) {
+    await supabase.storage.from(STORAGE_BUCKET).remove([item.file_path])
+  }
 
   revalidatePath('/dashboard/resources')
   return { success: true }

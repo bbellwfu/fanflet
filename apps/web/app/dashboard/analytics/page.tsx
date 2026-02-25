@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasFeature } from "@fanflet/db";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,10 +27,9 @@ export default async function AnalyticsPage() {
 
   if (!speaker) redirect("/dashboard/settings");
 
-  const [hasBasicStats, hasClickAnalytics] = await Promise.all([
-    hasFeature(speaker.id, "basic_engagement_stats"),
-    hasFeature(speaker.id, "click_through_analytics"),
-  ]);
+  const entitlements = await getSpeakerEntitlements(speaker.id);
+  const hasBasicStats = entitlements.features.has("basic_engagement_stats");
+  const hasClickAnalytics = entitlements.features.has("click_through_analytics");
   const canSeeAnalytics = hasBasicStats || hasClickAnalytics;
 
   if (!canSeeAnalytics) {

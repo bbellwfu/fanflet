@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasFeature } from "@fanflet/db";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { QuestionLibrary } from "@/components/dashboard/question-library";
@@ -24,7 +24,7 @@ export default async function SurveysPage() {
     redirect("/dashboard/settings");
   }
 
-  const hasSurveys = await hasFeature(speaker.id, "surveys_session_feedback");
+  const hasSurveys = (await getSpeakerEntitlements(speaker.id)).features.has("surveys_session_feedback");
 
   const { data: surveyQuestions } = await supabase
     .from("survey_questions")
@@ -33,7 +33,7 @@ export default async function SurveysPage() {
     .order("created_at", { ascending: true });
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
+    <div className="w-full min-w-0 space-y-8 max-w-5xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-[#1B365D]">
           Survey Questions

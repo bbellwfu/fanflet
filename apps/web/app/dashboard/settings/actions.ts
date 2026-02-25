@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { hasFeature } from '@fanflet/db'
+import { getSpeakerEntitlements } from '@fanflet/db'
 import type { PhotoFrame } from '@/lib/photo-frame'
 import { DEFAULT_THEME_ID, THEME_PRESETS } from '@/lib/themes'
 import { toSocialLinksRecord } from '@/lib/speaker-preferences'
@@ -54,7 +54,7 @@ export async function updateSpeakerProfile(formData: FormData) {
       ? existingSocialLinks.photo_frame
       : null
   const validThemePresetIds = new Set(THEME_PRESETS.map((theme) => theme.id))
-  const allowMultipleThemes = await hasFeature(speaker.id, 'multiple_theme_colors')
+  const allowMultipleThemes = (await getSpeakerEntitlements(speaker.id)).features.has('multiple_theme_colors')
   const safeThemePreset =
     allowMultipleThemes && validThemePresetIds.has(defaultThemePreset)
       ? defaultThemePreset

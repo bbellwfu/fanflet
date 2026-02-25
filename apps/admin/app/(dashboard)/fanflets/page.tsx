@@ -40,7 +40,7 @@ export default async function FanfletsPage({
     );
   }
 
-  const rows = (fanflets ?? []) as FanfletRow[];
+  const rows = (fanflets ?? []) as unknown as FanfletRow[];
   const publishedCount = rows.filter((f) => f.status === "published").length;
   const draftCount = rows.filter((f) => f.status === "draft").length;
 

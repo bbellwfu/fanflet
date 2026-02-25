@@ -27,6 +27,7 @@ type Plan = {
   limits: Record<string, number> | null;
   sort_order: number;
   is_active: boolean;
+  is_public: boolean;
   price_monthly_cents: number | null;
 };
 
@@ -219,11 +220,18 @@ export function FeaturesPageClient({
                           {p.display_name}
                         </h3>
                       </div>
-                      {!p.is_active && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-elevated text-fg-muted">
-                          Inactive
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {p.is_public && (
+                          <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary-muted text-primary-soft">
+                            Public
+                          </span>
+                        )}
+                        {!p.is_active && (
+                          <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-elevated text-fg-muted">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {p.description && (
                       <p className="text-[12px] text-fg-secondary">

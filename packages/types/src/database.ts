@@ -10,6 +10,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -135,6 +137,141 @@ export type Database = {
           },
         ]
       }
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          id: string
+          is_global: boolean
+          key: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          is_global?: boolean
+          key: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_global?: boolean
+          key?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketing_subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          interest_tier: string | null
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          interest_tier?: string | null
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          interest_tier?: string | null
+          source?: string
+        }
+        Relationships: []
+      }
+      plan_features: {
+        Row: {
+          feature_flag_id: string
+          plan_id: string
+        }
+        Insert: {
+          feature_flag_id: string
+          plan_id: string
+        }
+        Update: {
+          feature_flag_id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_features_feature_flag_id_fkey"
+            columns: ["feature_flag_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          is_public: boolean
+          limits: Json
+          name: string
+          price_monthly_cents: number | null
+          price_yearly_cents: number | null
+          sort_order: number
+          stripe_price_id_monthly: string | null
+          stripe_price_id_yearly: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          limits?: Json
+          name: string
+          price_monthly_cents?: number | null
+          price_yearly_cents?: number | null
+          sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          limits?: Json
+          name?: string
+          price_monthly_cents?: number | null
+          price_yearly_cents?: number | null
+          sort_order?: number
+          stripe_price_id_monthly?: string | null
+          stripe_price_id_yearly?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       resource_blocks: {
         Row: {
           created_at: string
@@ -144,6 +281,7 @@ export type Database = {
           file_path: string | null
           id: string
           image_url: string | null
+          library_item_id: string | null
           metadata: Json | null
           section_name: string | null
           title: string
@@ -159,6 +297,7 @@ export type Database = {
           file_path?: string | null
           id?: string
           image_url?: string | null
+          library_item_id?: string | null
           metadata?: Json | null
           section_name?: string | null
           title?: string
@@ -174,6 +313,7 @@ export type Database = {
           file_path?: string | null
           id?: string
           image_url?: string | null
+          library_item_id?: string | null
           metadata?: Json | null
           section_name?: string | null
           title?: string
@@ -189,6 +329,180 @@ export type Database = {
             referencedRelation: "fanflets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "resource_blocks_library_item_id_fkey"
+            columns: ["library_item_id"]
+            isOneToOne: false
+            referencedRelation: "resource_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      resource_library: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_path: string | null
+          file_size_bytes: number | null
+          file_type: string | null
+          id: string
+          image_url: string | null
+          media_metadata: Json | null
+          metadata: Json | null
+          section_name: string | null
+          speaker_id: string
+          title: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          image_url?: string | null
+          media_metadata?: Json | null
+          metadata?: Json | null
+          section_name?: string | null
+          speaker_id: string
+          title?: string
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          image_url?: string | null
+          media_metadata?: Json | null
+          metadata?: Json | null
+          section_name?: string | null
+          speaker_id?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_library_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      speaker_feature_overrides: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          feature_flag_id: string
+          granted_by: string | null
+          id: string
+          reason: string | null
+          speaker_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled: boolean
+          feature_flag_id: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          speaker_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          feature_flag_id?: string
+          granted_by?: string | null
+          id?: string
+          reason?: string | null
+          speaker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speaker_feature_overrides_feature_flag_id_fkey"
+            columns: ["feature_flag_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "speaker_feature_overrides_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      speaker_subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          features_snapshot: string[] | null
+          id: string
+          limits_snapshot: Json | null
+          plan_id: string
+          speaker_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          features_snapshot?: string[] | null
+          id?: string
+          limits_snapshot?: Json | null
+          plan_id: string
+          speaker_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          features_snapshot?: string[] | null
+          id?: string
+          limits_snapshot?: Json | null
+          plan_id?: string
+          speaker_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "speaker_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "speaker_subscriptions_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: true
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       speakers: {
@@ -202,6 +516,10 @@ export type Database = {
           photo_url: string | null
           slug: string | null
           social_links: Json | null
+          status: string
+          suspended_at: string | null
+          suspended_by: string | null
+          suspension_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -214,6 +532,10 @@ export type Database = {
           photo_url?: string | null
           slug?: string | null
           social_links?: Json | null
+          status?: string
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -226,6 +548,10 @@ export type Database = {
           photo_url?: string | null
           slug?: string | null
           social_links?: Json | null
+          status?: string
+          suspended_at?: string | null
+          suspended_by?: string | null
+          suspension_reason?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -355,12 +681,45 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          auth_user_id: string
+          created_at: string
+          granted_by: string | null
+          id: string
+          role: string
+          scope_id: string | null
+          scope_type: string
+          updated_at: string
+        }
+        Insert: {
+          auth_user_id: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string
+        }
+        Update: {
+          auth_user_id?: string
+          created_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: string
+          scope_id?: string | null
+          scope_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_platform_admin: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

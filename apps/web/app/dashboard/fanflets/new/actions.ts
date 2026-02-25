@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getSpeakerLimits, hasFeature } from '@fanflet/db'
+import { getSpeakerEntitlements } from '@fanflet/db'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { getStoredDefaultThemePreset } from '@/lib/speaker-preferences'
 import { parseExpirationFromForm, resolveExpirationDate } from '@/lib/expiration'
@@ -20,8 +20,8 @@ export async function createFanflet(formData: FormData) {
 
   if (!speaker) return { error: 'Speaker profile not found' }
 
-  const limits = await getSpeakerLimits(speaker.id)
-  const maxFanflets = limits?.max_fanflets
+  const entitlements = await getSpeakerEntitlements(speaker.id)
+  const maxFanflets = entitlements.limits.max_fanflets
   if (typeof maxFanflets === 'number' && maxFanflets !== -1) {
     const { count, error: countError } = await supabase
       .from('fanflets')
@@ -52,14 +52,14 @@ export async function createFanflet(formData: FormData) {
   }
 
   const speakerDefaultTheme = getStoredDefaultThemePreset(speaker.social_links)
-  const allowMultipleThemes = await hasFeature(speaker.id, 'multiple_theme_colors')
+  const allowMultipleThemes = entitlements.features.has('multiple_theme_colors')
   const themeConfig =
     allowMultipleThemes && speakerDefaultTheme && speakerDefaultTheme !== DEFAULT_THEME_ID
       ? { preset: speakerDefaultTheme }
       : {}
 
   let expiration = parseExpirationFromForm(formData)
-  const allowCustomExpiration = await hasFeature(speaker.id, 'custom_expiration')
+  const allowCustomExpiration = entitlements.features.has('custom_expiration')
   if (!allowCustomExpiration && expiration.preset !== 'none' && expiration.preset !== '14d') {
     expiration = { ...expiration, preset: '14d' as const, customDate: null }
   }

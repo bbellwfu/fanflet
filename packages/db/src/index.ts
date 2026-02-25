@@ -3,4 +3,20 @@ export { createClient as createBrowserClient } from "./client";
 export { createServiceClient } from "./service";
 export { updateSession } from "./middleware";
 export { getSiteUrl } from "./config";
-export { hasFeature, getSpeakerLimits } from "./features";
+export { getSpeakerEntitlements, hasFeature, getSpeakerLimits } from "./features";
+export type { SpeakerEntitlements } from "./features";
+export {
+  STORAGE_BUCKET,
+  PUBLIC_BUCKET,
+  ALLOWED_FILE_TYPES,
+  ALLOWED_EXTENSIONS,
+  ALLOWED_MIME_TYPES,
+  getStorageQuota,
+  formatFileSize,
+  isAllowedFileType,
+  getFileExtension,
+  getFileTypeLabel,
+  buildStoragePath,
+  extractFilename,
+} from "./storage";
+export type { StorageQuota } from "./storage";

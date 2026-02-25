@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasFeature } from "@fanflet/db";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { SettingsForm } from "@/components/dashboard/settings-form";
@@ -21,7 +21,7 @@ export default async function SettingsPage() {
     .single();
 
   const allowMultipleThemes = speaker
-    ? await hasFeature(speaker.id, "multiple_theme_colors")
+    ? (await getSpeakerEntitlements(speaker.id)).features.has("multiple_theme_colors")
     : false;
 
   return (

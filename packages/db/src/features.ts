@@ -1,91 +1,143 @@
+import { cache } from "react";
 import { createClient } from "./server";
 
+export interface SpeakerEntitlements {
+  features: Set<string>;
+  limits: Record<string, number>;
+  planName: string | null;
+  planDisplayName: string | null;
+}
+
+const EMPTY_ENTITLEMENTS: SpeakerEntitlements = {
+  features: new Set<string>(),
+  limits: {},
+  planName: null,
+  planDisplayName: null,
+};
+
 /**
- * Check if a speaker has access to a specific feature.
+ * Load all entitlements for a speaker in as few queries as possible.
  *
- * Resolution order:
- * 1. Speaker-specific feature override (explicit grant/deny)
- * 2. Global feature flag (is_global = true -> everyone gets it)
- * 3. Speaker's plan -> plan_features junction
+ * Resolution:
+ * 1. Subscription row (with snapshots when available)
+ * 2. Global feature flags (everyone gets these)
+ * 3. Speaker-specific overrides (explicit grant/deny)
  *
- * Falls back to false if no match is found.
+ * Wrapped in React `cache()` so multiple calls within the same
+ * server render or server action share one result.
+ */
+export const getSpeakerEntitlements = cache(
+  async (speakerId: string): Promise<SpeakerEntitlements> => {
+    const supabase = await createClient();
+
+    const [subResult, globalFlagsResult, overridesResult] = await Promise.all([
+      supabase
+        .from("speaker_subscriptions")
+        .select(
+          "plan_id, limits_snapshot, features_snapshot, plans(name, display_name, limits)"
+        )
+        .eq("speaker_id", speakerId)
+        .eq("status", "active")
+        .maybeSingle(),
+
+      supabase
+        .from("feature_flags")
+        .select("key")
+        .eq("is_global", true),
+
+      supabase
+        .from("speaker_feature_overrides")
+        .select("feature_flag_id, enabled, feature_flags(key)")
+        .eq("speaker_id", speakerId),
+    ]);
+
+    const sub = subResult.data;
+    const globalFlags = globalFlagsResult.data ?? [];
+    const overrides = overridesResult.data ?? [];
+
+    const features = new Set<string>();
+    let limits: Record<string, number> = {};
+    let planName: string | null = null;
+    let planDisplayName: string | null = null;
+
+    if (sub) {
+      const plan = sub.plans as unknown as {
+        name: string;
+        display_name: string;
+        limits: Record<string, number>;
+      } | null;
+
+      planName = plan?.name ?? null;
+      planDisplayName = plan?.display_name ?? null;
+
+      if (sub.features_snapshot && sub.features_snapshot.length > 0) {
+        for (const key of sub.features_snapshot) features.add(key);
+      } else if (plan) {
+        const { data: planFeatures } = await supabase
+          .from("plan_features")
+          .select("feature_flags(key)")
+          .eq("plan_id", sub.plan_id);
+
+        for (const pf of planFeatures ?? []) {
+          const flag = pf.feature_flags as unknown as { key: string } | null;
+          if (flag?.key) features.add(flag.key);
+        }
+      }
+
+      if (sub.limits_snapshot && typeof sub.limits_snapshot === "object") {
+        limits = sub.limits_snapshot as Record<string, number>;
+      } else if (plan?.limits) {
+        limits = plan.limits;
+      }
+    } else {
+      const { data: freePlan } = await supabase
+        .from("plans")
+        .select("name, display_name, limits")
+        .eq("name", "free")
+        .single();
+
+      if (freePlan) {
+        planName = freePlan.name;
+        planDisplayName = freePlan.display_name;
+        limits = (freePlan.limits as Record<string, number>) ?? {};
+      }
+    }
+
+    for (const gf of globalFlags) features.add(gf.key);
+
+    for (const ov of overrides) {
+      const flag = ov.feature_flags as unknown as { key: string } | null;
+      if (!flag?.key) continue;
+      if (ov.enabled) {
+        features.add(flag.key);
+      } else {
+        features.delete(flag.key);
+      }
+    }
+
+    return { features, limits, planName, planDisplayName };
+  }
+);
+
+/**
+ * @deprecated Use `getSpeakerEntitlements()` instead. Kept for backward compatibility.
  */
 export async function hasFeature(
   speakerId: string,
   featureKey: string
 ): Promise<boolean> {
-  const supabase = await createClient();
-
-  // 1. Check feature flag exists and get its properties
-  const { data: flag } = await supabase
-    .from("feature_flags")
-    .select("id, is_global")
-    .eq("key", featureKey)
-    .single();
-
-  if (!flag) return false;
-
-  // 2. Check speaker-specific override
-  const { data: override } = await supabase
-    .from("speaker_feature_overrides")
-    .select("enabled")
-    .eq("speaker_id", speakerId)
-    .eq("feature_flag_id", flag.id)
-    .maybeSingle();
-
-  if (override) return override.enabled;
-
-  // 3. Check if globally enabled
-  if (flag.is_global) return true;
-
-  // 4. Check speaker's plan
-  const { data: subscription } = await supabase
-    .from("speaker_subscriptions")
-    .select("plan_id")
-    .eq("speaker_id", speakerId)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!subscription) return false;
-
-  // 5. Check plan_features junction
-  const { data: planFeature } = await supabase
-    .from("plan_features")
-    .select("plan_id")
-    .eq("plan_id", subscription.plan_id)
-    .eq("feature_flag_id", flag.id)
-    .maybeSingle();
-
-  return !!planFeature;
+  const entitlements = await getSpeakerEntitlements(speakerId);
+  return entitlements.features.has(featureKey);
 }
 
 /**
- * Get the speaker's current plan limits.
- * Returns null if speaker has no subscription (treated as free tier).
+ * @deprecated Use `getSpeakerEntitlements()` instead. Kept for backward compatibility.
  */
 export async function getSpeakerLimits(
   speakerId: string
 ): Promise<Record<string, number> | null> {
-  const supabase = await createClient();
-
-  const { data: subscription } = await supabase
-    .from("speaker_subscriptions")
-    .select("plan_id, plans(limits)")
-    .eq("speaker_id", speakerId)
-    .eq("status", "active")
-    .maybeSingle();
-
-  if (!subscription) {
-    // Default free tier limits
-    const { data: freePlan } = await supabase
-      .from("plans")
-      .select("limits")
-      .eq("name", "free")
-      .single();
-
-    return (freePlan?.limits as Record<string, number>) ?? null;
-  }
-
-  const plans = subscription.plans as unknown as { limits: Record<string, number> } | null;
-  return plans?.limits ?? null;
+  const entitlements = await getSpeakerEntitlements(speakerId);
+  return Object.keys(entitlements.limits).length > 0
+    ? entitlements.limits
+    : null;
 }

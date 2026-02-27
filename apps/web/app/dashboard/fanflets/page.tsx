@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Plus, FileText, Pencil, ExternalLink } from "lucide-react";
+import { CloneFanfletButton } from "./clone-fanflet-button";
+import { CopyFanfletUrlButton } from "./copy-fanflet-url-button";
 import { getExpirationStatus } from "@/lib/expiration";
 
 export default async function FanfletsPage() {
@@ -195,6 +197,14 @@ export default async function FanfletsPage() {
                         {fanflet.event_date &&
                           ` • ${formatDate(fanflet.event_date)}`}
                       </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs text-slate-600 font-mono truncate min-w-0">
+                          /{speaker.slug}/<b>{fanflet.slug}</b>
+                        </p>
+                        <CopyFanfletUrlButton
+                          url={`${baseUrl}/${speaker.slug}/${fanflet.slug}`}
+                        />
+                      </div>
                     </div>
                     {getStatusBadge(fanflet.status, fanflet.expiration_date ?? null)}
                   </div>
@@ -223,6 +233,7 @@ export default async function FanfletsPage() {
                         </a>
                       </Button>
                     )}
+                    <CloneFanfletButton fanfletId={fanflet.id} />
                   </div>
                 </CardContent>
               </Card>

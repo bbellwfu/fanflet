@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasFeature } from "@fanflet/db";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import { NewFanfletForm } from "./new-fanflet-form";
 
@@ -18,7 +18,7 @@ export default async function NewFanfletPage() {
     .single();
 
   const allowCustomExpiration = speaker
-    ? await hasFeature(speaker.id, "custom_expiration")
+    ? (await getSpeakerEntitlements(speaker.id)).features.has("custom_expiration")
     : false;
 
   return (

@@ -2,6 +2,56 @@
 
 Digital resource platform for speakers — attendees scan a QR code and get instant access to the speaker's curated resources (links, files, downloads).
 
+## Product scope (key features in place)
+
+### Core product
+
+- **Fanflet creation & editing**: Speakers create resource pages (fanflets) with a WYSIWYG editor supporting four block types: link, file, text, and sponsor. Blocks can reference a centralized resource library (`library_item_id`) so updates propagate. Themes, expiration dates, and survey questions are configurable per fanflet.
+- **Public landing pages** (`/[speakerSlug]/[fanfletSlug]`): Mobile-first audience pages with speaker profile, event context, resource cards, email subscribe, SMS bookmark, survey prompt, and sponsor section. Theme CSS variables applied from fanflet config.
+- **QR code system** (`/api/qr/[id]`): Generates branded QR codes (PNG/SVG) linking to the public fanflet page. Downloadable from `/dashboard/fanflets/[id]/qr`.
+- **Analytics & tracking** (`/api/track`): Tracks page_view, resource_click, email_signup, qr_scan, sms_bookmark, referral_click, and resource_download events. Dashboard views at `/dashboard` (overview chart) and `/dashboard/analytics` (per-fanflet and per-resource breakdown). Feature-gated by plan.
+
+### Demo page
+
+- **Route**: `/demo` — static dental-focused demo page (no auth required)
+- **Content**: Fictitious speaker Dr. Sarah Mitchell, DDS at "Southwest Dental Conference 2026." Shows all four resource types (slides PDF, CE credit link, clinical protocol download, product recommendations link), a text block, sponsor block (ApexDental), email subscribe, and SMS bookmark.
+- **Design**: Matches the real `LandingPage` component structure (hero, subscribe card, SMS card, resource sections, sponsor section, footer CTA). Uses the default Navy theme.
+- **Files**: `apps/web/app/(demo)/demo/page.tsx`
+
+### Subscriber management
+
+- **Dashboard page**: `/dashboard/subscribers` — server component fetching subscribers via server actions.
+- **Features**: Searchable/filterable table (by email, name, or source fanflet), sort by date/email/source, select all/individual checkboxes, bulk or single delete with confirmation modal, CSV export (selected or all), and email compose modal (opens user's email client with subscribers in BCC).
+- **Stats cards**: Total subscribers, this week's signups, number of source fanflets.
+- **Source filter dropdown**: Dynamically populated from fanflets that actually produced subscribers — only shows fanflets with at least one signup.
+- **Database**: Uses existing `subscribers` table. New migration `20260227100000` adds DELETE and UPDATE RLS policies so speakers can manage their own subscribers.
+- **Files**: `apps/web/app/dashboard/subscribers/page.tsx`, `apps/web/app/dashboard/subscribers/actions.ts`, `apps/web/components/dashboard/subscribers-dashboard.tsx`
+- **Admin**: Platform-level subscriber views exist separately in `apps/admin/app/(dashboard)/subscribers/`, backed by `marketing_subscribers` table.
+
+### SMS bookmark
+
+- **Audience feature**: Attendees enter their phone number on a public fanflet page and receive a single SMS with the link. Shown on every public landing page and the demo page.
+- **API route**: `POST /api/sms` — validates phone (Zod), normalizes to E.164 format, rate-limits (max 2 per phone+fanflet per 24h via SHA-256 phone hash), sends SMS via Twilio, records bookmark in `sms_bookmarks` table, and fires an `sms_bookmark` analytics event.
+- **Graceful degradation**: If Twilio env vars are not configured, the bookmark is still tracked in the database and the user sees "SMS delivery will be available soon." No errors thrown.
+- **Environment variables** (server-only, set in Vercel):
+  - `TWILIO_ACCOUNT_SID` — Twilio account SID (starts with `AC`)
+  - `TWILIO_AUTH_TOKEN` — Twilio auth token
+  - `TWILIO_PHONE_NUMBER` — Purchased Twilio phone number in E.164 format (e.g., `+15551234567`)
+- **Database**: `sms_bookmarks` table (migration `20260227110000`) with `phone_hash`, `fanflet_id`, and `created_at`. Phone numbers are never stored — only SHA-256 hashes for rate limiting.
+- **Files**: `apps/web/app/api/sms/route.ts`, `apps/web/components/landing/sms-bookmark-form.tsx`
+- **Note**: Twilio trial accounts can only send to verified phone numbers. Add numbers under Twilio Console → Phone Numbers → Verified Caller IDs.
+
+### Sponsor portal (schema only — no UI yet)
+
+- **Architecture doc**: `docs/SPONSOR_PORTAL_ARCHITECTURE.md` — full design covering user roles, connection flow, resource sharing, content lifecycle, discovery model, RLS policies, and phased implementation plan.
+- **Database tables** (migration `20260227120000`):
+  - `sponsor_accounts` — company profile (name, logo, industry, website, verification status). One per auth user, parallel to `speakers`.
+  - `sponsor_connections` — manages sponsor↔speaker relationships with request flow (`pending → active/declined/revoked`). Either party can initiate. Unique constraint on `(sponsor_id, speaker_id)`.
+  - `sponsor_resources` — content curated by sponsors with lifecycle control (`active/paused/retired` + optional `expires_at`). Types: link, file, text, promo.
+  - `resource_blocks.sponsor_resource_id` — new nullable FK (`ON DELETE SET NULL`) linking fanflet blocks to sponsor-controlled resources. When the sponsor retires or deletes a resource, the block shows "This content is no longer available."
+- **RLS**: Full policies on all three tables. Sponsors manage their own data; speakers with active connections can read sponsor resources; public can read resources linked to published fanflets.
+- **No UI yet**: The sponsor-facing app, discovery/search, and connection management UI are planned for post-launch.
+
 ## Tech Stack
 
 - **Framework:** Next.js 16 (App Router, React 19, TypeScript strict)
@@ -18,17 +68,17 @@ apps/
   web/                 # Speaker-facing Next.js app
     app/               # App Router pages and API routes
       (auth)/          # Auth pages (login, signup, forgot-password)
-      (demo)/          # Demo/preview pages
+      (demo)/          # Demo/preview pages (e.g. /demo — dental demo, all resource types)
       (marketing)/     # Marketing/landing pages
       [speakerSlug]/   # Public speaker pages (dynamic routes)
-      api/             # API routes (qr, survey, track)
+      api/             # API routes (qr, survey, track, subscribe, sms)
       auth/            # Auth callbacks (callback, confirm, signout)
-      dashboard/       # Authenticated dashboard
+      dashboard/       # Authenticated dashboard (fanflets, resources, subscribers, analytics, settings)
     components/        # Web-specific React components
     lib/               # Web-specific utilities, themes
     middleware.ts      # Auth middleware (speaker dashboard)
   admin/               # Admin back-office Next.js app
-    app/               # Admin pages (overview, accounts, features)
+    app/               # Admin pages (overview, accounts, features, subscribers, waiting-list)
     components/        # Admin-specific components
     middleware.ts      # Admin auth middleware (platform_admin only)
 packages/
@@ -36,6 +86,8 @@ packages/
   types/               # Generated Supabase types + shared interfaces
   ui/                  # Shared shadcn/ui components (button, card, input, etc.)
   config/              # Shared TypeScript and lint configs
+docs/                  # Architecture and product docs (e.g. SPONSOR_PORTAL_ARCHITECTURE.md)
+supabase/migrations/   # Idempotent SQL migrations (see migrations/README.md)
 ```
 
 ## Key Architectural Patterns
@@ -86,3 +138,57 @@ When reviewing PRs, prioritize:
 3. **Architecture** — Server vs. client component boundaries, data fetching patterns
 4. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
 5. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)
+
+## Implementation Status (AI and CI)
+
+**Canonical project context and implementation status:** This document. For the full AI Team Lead phase plan, cost analysis, and decisions, see `AI_TEAM_LEAD_VISION.md`.
+
+### CI today
+
+- **Quality job** (`.github/workflows/ci.yml`): Lint, type-check, build (web) on PRs and pushes to `develop`.
+- **Migration idempotency:** CI runs `.github/scripts/check-migrations-idempotent.sh` when migrations are present; see `supabase/migrations/README.md` for required patterns.
+- **Not yet in CI:** `npm audit` and gitleaks (secrets scanning) are not in the pipeline.
+
+### Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, build, migration idempotency check |
+| `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations to linked Supabase project (dev on develop, prod on main) |
+| `claude-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | AI code review using ANTHROPIC_API_KEY, Sonnet, CLAUDE.md + engineering guidelines |
+| `security-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | Security scan using anthropics/claude-code-security-review |
+| `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App |
+| `claude-code-review.yml` | PR opened/synchronized/reopened | Code review on every PR using CLAUDE_CODE_OAUTH_TOKEN and code-review plugin |
+
+So there are two review setups: (1) `claude-review.yml` (API key, custom prompt, manual run) and (2) `claude-code-review.yml` (OAuth, plugin, runs automatically on PR).
+
+### Branch protection
+
+Branch protection on `main` and `develop` is not configured (no required status checks or reviewers).
+
+### Database migrations
+
+| Migration | Purpose |
+|-----------|---------|
+| `20260217190000` | Marketing subscribers table |
+| `20260218031402` | Content expiration for fanflets |
+| `20260218100000` | Marketing subscribers allow authenticated |
+| `20260218120000` | Plans, subscriptions, feature flags, entitlements |
+| `20260218140000` | Backfill early access subscriptions |
+| `20260218150000` | Marketing subscribers interest tier |
+| `20260220110000` | Resource library table |
+| `20260220120000` | Plan visibility and entitlement snapshots |
+| `20260224120000` | Content library secure delivery (storage quotas, signed URLs) |
+| `20260227100000` | Subscriber management (DELETE/UPDATE RLS policies) |
+| `20260227110000` | SMS bookmarks tracking table |
+| `20260227120000` | Sponsor portal schema (accounts, connections, resources) |
+
+### Next steps
+
+- **Sponsor portal UI**: Build the sponsor-facing app, connection discovery/search, and resource sharing interface. Schema is ready (see `docs/SPONSOR_PORTAL_ARCHITECTURE.md`).
+- **Email sending integration**: The subscriber email compose currently opens the user's email client via `mailto:`. Wire up a server-side email service (e.g., Resend) for in-app sending with templates and tracking.
+- **Twilio verification**: The toll-free number requires Twilio verification before it can send to unverified numbers. Trial accounts are limited to verified caller IDs.
+- Re-enable PR triggers in `claude-review.yml` and `security-review.yml` if you want automated AI review and security checks on every PR.
+- Add `npm audit --audit-level=high` and gitleaks to `ci.yml` per engineering guidelines.
+- Optionally configure branch protection (required status checks) once the check suite is stable.
+- Optionally add a promote-to-production workflow (develop → main PR creation and checks) as in Phase 3 of the vision doc.

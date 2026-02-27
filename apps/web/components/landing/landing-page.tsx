@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { SubscribeForm } from "./subscribe-form";
+import { SmsBookmarkForm } from "./sms-bookmark-form";
 import { trackResourceClick, trackReferralClick } from "./analytics-script";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
@@ -47,6 +48,8 @@ type ResourceBlock = {
   file_path: string | null;
   image_url: string | null;
   section_name: string | null;
+  file_size_bytes: number | null;
+  file_type: string | null;
   metadata: {
     logo_url?: string;
     cta_text?: string;
@@ -72,9 +75,17 @@ type LandingPageProps = {
   subscriberCount: number;
 };
 
-function getStorageUrl(filePath: string): string {
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  return `${base}/storage/v1/object/public/resources/${filePath}`;
+function getDownloadUrl(block: ResourceBlock, fanfletId: string): string {
+  if (!block.file_path) return "#";
+  if (block.file_path.startsWith("http")) return block.file_path;
+  return `/api/download/${fanfletId}/${block.id}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 function getInitials(name: string): string {
@@ -261,6 +272,9 @@ export function LandingPage({
           </CardContent>
         </Card>
 
+        {/* SMS Bookmark */}
+        <SmsBookmarkForm fanfletId={fanflet.id} />
+
         {/* Resource Blocks by Section */}
         {Object.entries(blocksBySection).map(([sectionName, blocks]) => (
           <div key={sectionName} className="space-y-3">
@@ -349,8 +363,13 @@ export function LandingPage({
               }
 
               if (block.type === "file" && block.file_path) {
-                const fileUrl = getStorageUrl(block.file_path);
+                const fileUrl = getDownloadUrl(block, fanflet.id);
+                const isLegacy = block.file_path.startsWith("http");
+                const sizeLabel = block.file_size_bytes
+                  ? formatBytes(block.file_size_bytes)
+                  : null;
                 const fileInfo =
+                  [block.file_type, sizeLabel].filter(Boolean).join(" · ") ||
                   block.metadata?.file_size ||
                   block.description ||
                   "Download";
@@ -358,9 +377,9 @@ export function LandingPage({
                   <a
                     key={block.id}
                     href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
+                    {...(isLegacy
+                      ? { target: "_blank", rel: "noopener noreferrer", download: true }
+                      : {})}
                     className="block"
                     onClick={() => trackResourceClick(fanflet.id, block.id)}
                   >

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/config";
-import { hasFeature } from "@fanflet/db";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect, notFound } from "next/navigation";
 import { FanfletEditor } from "@/components/fanflet-builder/fanflet-editor";
 
@@ -40,7 +40,7 @@ export default async function FanfletEditorPage({
 
   const { data: resourceBlocks } = await supabase
     .from("resource_blocks")
-    .select("*")
+    .select("*, resource_library(file_path, file_type, file_size_bytes)")
     .eq("fanflet_id", id)
     .order("display_order", { ascending: true });
 
@@ -54,7 +54,7 @@ export default async function FanfletEditorPage({
   // Fetch speaker's resource library for the "Add from Library" flow
   const { data: libraryItems } = await supabase
     .from("resource_library")
-    .select("id, type, title, description, url, file_path, image_url, section_name, metadata")
+    .select("id, type, title, description, url, file_path, file_type, file_size_bytes, image_url, section_name, metadata")
     .eq("speaker_id", speaker.id)
     .order("created_at", { ascending: true });
 
@@ -64,13 +64,11 @@ export default async function FanfletEditorPage({
       ? `${baseUrl}/${speaker.slug}/${fanflet.slug}`
       : null;
 
-  const [allowMultipleThemes, hasSurveys, allowCustomExpiration, allowSponsorVisibility] =
-    await Promise.all([
-      hasFeature(speaker.id, "multiple_theme_colors"),
-      hasFeature(speaker.id, "surveys_session_feedback"),
-      hasFeature(speaker.id, "custom_expiration"),
-      hasFeature(speaker.id, "sponsor_visibility"),
-    ]);
+  const entitlements = await getSpeakerEntitlements(speaker.id);
+  const allowMultipleThemes = entitlements.features.has("multiple_theme_colors");
+  const hasSurveys = entitlements.features.has("surveys_session_feedback");
+  const allowCustomExpiration = entitlements.features.has("custom_expiration");
+  const allowSponsorVisibility = entitlements.features.has("sponsor_visibility");
 
   return (
     <FanfletEditor

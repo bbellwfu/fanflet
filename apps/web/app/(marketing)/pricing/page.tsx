@@ -1,12 +1,13 @@
 /**
- * Pricing page — matches PRDs/pricing (App.tsx + components).
+ * Pricing page — fetches public plans from the database.
  * Order: PricingHero → PricingTiers → FeatureComparison → FAQ → BottomCTA.
  */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { SubscribeForm } from "@/components/marketing/subscribe-form";
-import { PricingTiers } from "@/components/marketing/pricing-tiers";
+import { PricingTiers, type PublicPlan } from "@/components/marketing/pricing-tiers";
 import { FeatureComparison } from "@/components/marketing/feature-comparison";
 import { PricingFAQ } from "@/components/marketing/pricing-faq";
 
@@ -29,7 +30,47 @@ const GRAY_400 = "#94A3B8";
 const GRAY_600 = "#475569";
 const EMERALD = "#10B981";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+
+  const [plansResult, planFeaturesResult] = await Promise.all([
+    supabase
+      .from("plans")
+      .select("name, display_name, description, price_monthly_cents, limits, is_public")
+      .eq("is_public", true)
+      .order("sort_order"),
+    supabase
+      .from("plan_features")
+      .select("plan_id, feature_flags(key, display_name), plans!inner(name)")
+      .eq("plans.is_public", true),
+  ]);
+
+  const rawPlans = plansResult.data ?? [];
+  const rawPlanFeatures = planFeaturesResult.data ?? [];
+
+  const planFeatureMap: Record<string, string[]> = {};
+  for (const pf of rawPlanFeatures) {
+    const plan = pf.plans as unknown as { name: string } | null;
+    const flag = pf.feature_flags as unknown as {
+      key: string;
+      display_name: string;
+    } | null;
+    if (plan?.name && flag?.display_name) {
+      const arr = planFeatureMap[plan.name] ?? [];
+      arr.push(flag.display_name);
+      planFeatureMap[plan.name] = arr;
+    }
+  }
+
+  const publicPlans: PublicPlan[] = rawPlans.map((p) => ({
+    name: p.name,
+    display_name: p.display_name,
+    description: p.description,
+    price_monthly_cents: p.price_monthly_cents,
+    limits: p.limits as Record<string, number> | null,
+    features: planFeatureMap[p.name] ?? [],
+  }));
+
   return (
     <div className="w-full min-h-screen bg-white">
       {/* PricingHero — PRD structure and copy */}
@@ -94,7 +135,7 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <PricingTiers />
+      <PricingTiers plans={publicPlans} />
       <FeatureComparison />
       <PricingFAQ />
 

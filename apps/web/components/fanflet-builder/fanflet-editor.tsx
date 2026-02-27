@@ -88,6 +88,7 @@ type ResourceBlock = {
   section_name: string | null;
   metadata: Record<string, unknown> | null;
   library_item_id: string | null;
+  resource_library?: { file_path: string | null; file_type: string | null; file_size_bytes?: number | null } | null;
 };
 
 type LibraryItem = {
@@ -138,6 +139,8 @@ export function FanfletEditor({
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [showSlugWarning, setShowSlugWarning] = useState(false);
+  const [surveySelectMounted, setSurveySelectMounted] = useState(false);
+  useEffect(() => setSurveySelectMounted(true), []);
 
   const [title, setTitle] = useState(fanflet.title);
   const [description, setDescription] = useState(fanflet.description ?? "");
@@ -696,22 +699,31 @@ export function FanfletEditor({
             </div>
           ) : (
             <div className="space-y-3">
-              <Select
-                value={surveyQuestionId}
-                onValueChange={setSurveyQuestionId}
-              >
-                <SelectTrigger className="border-[#e2e8f0]">
-                  <SelectValue placeholder="Select a question..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (no survey)</SelectItem>
-                  {surveyQuestions.map((q) => (
-                    <SelectItem key={q.id} value={q.id}>
-                      {q.question_text}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!surveySelectMounted ? (
+                <div
+                  className="flex h-9 w-fit items-center justify-between gap-2 rounded-md border border-[#e2e8f0] bg-transparent px-3 py-2 text-sm text-muted-foreground shadow-xs"
+                  aria-hidden
+                >
+                  {surveyQuestions.find((q) => q.id === surveyQuestionId)?.question_text ?? "Select a question..."}
+                </div>
+              ) : (
+                <Select
+                  value={surveyQuestionId}
+                  onValueChange={setSurveyQuestionId}
+                >
+                  <SelectTrigger className="border-[#e2e8f0]">
+                    <SelectValue placeholder="Select a question..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (no survey)</SelectItem>
+                    {surveyQuestions.map((q) => (
+                      <SelectItem key={q.id} value={q.id}>
+                        {q.question_text}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {surveyQuestionId !== "none" && (
                 <p className="text-xs text-muted-foreground">
                   Type:{" "}
@@ -755,6 +767,7 @@ export function FanfletEditor({
             authUserId={authUserId}
             onAdded={() => {}}
             libraryItems={libraryItems}
+            linkedLibraryItemIds={new Set(resourceBlocks.map((b) => b.library_item_id).filter(Boolean) as string[])}
             allowSponsorVisibility={allowSponsorVisibility}
           />
         </div>

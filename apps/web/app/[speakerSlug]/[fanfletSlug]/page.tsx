@@ -116,7 +116,12 @@ export default async function AudienceLandingPage({ params }: Props) {
 
   // For dynamic blocks (library_item_id set), merge library item data over block data
   const resourceBlocks = (rawBlocks ?? []).map((block) => {
-    const lib = block.resource_library;
+    const lib = block.resource_library as {
+      title?: string; description?: string | null; url?: string | null;
+      file_path?: string | null; image_url?: string | null;
+      metadata?: Record<string, unknown> | null; type?: string;
+      file_size_bytes?: number | null; file_type?: string | null;
+    } | null;
     if (lib && block.library_item_id) {
       return {
         ...block,
@@ -127,11 +132,17 @@ export default async function AudienceLandingPage({ params }: Props) {
         image_url: lib.image_url ?? block.image_url,
         metadata: lib.metadata ?? block.metadata,
         type: lib.type ?? block.type,
-        // Keep block's own section_name and display_order
+        file_size_bytes: lib.file_size_bytes ?? null,
+        file_type: lib.file_type ?? null,
         resource_library: undefined,
       };
     }
-    return { ...block, resource_library: undefined };
+    return {
+      ...block,
+      file_size_bytes: (lib?.file_size_bytes as number | null) ?? null,
+      file_type: (lib?.file_type as string | null) ?? null,
+      resource_library: undefined,
+    };
   });
 
   const { count: subscriberCount } = await supabase

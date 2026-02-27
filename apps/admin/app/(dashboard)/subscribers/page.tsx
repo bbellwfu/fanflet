@@ -28,7 +28,7 @@ export default async function SubscribersPage() {
     );
   }
 
-  const rows = (subscribers ?? []) as SubscriberRow[];
+  const rows = (subscribers ?? []) as unknown as SubscriberRow[];
 
   return (
     <div className="space-y-8">

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft } from "lucide-react";
+import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft, Info } from "lucide-react";
 import { addResourceBlock, addLibraryBlockToFanflet } from "@/app/dashboard/fanflets/[id]/actions";
+import { requestUploadSlot, confirmUpload, cancelUploadSlot } from "@/app/dashboard/resources/upload-actions";
 import { createClient } from "@/lib/supabase/client";
+import { STORAGE_BUCKET, isAllowedFileType, ALLOWED_EXTENSIONS, extractFilename, formatFileSize } from "@fanflet/db/storage";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -26,10 +28,66 @@ export type LibraryItem = {
   description: string | null;
   url: string | null;
   file_path: string | null;
+  file_type?: string | null;
+  file_size_bytes?: number | null;
   image_url: string | null;
   section_name: string | null;
   metadata: Record<string, unknown> | null;
 };
+
+function isImageFileType(fileType: string | null | undefined, filePath: string | null): boolean {
+  if (fileType) {
+    if (fileType.toLowerCase().startsWith("image/")) return true;
+  }
+  if (!filePath) return false;
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext);
+}
+
+/** Thumbnail for file items in library picker: image preview or icon. */
+function LibraryFileThumbnail({
+  filePath,
+  fileType,
+  title,
+  fallbackIcon: FallbackIcon,
+}: {
+  filePath: string | null;
+  fileType: string | null | undefined;
+  title: string;
+  fallbackIcon: typeof FileDown;
+}) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const isImage = isImageFileType(fileType ?? null, filePath);
+
+  useEffect(() => {
+    if (!isImage || !filePath || filePath.startsWith("http")) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(filePath, 60)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setSignedUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isImage, filePath]);
+
+  if (signedUrl) {
+    return (
+      <div className="w-10 h-10 rounded-lg border border-white/20 bg-white/10 shrink-0 overflow-hidden flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={signedUrl} alt={title || "File"} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-white/70">
+      <FallbackIcon className="w-4 h-4" />
+    </div>
+  );
+}
 
 const libraryTypeIcons: Record<string, typeof Link2> = {
   link: Link2,
@@ -50,6 +108,8 @@ interface AddBlockFormProps {
   authUserId: string;
   onAdded: () => void;
   libraryItems?: LibraryItem[];
+  /** Set of library item IDs already linked to this fanflet (to show "Already linked" in picker). */
+  linkedLibraryItemIds?: Set<string>;
   /** When false, sponsor block type is hidden (gated by plan). */
   allowSponsorVisibility?: boolean;
 }
@@ -59,6 +119,7 @@ export function AddBlockForm({
   authUserId,
   onAdded,
   libraryItems = [],
+  linkedLibraryItemIds = new Set(),
   allowSponsorVisibility = true,
 }: AddBlockFormProps) {
   const blockTypes = allowSponsorVisibility
@@ -162,42 +223,69 @@ export function AddBlockForm({
         toast.error("Please select a file to upload");
         return;
       }
+      if (!isAllowedFileType(file.name)) {
+        toast.error(`File type not supported. Accepted: ${ALLOWED_EXTENSIONS.join(", ")}`);
+        return;
+      }
+
       setUploading(true);
-      const supabase = createClient();
-      const ext = file.name.split(".").pop() || "file";
-      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
-      const path = `${authUserId}/${fanfletId}/${safeName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("resources")
-        .upload(path, file, { upsert: true });
+      // Step 1: Request upload slot (creates library item, validates quota)
+      const slot = await requestUploadSlot({
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type || "application/octet-stream",
+        title: title || undefined,
+        description: description || undefined,
+        sectionName: sectionName || undefined,
+      });
 
-      if (uploadError) {
-        toast.error(uploadError.message || "Upload failed");
+      if (!slot.allowed) {
+        toast.error(slot.error);
         setUploading(false);
         return;
       }
 
-      const { data } = supabase.storage.from("resources").getPublicUrl(path);
-      const filePath = data.publicUrl;
+      // Step 2: Upload to private bucket
+      const supabase = createClient();
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(slot.path, file, { upsert: false });
+
+      if (uploadError) {
+        toast.error(uploadError.message || "Upload failed");
+        await cancelUploadSlot(slot.libraryItemId);
+        setUploading(false);
+        return;
+      }
+
+      // Step 3: Confirm upload (finalize library item metadata)
+      const confirm = await confirmUpload({
+        libraryItemId: slot.libraryItemId,
+        filePath: slot.path,
+        fileSizeBytes: file.size,
+        fileType: file.type || "application/octet-stream",
+        title: title || file.name,
+      });
+
+      if (confirm.error) {
+        toast.error(confirm.error);
+        setUploading(false);
+        return;
+      }
 
       setUploading(false);
       setSubmitting(true);
 
-      const result = await addResourceBlock(fanfletId, {
-        type: "file",
-        title: title || file.name,
-        description: description || undefined,
-        file_path: filePath,
-        section_name: sectionName || undefined,
-      });
+      // Step 4: Link library item to fanflet as a dynamic block
+      const result = await addLibraryBlockToFanflet(fanfletId, slot.libraryItemId, "dynamic");
 
       setSubmitting(false);
       if (result.error) {
         toast.error(result.error);
         return;
       }
-      toast.success("Resource added");
+      toast.success("File uploaded and added to your library");
       reset();
       router.refresh();
       onAdded();
@@ -285,21 +373,33 @@ export function AddBlockForm({
           </Button>
         </div>
         <p className="text-sm leading-relaxed text-white/75">
-          Pick a saved resource from your library. <strong className="text-white/80">Static Copy</strong> creates a one-time copy
-          you can edit just for this Fanflet. <strong className="text-white/80">Dynamic Link</strong> keeps this block updated
-          automatically when you change the library version.
+          Pick a saved resource from your library. For links, text, and sponsors you can add a <strong className="text-white/80">Static Copy</strong> (edit only here)
+          or a <strong className="text-white/80">Dynamic Link</strong> (updates when you change the library). Files are always linked (one copy in your library).
         </p>
         <div className="space-y-2">
           {libraryItems.map((item) => {
             const Icon = libraryTypeIcons[item.type] ?? Link2;
             const isAdding = addingFromLibrary === item.id;
-            const preview = item.description ?? item.url ?? item.file_path ?? "";
+            const alreadyLinked = linkedLibraryItemIds.has(item.id);
+            const preview =
+              item.type === "file"
+                ? (item.description ?? (item.file_path
+                    ? `${extractFilename(item.file_path)}${item.file_size_bytes != null && item.file_size_bytes > 0 ? ` · ${formatFileSize(item.file_size_bytes)}` : ""}`
+                    : ""))
+                : item.description ?? item.url ?? "";
             return (
               <div
                 key={item.id}
-                className="flex items-start gap-3 p-3 bg-white/10 rounded-md border border-white/15"
+                className={`flex items-start gap-3 p-3 rounded-md border ${alreadyLinked ? "bg-white/5 border-white/10 opacity-75" : "bg-white/10 border-white/15"}`}
               >
-                {item.image_url ? (
+                {item.type === "file" ? (
+                  <LibraryFileThumbnail
+                    filePath={item.file_path}
+                    fileType={item.file_type}
+                    title={item.title || "File"}
+                    fallbackIcon={Icon}
+                  />
+                ) : item.image_url ? (
                   <div className="w-10 h-10 rounded-lg border border-white/20 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -318,6 +418,11 @@ export function AddBlockForm({
                     <span className="text-xs font-semibold text-white/60 uppercase tracking-wide">
                       {libraryTypeLabels[item.type] ?? item.type}
                     </span>
+                    {alreadyLinked && (
+                      <span className="text-[10px] font-medium text-white/50 bg-white/10 px-1.5 py-0.5 rounded">
+                        Already linked
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm font-medium text-white truncate">{item.title || "Untitled"}</p>
                   {preview && (
@@ -325,25 +430,27 @@ export function AddBlockForm({
                   )}
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
+                  {item.type !== "file" && (
+                    <Button
+                      size="sm"
+                      disabled={isAdding || alreadyLinked}
+                      onClick={() => handleAddFromLibrary(item.id, "static")}
+                      className="h-8 text-sm bg-white/20 hover:bg-white/30 text-white border-0 gap-1.5"
+                      title="Copies this resource -- edits to the library won't affect this fanflet"
+                    >
+                      {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                      Static
+                    </Button>
+                  )}
                   <Button
                     size="sm"
-                    disabled={isAdding}
-                    onClick={() => handleAddFromLibrary(item.id, 'static')}
-                    className="h-8 text-sm bg-white/20 hover:bg-white/30 text-white border-0 gap-1.5"
-                    title="Copies this resource -- edits to the library won't affect this fanflet"
-                  >
-                    {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
-                    Static
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={isAdding}
-                    onClick={() => handleAddFromLibrary(item.id, 'dynamic')}
+                    disabled={isAdding || alreadyLinked}
+                    onClick={() => handleAddFromLibrary(item.id, "dynamic")}
                     className="h-8 text-sm bg-[#3BA5D9]/80 hover:bg-[#3BA5D9] text-white border-0 gap-1.5"
-                    title="Links this resource -- changes in your library will update this fanflet"
+                    title={item.type === "file" ? "Files are always linked (one copy in library)" : "Links this resource -- changes in your library will update this fanflet"}
                   >
                     {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <LinkIcon className="w-3 h-3" />}
-                    Dynamic
+                    {item.type === "file" ? "Add file" : "Dynamic"}
                   </Button>
                 </div>
               </div>
@@ -540,8 +647,13 @@ export function AddBlockForm({
           <Input
             ref={fileInputRef}
             type="file"
+            accept={ALLOWED_EXTENSIONS.join(",")}
             className="border-[#e2e8f0]"
           />
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+            This file will be saved to your Resource Library so you can reuse it across fanflets.
+          </p>
         </div>
       )}
 

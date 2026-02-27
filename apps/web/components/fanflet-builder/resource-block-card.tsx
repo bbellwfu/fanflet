@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import {
   reorderBlock,
 } from "@/app/dashboard/fanflets/[id]/actions";
 import { createClient } from "@/lib/supabase/client";
+import { STORAGE_BUCKET, extractFilename, formatFileSize } from "@fanflet/db/storage";
 import { toast } from "sonner";
 import { ChevronUp, ChevronDown, Pencil, Trash2, Loader2, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,61 @@ export type ResourceBlock = {
   section_name: string | null;
   metadata: Record<string, unknown> | null;
   library_item_id?: string | null;
+  /** When block is linked from library (dynamic), file_path/file_type may come from here */
+  resource_library?: { file_path: string | null; file_type: string | null; file_size_bytes?: number | null } | null;
 };
+
+function isImageFileType(fileType: string | null | undefined, filePath: string | null): boolean {
+  if (fileType?.toLowerCase().startsWith("image/")) return true;
+  if (!filePath) return false;
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  return [".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"].includes(ext);
+}
+
+/** Thumbnail for file blocks: image preview from private storage or icon. */
+function BlockFileThumbnail({
+  filePath,
+  fileType,
+  title,
+  fallbackIcon: FallbackIcon,
+}: {
+  filePath: string | null;
+  fileType: string | null | undefined;
+  title: string | null;
+  fallbackIcon: typeof FileDown;
+}) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const isImage = isImageFileType(fileType ?? null, filePath);
+
+  useEffect(() => {
+    if (!isImage || !filePath || filePath.startsWith("http")) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(filePath, 60)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setSignedUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isImage, filePath]);
+
+  if (signedUrl) {
+    return (
+      <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white shrink-0 overflow-hidden flex items-center justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={signedUrl} alt={title || "File"} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-10 h-10 rounded-lg bg-[#1B365D]/10 flex items-center justify-center shrink-0 text-[#1B365D]">
+      <FallbackIcon className="w-5 h-5" />
+    </div>
+  );
+}
 
 interface ResourceBlockCardProps {
   block: ResourceBlock;
@@ -124,6 +179,9 @@ export function ResourceBlockCard({
 
   const Icon = typeIcons[block.type] ?? Link2;
   const isDynamic = !!block.library_item_id;
+  const resolvedFilePath = block.file_path ?? block.resource_library?.file_path ?? null;
+  const resolvedFileType = block.resource_library?.file_type ?? null;
+  const resolvedFileSize = block.resource_library?.file_size_bytes ?? null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -178,7 +236,14 @@ export function ResourceBlockCard({
         <CardContent className="p-4 space-y-4">
           {/* Resource identity header */}
           <div className="flex items-start gap-3">
-            {block.image_url ? (
+            {block.type === "file" && resolvedFilePath ? (
+              <BlockFileThumbnail
+                filePath={resolvedFilePath}
+                fileType={resolvedFileType}
+                title={block.title}
+                fallbackIcon={Icon}
+              />
+            ) : block.image_url ? (
               <div className="w-10 h-10 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -402,12 +467,23 @@ export function ResourceBlockCard({
   const preview =
     block.type === "text"
       ? (block.description ?? "").slice(0, 80) + (block.description && block.description.length > 80 ? "..." : "")
-      : block.description ?? block.url ?? block.file_path ?? "";
+      : block.type === "file"
+        ? (block.description ?? (resolvedFilePath
+            ? `${extractFilename(resolvedFilePath)}${resolvedFileSize != null && resolvedFileSize > 0 ? ` · ${formatFileSize(resolvedFileSize)}` : ""}`
+            : ""))
+        : block.description ?? block.url ?? "";
 
   return (
     <Card className="border-slate-200 hover:border-[#3BA5D9]/30 transition-colors group">
       <CardContent className="p-4 flex items-start gap-4">
-        {block.image_url ? (
+        {block.type === "file" && resolvedFilePath ? (
+          <BlockFileThumbnail
+            filePath={resolvedFilePath}
+            fileType={resolvedFileType}
+            title={block.title}
+            fallbackIcon={Icon}
+          />
+        ) : block.image_url ? (
           <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img

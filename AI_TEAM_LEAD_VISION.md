@@ -1,5 +1,7 @@
 # AI Software Engineering Team Lead: Vision and Implementation Plan
 
+**Canonical project context and implementation status:** See `CLAUDE.md`.
+
 **Prepared for:** Brian Bell, Founder
 **Date:** February 14, 2026
 **Version:** 1.0
@@ -53,24 +55,18 @@ This is not autonomous coding. It does not write features, refactor on its own, 
 
 ## 2. CURRENT STATE ASSESSMENT
 
-### What You Have Today
+### Current state (as of February 2026)
 
-| Component | Status | Details |
-|-----------|--------|---------|
-| **Git workflow** | Established | `main` (production) + `develop` (staging) + feature branches |
-| **CI pipeline** | Active | GitHub Actions: lint, type-check, build on PRs and develop pushes |
-| **Deployment** | Automated | Vercel auto-deploys from GitHub (preview on PR, staging on develop, production on main) |
-| **Branch protection on `main`** | **Not configured** | No required reviewers, no required status checks |
-| **Branch protection on `develop`** | **Not configured** | Same |
-| **Engineering standards** | Documented | `ENGINEERING_GUIDELINES_MEMO_v2.md` -- comprehensive, project-specific |
-| **PR template** | **Missing** | No `.github/PULL_REQUEST_TEMPLATE.md` |
-| **Security scanning** | **Missing** | No gitleaks, no npm audit in CI |
-| **Testing** | **Missing** | No test framework configured, no test files |
-| **CLAUDE.md** | **Missing** | No project-level context file for Claude tools |
+- **Git workflow:** `main` (production) + `develop` (staging) + feature branches. Vercel auto-deploys (preview on PR, staging on develop, production on main).
+- **CI pipeline:** Active. `ci.yml` runs lint, type-check, build (web), and **migration idempotency check** (`.github/scripts/check-migrations-idempotent.sh`) on PRs and pushes to develop. `migrate.yml` runs on push to main/develop when migrations change.
+- **CLAUDE.md and PR template:** In place. `.github/PULL_REQUEST_TEMPLATE.md` exists with ship checklist. CLAUDE.md is the canonical project context (see CLAUDE.md for up-to-date implementation status).
+- **AI workflows:** `claude-review.yml` and `security-review.yml` exist but PR triggers are **commented out** (manual `workflow_dispatch` only). `claude-code-review.yml` runs on every PR (OAuth + code-review plugin). `claude.yml` runs when you comment `@claude` on issues/PRs.
+- **Branch protection:** Not configured on `main` or `develop`.
+- **Security scanning in CI:** Not yet added — no gitleaks, no npm audit in ci.yml.
+- **Testing:** No test framework or test files.
+- **Engineering standards:** `ENGINEERING_GUIDELINES_MEMO_v2.md` is the comprehensive reference.
 
-### Key Observation
-
-Your documented standards in `ENGINEERING_GUIDELINES_MEMO_v2.md` are significantly ahead of your actual enforcement infrastructure. The memo describes a full CI pipeline with security scanning, testing, and migration checks -- but the implemented pipeline only covers lint, type-check, and build. **This gap is exactly what the AI Team Lead fills in the near term**, while you build out the full pipeline described in your guidelines.
+The AI Team Lead Phase 1 artifacts (CLAUDE.md, PR template, review workflows) are built; the custom-prompt review and security review are currently manual-only. Phase 2 (npm audit, gitleaks, branch protection) and Phase 3 (promote-to-production workflow) are not yet implemented.
 
 ### GitHub Account Context
 
@@ -251,7 +247,7 @@ This is the most important file you will create for this system. It gives Claude
 
 **Content should include:**
 - Project overview (Next.js 16, App Router, Supabase, Vercel)
-- Repository structure (monorepo with `application/` directory)
+- Repository structure (Turborepo monorepo with `apps/` — web, admin — and `packages/` — db, types, ui, config)
 - Key architectural decisions (server components vs. client components, Supabase SSR patterns)
 - Coding conventions (TypeScript strict, Zod validation, naming patterns)
 - Security requirements (RLS policies, service role key isolation, auth patterns)

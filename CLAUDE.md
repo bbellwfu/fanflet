@@ -86,3 +86,37 @@ When reviewing PRs, prioritize:
 3. **Architecture** — Server vs. client component boundaries, data fetching patterns
 4. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
 5. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)
+
+## Implementation Status (AI and CI)
+
+**Canonical project context and implementation status:** This document. For the full AI Team Lead phase plan, cost analysis, and decisions, see `AI_TEAM_LEAD_VISION.md`.
+
+### CI today
+
+- **Quality job** (`.github/workflows/ci.yml`): Lint, type-check, build (web) on PRs and pushes to `develop`.
+- **Migration idempotency:** CI runs `.github/scripts/check-migrations-idempotent.sh` when migrations are present; see `supabase/migrations/README.md` for required patterns.
+- **Not yet in CI:** `npm audit` and gitleaks (secrets scanning) are not in the pipeline.
+
+### Workflows
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, build, migration idempotency check |
+| `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations to linked Supabase project (dev on develop, prod on main) |
+| `claude-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | AI code review using ANTHROPIC_API_KEY, Sonnet, CLAUDE.md + engineering guidelines |
+| `security-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | Security scan using anthropics/claude-code-security-review |
+| `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App |
+| `claude-code-review.yml` | PR opened/synchronized/reopened | Code review on every PR using CLAUDE_CODE_OAUTH_TOKEN and code-review plugin |
+
+So there are two review setups: (1) `claude-review.yml` (API key, custom prompt, manual run) and (2) `claude-code-review.yml` (OAuth, plugin, runs automatically on PR).
+
+### Branch protection
+
+Branch protection on `main` and `develop` is not configured (no required status checks or reviewers).
+
+### Next steps
+
+- Re-enable PR triggers in `claude-review.yml` and `security-review.yml` if you want automated AI review and security checks on every PR.
+- Add `npm audit --audit-level=high` and gitleaks to `ci.yml` per engineering guidelines.
+- Optionally configure branch protection (required status checks) once the check suite is stable.
+- Optionally add a promote-to-production workflow (develop → main PR creation and checks) as in Phase 3 of the vision doc.

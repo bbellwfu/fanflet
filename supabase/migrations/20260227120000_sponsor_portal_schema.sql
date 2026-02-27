@@ -152,6 +152,19 @@ CREATE POLICY "Connected speakers can read sponsor resources"
     AND sc.status = 'active'
   ));
 
+-- ============================================================================
+-- 4. ADD SPONSOR RESOURCE FK TO RESOURCE_BLOCKS
+-- (Must come before the policy below that references sponsor_resource_id)
+-- ============================================================================
+
+ALTER TABLE public.resource_blocks
+  ADD COLUMN IF NOT EXISTS sponsor_resource_id UUID
+    REFERENCES public.sponsor_resources(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_resource_blocks_sponsor_resource
+  ON public.resource_blocks(sponsor_resource_id)
+  WHERE sponsor_resource_id IS NOT NULL;
+
 -- Public can read active sponsor resources linked to published fanflets
 DROP POLICY IF EXISTS "Public can read published sponsor resources" ON public.sponsor_resources;
 CREATE POLICY "Public can read published sponsor resources"
@@ -162,15 +175,3 @@ CREATE POLICY "Public can read published sponsor resources"
     WHERE f.status = 'published'
     AND rb.sponsor_resource_id IS NOT NULL
   ));
-
--- ============================================================================
--- 4. ADD SPONSOR RESOURCE FK TO RESOURCE_BLOCKS
--- ============================================================================
-
-ALTER TABLE public.resource_blocks
-  ADD COLUMN IF NOT EXISTS sponsor_resource_id UUID
-    REFERENCES public.sponsor_resources(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_resource_blocks_sponsor_resource
-  ON public.resource_blocks(sponsor_resource_id)
-  WHERE sponsor_resource_id IS NOT NULL;

@@ -10,7 +10,7 @@ type FanfletRow = {
   published_at: string | null;
   created_at: string;
   speaker_id: string;
-  speakers: { name: string | null; email: string; slug: string | null } | null;
+  speakers: { name: string | null; email: string; slug: string | null }[] | null;
 };
 
 export default async function FanfletsPage({
@@ -145,7 +145,7 @@ export default async function FanfletsPage({
                       href={`/accounts/${fanflet.speaker_id}`}
                       className="text-primary-soft hover:text-primary transition-colors"
                     >
-                      {fanflet.speakers?.name || fanflet.speakers?.email || "—"}
+                      {fanflet.speakers?.[0]?.name || fanflet.speakers?.[0]?.email || "—"}
                     </Link>
                   </td>
                   <td className="px-5 py-3.5 text-fg-muted font-mono text-[11px]">
@@ -171,9 +171,9 @@ export default async function FanfletsPage({
                     {new Date(fanflet.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-3.5 text-right">
-                    {fanflet.status === "published" && fanflet.speakers?.slug && (
+                    {fanflet.status === "published" && fanflet.speakers?.[0]?.slug && (
                       <a
-                        href={`https://fanflet.com/${fanflet.speakers.slug}/${fanflet.slug}?preview`}
+                        href={`https://fanflet.com/${fanflet.speakers[0].slug}/${fanflet.slug}?preview`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary-soft hover:text-primary transition-colors inline-flex items-center gap-1 text-[12px]"

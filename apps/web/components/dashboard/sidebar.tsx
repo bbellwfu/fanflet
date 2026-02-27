@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Settings, LogOut } from "lucide-react";
+import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Users, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
@@ -18,6 +18,7 @@ const sidebarItems = [
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: MessageSquare, label: "Survey Questions", href: "/dashboard/surveys" },
   { icon: BookOpen, label: "Resource Library", href: "/dashboard/resources" },
+  { icon: Users, label: "Subscribers", href: "/dashboard/subscribers" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 

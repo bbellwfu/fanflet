@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { SubscribeForm } from "./subscribe-form";
+import { SmsBookmarkForm } from "./sms-bookmark-form";
 import { trackResourceClick, trackReferralClick } from "./analytics-script";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
@@ -270,6 +271,9 @@ export function LandingPage({
             />
           </CardContent>
         </Card>
+
+        {/* SMS Bookmark */}
+        <SmsBookmarkForm fanfletId={fanflet.id} />
 
         {/* Resource Blocks by Section */}
         {Object.entries(blocksBySection).map(([sectionName, blocks]) => (

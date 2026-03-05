@@ -4,6 +4,7 @@ export { createServiceClient } from "./service";
 export { updateSession } from "./middleware";
 export { getSiteUrl } from "./config";
 export { getSpeakerEntitlements, hasFeature, getSpeakerLimits } from "./features";
+export { FREE_PLAN_NAME } from "./constants";
 export type { SpeakerEntitlements } from "./features";
 export {
   STORAGE_BUCKET,

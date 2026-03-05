@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
+import { readPhotoFrame } from "@/lib/photo-frame";
+import { FramedAvatar } from "@/components/dashboard/framed-avatar";
 import { ensureUrl } from "@/lib/utils";
 import { getThemeCSSVariables } from "@/lib/themes";
 
@@ -48,7 +48,7 @@ function getCtaLink(social_links: Speaker["social_links"]): { url: string; label
 
 export function ExpiredFanfletPage({ speaker }: ExpiredFanfletPageProps) {
   const themeVars = getThemeCSSVariables("default");
-  const photoFrameStyle = getPhotoFrameImageStyle(readPhotoFrame(speaker.social_links));
+  const photoFrame = readPhotoFrame(speaker.social_links);
   const cta = getCtaLink(speaker.social_links);
 
   return (
@@ -64,17 +64,18 @@ export function ExpiredFanfletPage({ speaker }: ExpiredFanfletPageProps) {
         }}
       >
         <div className="rounded-2xl bg-white/10 backdrop-blur-sm border border-white/15 px-6 py-8 w-full">
-          <Avatar className="w-20 h-20 sm:w-24 sm:h-24 ring-[3px] ring-white/30 ring-offset-2 ring-offset-transparent shadow-xl mx-auto mb-4">
-            <AvatarImage
-              src={speaker.photo_url ?? undefined}
-              alt={speaker.name}
-              className="object-cover"
-              style={photoFrameStyle}
-            />
-            <AvatarFallback className="text-xl font-bold bg-slate-700 text-white">
-              {getInitials(speaker.name)}
-            </AvatarFallback>
-          </Avatar>
+          <FramedAvatar
+            src={speaker.photo_url ?? undefined}
+            frame={photoFrame}
+            alt={speaker.name}
+            size={96}
+            className="ring-[3px] ring-white/30 ring-offset-2 ring-offset-transparent shadow-xl mx-auto mb-4"
+            fallback={
+              <div className="flex items-center justify-center w-full h-full text-xl font-bold bg-slate-700 text-white rounded-full">
+                {getInitials(speaker.name)}
+              </div>
+            }
+          />
           <h1 className="text-xl sm:text-2xl font-bold text-white mb-2">
             {speaker.name}
           </h1>

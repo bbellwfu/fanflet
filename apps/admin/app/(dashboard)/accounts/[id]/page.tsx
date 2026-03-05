@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
 import { createServiceClient } from "@fanflet/db/service";
+import { FREE_PLAN_NAME } from "@fanflet/db";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, UserIcon, AlertTriangleIcon } from "lucide-react";
 import { SuspendButton } from "./suspend-button";
+import { ResetAccountButton } from "./reset-account-button";
+import { PlanSelector } from "./plan-selector";
 
 export default async function AccountDetailPage({
   params,
@@ -22,58 +25,73 @@ export default async function AccountDetailPage({
     notFound();
   }
 
-  const [fanfletsResult, subscribersResult, analyticsResult, subscriptionResult] =
-    await Promise.all([
-      supabase
-        .from("fanflets")
-        .select("id, title, slug, status, created_at, published_at")
-        .eq("speaker_id", id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("subscribers")
-        .select("id", { count: "exact", head: true })
-        .eq("speaker_id", id),
-      supabase
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .in(
-          "fanflet_id",
-          (
-            await supabase
-              .from("fanflets")
-              .select("id")
-              .eq("speaker_id", id)
-          ).data?.map((f) => f.id) ?? []
-        ),
-      supabase
-        .from("speaker_subscriptions")
-        .select("*, plans(*)")
-        .eq("speaker_id", id)
-        .maybeSingle(),
-    ]);
+  const [
+    fanfletsResult,
+    subscribersResult,
+    analyticsResult,
+    subscriptionResult,
+    plansResult,
+  ] = await Promise.all([
+    supabase
+      .from("fanflets")
+      .select("id, title, slug, status, created_at, published_at")
+      .eq("speaker_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("subscribers")
+      .select("id", { count: "exact", head: true })
+      .eq("speaker_id", id),
+    supabase
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .in(
+        "fanflet_id",
+        (
+          await supabase
+            .from("fanflets")
+            .select("id")
+            .eq("speaker_id", id)
+        ).data?.map((f) => f.id) ?? []
+      ),
+    supabase
+      .from("speaker_subscriptions")
+      .select("*, plans(*)")
+      .eq("speaker_id", id)
+      .maybeSingle(),
+    supabase
+      .from("plans")
+      .select("id, name, display_name")
+      .eq("is_active", true)
+      .order("sort_order"),
+  ]);
 
   const fanflets = fanfletsResult.data ?? [];
   const subscriberCount = subscribersResult.count ?? 0;
   const totalEvents = analyticsResult.count ?? 0;
   const subscription = subscriptionResult.data;
+  const plans = (plansResult.data ?? []) as {
+    id: string;
+    name: string;
+    display_name: string;
+  }[];
+
+  const planData = subscription
+    ? (subscription as Record<string, unknown>).plans as
+        | Record<string, unknown>
+        | null
+    : null;
+  const currentPlanId = subscription
+    ? (subscription as { plan_id: string }).plan_id
+    : null;
+  const freePlan = plans.find((p) => p.name === FREE_PLAN_NAME);
+  const currentPlanName = planData?.display_name
+    ? (planData.display_name as string)
+    : (freePlan?.display_name ?? "—");
 
   const statItems = [
     { label: "Fanflets", value: fanflets.length },
     { label: "Subscribers", value: subscriberCount },
     { label: "Analytics Events", value: totalEvents.toLocaleString() },
-    {
-      label: "Plan",
-      value: subscription
-        ? (subscription as Record<string, unknown>).plans
-          ? (
-              (subscription as Record<string, unknown>).plans as Record<
-                string,
-                unknown
-              >
-            ).display_name as string
-          : "Unknown"
-        : "Free",
-    },
   ];
 
   return (
@@ -118,11 +136,20 @@ export default async function AccountDetailPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={speaker.status} />
           <SuspendButton
             speakerId={speaker.id}
             currentStatus={speaker.status}
+          />
+          <ResetAccountButton
+            speakerId={speaker.id}
+            speakerName={speaker.name}
+            stats={{
+              fanfletsCount: fanflets.length,
+              subscriberCount: subscriberCount ?? 0,
+              analyticsEventsCount: totalEvents,
+            }}
           />
         </div>
       </div>
@@ -142,6 +169,17 @@ export default async function AccountDetailPage({
             </p>
           </div>
         ))}
+        <div className="bg-surface rounded-lg border border-border-subtle p-5">
+          <p className="text-[12px] font-medium uppercase tracking-wider text-fg-muted mb-2">
+            Plan
+          </p>
+          <PlanSelector
+            speakerId={id}
+            currentPlanId={currentPlanId}
+            currentPlanName={currentPlanName}
+            plans={plans}
+          />
+        </div>
       </div>
 
       {/* Profile Details */}

@@ -20,9 +20,9 @@ export default async function SettingsPage() {
     .eq("auth_user_id", user.id)
     .single();
 
-  const allowMultipleThemes = speaker
-    ? (await getSpeakerEntitlements(speaker.id)).features.has("multiple_theme_colors")
-    : false;
+  const entitlements = speaker ? await getSpeakerEntitlements(speaker.id) : null;
+  const allowMultipleThemes = entitlements?.features.has("multiple_theme_colors") ?? false;
+  const currentPlanDisplayName = entitlements?.planDisplayName ?? "Free";
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -49,7 +49,10 @@ export default async function SettingsPage() {
               Manage your plan and unlock more themes, analytics, and features.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-[#1B365D] font-medium">
+              Current subscription plan: {currentPlanDisplayName}
+            </p>
             <Button asChild variant="outline" className="border-[#1B365D] text-[#1B365D] hover:bg-[#1B365D]/5">
               <Link href="/pricing">View plans and upgrade</Link>
             </Button>

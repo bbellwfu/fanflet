@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Users, Link2, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import type { CSSProperties } from "react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getPhotoFrameImageStyle, readPhotoFrame } from "@/lib/photo-frame";
+import { readPhotoFrame } from "@/lib/photo-frame";
+import { FramedAvatar } from "@/components/dashboard/framed-avatar";
 import { SetupChecklistPanel } from "@/components/dashboard/setup-checklist-panel";
 import { hasStoredDefaultThemePreset, isOnboardingDismissed } from "@/lib/speaker-preferences";
 
@@ -42,11 +41,11 @@ interface SidebarContentProps {
   displayName: string;
   displayEmail: string;
   photoUrl?: string;
-  photoFrameStyle?: CSSProperties;
+  photoFrame: ReturnType<typeof readPhotoFrame>;
   initials: string;
 }
 
-function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrameStyle, initials }: SidebarContentProps) {
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials }: SidebarContentProps) {
   return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -74,10 +73,17 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
 
       <div className="p-4 border-t border-white/10 space-y-3">
         <div className="flex items-center gap-3">
-          <Avatar className="w-9 h-9 border border-white/20">
-            <AvatarImage src={photoUrl} style={photoFrameStyle} />
-            <AvatarFallback className="bg-slate-800 text-white">{initials}</AvatarFallback>
-          </Avatar>
+          <FramedAvatar
+            src={photoUrl}
+            frame={photoFrame}
+            size={36}
+            className="border border-white/20"
+            fallback={
+              <div className="flex items-center justify-center w-full h-full bg-slate-800 text-white text-sm rounded-full">
+                {initials}
+              </div>
+            }
+          />
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-medium truncate">{displayName}</p>
             <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
@@ -138,7 +144,6 @@ export function Sidebar({
   const displayEmail = speaker?.email ?? user.email ?? "";
   const photoUrl = speaker?.photo_url ?? undefined;
   const photoFrame = readPhotoFrame(speaker?.social_links ?? null);
-  const photoFrameStyle = getPhotoFrameImageStyle(photoFrame);
   const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
   const isChecklistDismissed = isOnboardingDismissed(speaker?.social_links ?? null);
   const hasCreatedFanflet =
@@ -160,7 +165,7 @@ export function Sidebar({
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
-        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrameStyle={photoFrameStyle} initials={initials} />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} />
       </aside>
 
       {/* Main Content */}
@@ -178,7 +183,7 @@ export function Sidebar({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrameStyle={photoFrameStyle} initials={initials} />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} />
             </SheetContent>
           </Sheet>
         </header>

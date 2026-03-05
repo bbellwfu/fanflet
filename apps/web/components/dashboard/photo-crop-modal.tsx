@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,7 @@ export function PhotoCropModal({
   const dragStartRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
 
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
@@ -75,16 +76,49 @@ export function PhotoCropModal({
     []
   );
 
-  const handleImageLoad = useCallback(() => {
-    setImageLoaded(true);
-    const normalized = clampPhotoFrame(initialFrame ?? { zoom: 1, offsetX: 0, offsetY: 0 });
-    setZoom(normalized.zoom);
-    setOffset({
-      x: normalized.offsetX * PREVIEW_SIZE,
-      y: normalized.offsetY * PREVIEW_SIZE,
-    });
-    prevZoomRef.current = normalized.zoom;
-  }, [initialFrame]);
+  const handleImageLoad = useCallback(
+    (e: React.SyntheticEvent<HTMLImageElement>) => {
+      const img = e.currentTarget;
+      setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+      setImageLoaded(true);
+      const normalized = clampPhotoFrame(initialFrame ?? { zoom: 1, offsetX: 0, offsetY: 0 });
+      setZoom(normalized.zoom);
+      setOffset({
+        x: normalized.offsetX * PREVIEW_SIZE,
+        y: normalized.offsetY * PREVIEW_SIZE,
+      });
+      prevZoomRef.current = normalized.zoom;
+    },
+    [initialFrame]
+  );
+
+  const imgStyle = useMemo(() => {
+    if (!naturalSize) return { display: "none" as const };
+    const { w, h } = naturalSize;
+    const aspect = w / h;
+
+    // Short side fills PREVIEW_SIZE at zoom=1 (same coverage as object-cover)
+    let baseW: number;
+    let baseH: number;
+    if (aspect >= 1) {
+      baseH = PREVIEW_SIZE;
+      baseW = PREVIEW_SIZE * aspect;
+    } else {
+      baseW = PREVIEW_SIZE;
+      baseH = PREVIEW_SIZE / aspect;
+    }
+
+    const scaledW = baseW * zoom;
+    const scaledH = baseH * zoom;
+
+    return {
+      width: scaledW,
+      height: scaledH,
+      maxWidth: "none" as const,
+      left: (PREVIEW_SIZE - scaledW) / 2 - displayOffset.x,
+      top: (PREVIEW_SIZE - scaledH) / 2 - displayOffset.y,
+    };
+  }, [naturalSize, zoom, displayOffset]);
 
   // Ref for current pan offset so the native pointer handler reads the latest value
   const displayOffsetRef = useRef(displayOffset);
@@ -200,6 +234,7 @@ export function PhotoCropModal({
         setZoom(1);
         setOffset({ x: 0, y: 0 });
         setImageLoaded(false);
+        setNaturalSize(null);
         prevZoomRef.current = 1;
       }
       onOpenChange(next);
@@ -222,6 +257,7 @@ export function PhotoCropModal({
   useEffect(() => {
     if (file) {
       setImageLoaded(false);
+      setNaturalSize(null);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
       prevZoomRef.current = 1;
@@ -236,6 +272,7 @@ export function PhotoCropModal({
   useEffect(() => {
     if (!imageSrc) {
       setImageLoaded(false);
+      setNaturalSize(null);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
       prevZoomRef.current = 1;
@@ -269,11 +306,8 @@ export function PhotoCropModal({
               src={imageSrc}
               alt="Crop preview"
               crossOrigin={existingPhotoUrl ? "anonymous" : undefined}
-              className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"
-              style={{
-                transform: `translate(${-displayOffset.x}px, ${-displayOffset.y}px) scale(${zoom})`,
-                transformOrigin: "center",
-              }}
+              className="pointer-events-none absolute select-none"
+              style={imgStyle}
               draggable={false}
               onLoad={handleImageLoad}
             />

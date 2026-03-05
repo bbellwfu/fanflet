@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +15,8 @@ import {
 } from "@/app/dashboard/settings/actions";
 import { PhotoCropModal } from "@/components/dashboard/photo-crop-modal";
 import { ThemePicker } from "@/components/fanflet-builder/theme-picker";
-import { getPhotoFrameImageStyle, readPhotoFrame, type PhotoFrame } from "@/lib/photo-frame";
+import { readPhotoFrame, type PhotoFrame } from "@/lib/photo-frame";
+import { FramedAvatar } from "@/components/dashboard/framed-avatar";
 import { getDefaultThemePreset } from "@/lib/speaker-preferences";
 import { toast } from "sonner";
 import { Check, X, Loader2, Upload, Trash2 } from "lucide-react";
@@ -75,6 +75,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
   const [slug, setSlug] = useState(speaker?.slug ?? "");
   const [photoUrl, setPhotoUrl] = useState(speaker?.photo_url ?? "");
   const [photoFrame, setPhotoFrame] = useState<PhotoFrame | null>(readPhotoFrame(speaker?.social_links ?? null));
+  const [frameVersion, setFrameVersion] = useState(0);
   const [linkedin, setLinkedin] = useState(speaker?.social_links?.linkedin ?? "");
   const [twitter, setTwitter] = useState(speaker?.social_links?.twitter ?? "");
   const [website, setWebsite] = useState(speaker?.social_links?.website ?? "");
@@ -207,6 +208,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
   const handleCropSaved = useCallback((url: string, frame: PhotoFrame) => {
     setPhotoUrl(url);
     setPhotoFrame(frame);
+    setFrameVersion((v) => v + 1);
     setRemovePhoto(false);
     setCropModalFile(null);
   }, []);
@@ -283,7 +285,6 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
   };
 
   const displayPhotoUrl = photoUrl || undefined;
-  const photoFrameStyle = getPhotoFrameImageStyle(photoFrame);
   const initials = getInitials(name || speaker?.name || null, userEmail);
 
   return (
@@ -297,12 +298,19 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col sm:flex-row items-start gap-6">
-          <Avatar className="w-20 h-20 border-2 border-[#e2e8f0] shrink-0">
-            <AvatarImage src={displayPhotoUrl} alt="Profile" className="object-cover" style={photoFrameStyle} />
-            <AvatarFallback className="bg-[#3BA5D9]/20 text-[#1B365D] text-xl font-semibold">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+          <FramedAvatar
+            key={frameVersion}
+            src={displayPhotoUrl}
+            frame={photoFrame}
+            alt="Profile"
+            size={80}
+            className="border-2 border-[#e2e8f0]"
+            fallback={
+              <div className="flex items-center justify-center w-full h-full bg-[#3BA5D9]/20 text-[#1B365D] text-xl font-semibold rounded-full">
+                {initials}
+              </div>
+            }
+          />
           <div className="flex flex-col gap-2">
             <input
               ref={fileInputRef}

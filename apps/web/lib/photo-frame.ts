@@ -34,12 +34,53 @@ export function readPhotoFrame(socialLinks: unknown): PhotoFrame | null {
   return clampPhotoFrame({ zoom, offsetX, offsetY });
 }
 
+/**
+ * Compute inline styles that position a photo inside a square container,
+ * matching the crop-modal's direct-positioning approach.
+ *
+ * `containerSize` is the rendered width/height of the avatar (e.g. 80).
+ * `aspect` is the image's naturalWidth / naturalHeight.
+ */
+export function getFramedImageStyle(
+  frame: PhotoFrame,
+  containerSize: number,
+  aspect: number,
+): CSSProperties {
+  const safe = clampPhotoFrame(frame);
+
+  let baseW: number;
+  let baseH: number;
+  if (aspect >= 1) {
+    baseH = containerSize;
+    baseW = containerSize * aspect;
+  } else {
+    baseW = containerSize;
+    baseH = containerSize / aspect;
+  }
+
+  const scaledW = baseW * safe.zoom;
+  const scaledH = baseH * safe.zoom;
+
+  return {
+    position: "absolute",
+    width: scaledW,
+    height: scaledH,
+    maxWidth: "none",
+    left: (containerSize - scaledW) / 2 - safe.offsetX * containerSize,
+    top: (containerSize - scaledH) / 2 - safe.offsetY * containerSize,
+  };
+}
+
+/** @deprecated Use FramedAvatar component instead for accurate display. */
 export function getPhotoFrameImageStyle(frame: PhotoFrame | null | undefined): CSSProperties | undefined {
   if (!frame) return undefined;
   const safe = clampPhotoFrame(frame);
 
+  const tx = -safe.offsetX * safe.zoom * 100;
+  const ty = -safe.offsetY * safe.zoom * 100;
+
   return {
-    transform: `translate(${-safe.offsetX * 100}%, ${-safe.offsetY * 100}%) scale(${safe.zoom})`,
+    transform: `translate(${tx}%, ${ty}%) scale(${safe.zoom})`,
     transformOrigin: "center",
   };
 }

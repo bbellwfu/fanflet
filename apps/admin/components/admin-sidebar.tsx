@@ -6,6 +6,7 @@ import Image from "next/image";
 import {
   LayoutDashboardIcon,
   UsersIcon,
+  BuildingIcon,
   FileTextIcon,
   MailIcon,
   ToggleLeftIcon,
@@ -37,6 +38,12 @@ const navItems: NavItem[] = [
     href: "/accounts",
     label: "Accounts",
     icon: <UsersIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "sponsors",
+    href: "/sponsors",
+    label: "Sponsors",
+    icon: <BuildingIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "fanflets",

@@ -35,6 +35,7 @@ export type LibraryResource = {
   image_url: string | null
   section_name: string | null
   metadata: Record<string, unknown> | null
+  default_sponsor_account_id: string | null
   created_at: string
   updated_at: string
   linked_fanflets_count: number
@@ -111,6 +112,7 @@ export async function listLibraryResources(): Promise<{
       image_url: item.image_url,
       section_name: item.section_name,
       metadata: item.metadata as Record<string, unknown> | null,
+      default_sponsor_account_id: item.default_sponsor_account_id ?? null,
       created_at: item.created_at,
       updated_at: item.updated_at,
       linked_fanflets_count: linkedFanflets.length,
@@ -145,6 +147,7 @@ export async function createLibraryResource(data: {
   image_url?: string
   section_name?: string
   metadata?: Record<string, unknown>
+  default_sponsor_account_id?: string | null
 }): Promise<{ error?: string; success?: boolean; id?: string }> {
   const ctx = await getSpeakerContext()
   if (!ctx) return { error: 'Not authenticated' }
@@ -157,21 +160,36 @@ export async function createLibraryResource(data: {
   if (data.type === 'sponsor') {
     const entitlements = await getSpeakerEntitlements(speakerId)
     if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor resources require a higher plan. Upgrade in Settings.' }
+    if (data.default_sponsor_account_id) {
+      const { data: conn } = await supabase
+        .from('sponsor_connections')
+        .select('id')
+        .eq('speaker_id', speakerId)
+        .eq('sponsor_id', data.default_sponsor_account_id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (!conn) return { error: 'Selected sponsor is not an active connection.' }
+    }
+  }
+
+  const insertPayload: Record<string, unknown> = {
+    speaker_id: speakerId,
+    type: data.type,
+    title: data.title.trim(),
+    description: data.description ?? null,
+    url: ensureUrl(data.url),
+    file_path: data.file_path ?? null,
+    image_url: data.image_url ?? null,
+    section_name: data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources'),
+    metadata: data.metadata ?? {},
+  }
+  if (data.type === 'sponsor' && data.default_sponsor_account_id !== undefined) {
+    insertPayload.default_sponsor_account_id = data.default_sponsor_account_id || null
   }
 
   const { data: item, error } = await supabase
     .from('resource_library')
-    .insert({
-      speaker_id: speakerId,
-      type: data.type,
-      title: data.title.trim(),
-      description: data.description ?? null,
-      url: ensureUrl(data.url),
-      file_path: data.file_path ?? null,
-      image_url: data.image_url ?? null,
-      section_name: data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources'),
-      metadata: data.metadata ?? {},
-    })
+    .insert(insertPayload)
     .select('id')
     .single()
 
@@ -191,11 +209,31 @@ export async function updateLibraryResource(
     image_url?: string
     section_name?: string
     metadata?: Record<string, unknown>
+    default_sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
   const ctx = await getSpeakerContext()
   if (!ctx) return { error: 'Not authenticated' }
   const { supabase, speakerId } = ctx
+
+  if (data.default_sponsor_account_id !== undefined) {
+    const { data: item } = await supabase
+      .from('resource_library')
+      .select('type')
+      .eq('id', id)
+      .eq('speaker_id', speakerId)
+      .single()
+    if (item?.type === 'sponsor' && data.default_sponsor_account_id) {
+      const { data: conn } = await supabase
+        .from('sponsor_connections')
+        .select('id')
+        .eq('speaker_id', speakerId)
+        .eq('sponsor_id', data.default_sponsor_account_id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (!conn) return { error: 'Selected sponsor is not an active connection.' }
+    }
+  }
 
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
@@ -205,6 +243,7 @@ export async function updateLibraryResource(
   if (data.image_url !== undefined) updateData.image_url = data.image_url
   if (data.section_name !== undefined) updateData.section_name = data.section_name
   if (data.metadata !== undefined) updateData.metadata = data.metadata
+  if (data.default_sponsor_account_id !== undefined) updateData.default_sponsor_account_id = data.default_sponsor_account_id || null
   updateData.updated_at = new Date().toISOString()
 
   const { error } = await supabase
@@ -219,20 +258,72 @@ export async function updateLibraryResource(
   return { success: true }
 }
 
+export type DeleteLibraryResourceOptions = {
+  /** When the resource is linked on fanflets: convert each block to a static copy, or remove blocks. */
+  handleLinkedBlocks: 'convert_to_static' | 'remove_from_fanflets'
+}
+
 export async function deleteLibraryResource(
-  id: string
-): Promise<{ error?: string; success?: boolean }> {
+  id: string,
+  options?: DeleteLibraryResourceOptions
+): Promise<{ error?: string; success?: boolean; needsChoice?: boolean }> {
   const ctx = await getSpeakerContext()
   if (!ctx) return { error: 'Not authenticated' }
   const { supabase, speakerId } = ctx
 
-  // Fetch the item first to get the file_path for storage cleanup
-  const { data: item } = await supabase
+  // Fetch the full library item (for storage cleanup and for convert_to_static)
+  const { data: item, error: fetchError } = await supabase
     .from('resource_library')
-    .select('file_path, type')
+    .select('*')
     .eq('id', id)
     .eq('speaker_id', speakerId)
     .single()
+
+  if (fetchError || !item) return { error: 'Resource not found' }
+
+  // Find blocks that reference this library item (dynamic blocks on this speaker's fanflets)
+  const { data: linkedBlocks } = await supabase
+    .from('resource_blocks')
+    .select('id, fanflet_id')
+    .eq('library_item_id', id)
+
+  const blocks = linkedBlocks ?? []
+  if (blocks.length > 0 && !options?.handleLinkedBlocks) {
+    return { error: 'Choose how to handle linked fanflet blocks.', needsChoice: true }
+  }
+
+  if (options?.handleLinkedBlocks === 'convert_to_static') {
+    // Copy library content into each block and clear library_item_id
+    for (const block of blocks) {
+      const { error: updateError } = await supabase
+        .from('resource_blocks')
+        .update({
+          title: item.title,
+          description: item.description ?? null,
+          url: item.url ? ensureUrl(item.url) : null,
+          file_path: item.file_path ?? null,
+          image_url: item.image_url ?? null,
+          section_name: item.section_name ?? null,
+          metadata: item.metadata ?? {},
+          library_item_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', block.id)
+
+      if (updateError) return { error: updateError.message }
+      revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
+    }
+  } else if (options?.handleLinkedBlocks === 'remove_from_fanflets') {
+    for (const block of blocks) {
+      const { error: deleteError } = await supabase
+        .from('resource_blocks')
+        .delete()
+        .eq('id', block.id)
+
+      if (deleteError) return { error: deleteError.message }
+      revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
+    }
+  }
 
   const { error } = await supabase
     .from('resource_library')
@@ -242,8 +333,7 @@ export async function deleteLibraryResource(
 
   if (error) return { error: error.message }
 
-  // Clean up the file from storage if it's a file-type resource with a non-legacy path
-  if (item?.type === 'file' && item.file_path && !item.file_path.startsWith('http')) {
+  if (item.type === 'file' && item.file_path && !item.file_path.startsWith('http')) {
     await supabase.storage.from(STORAGE_BUCKET).remove([item.file_path])
   }
 

@@ -23,14 +23,42 @@ export default async function ResourceLibraryPage() {
     redirect("/dashboard/settings");
   }
 
-  const [entitlements, resourcesResult, storageResult] = await Promise.all([
+  const [entitlements, resourcesResult, storageResult, activeConnectionsResult, endedConnectionsResult] = await Promise.all([
     getSpeakerEntitlements(speaker.id),
     listLibraryResources(),
     getSpeakerStorageUsage(),
+    supabase
+      .from("sponsor_connections")
+      .select("sponsor_id, sponsor_accounts(id, company_name)")
+      .eq("speaker_id", speaker.id)
+      .eq("status", "active")
+      .is("ended_at", null),
+    supabase
+      .from("sponsor_connections")
+      .select("sponsor_id, ended_at, sponsor_accounts(id, company_name)")
+      .eq("speaker_id", speaker.id)
+      .eq("status", "active")
+      .not("ended_at", "is", null),
   ]);
 
   const allowSponsorVisibility = entitlements.features.has("sponsor_visibility");
   const quota = getStorageQuota(entitlements.limits);
+
+  const connectedSponsors = (activeConnectionsResult.data ?? []).map((c) => {
+    const row = c as Record<string, unknown>;
+    const acc = row.sponsor_accounts as { id: string; company_name: string } | { id: string; company_name: string }[] | null;
+    const sponsor = Array.isArray(acc) ? acc[0] : acc;
+    return sponsor;
+  }).filter(Boolean) as { id: string; company_name: string }[];
+  const uniqueSponsors = Array.from(new Map(connectedSponsors.map((s) => [s.id, s])).values());
+
+  const endedSponsors = (endedConnectionsResult.data ?? []).map((c) => {
+    const row = c as Record<string, unknown>;
+    const acc = row.sponsor_accounts as { id: string; company_name: string } | { id: string; company_name: string }[] | null;
+    const sponsor = Array.isArray(acc) ? acc[0] : acc;
+    const endedAt = row.ended_at as string | null;
+    return sponsor && endedAt ? { id: sponsor.id, company_name: sponsor.company_name, ended_at: endedAt } : null;
+  }).filter(Boolean) as { id: string; company_name: string; ended_at: string }[];
 
   return (
     <div className="w-full min-w-0 space-y-8 max-w-5xl mx-auto">
@@ -50,6 +78,8 @@ export default async function ResourceLibraryPage() {
         storageUsedBytes={storageResult.usedBytes}
         storageLimitMb={quota.storageMb}
         maxFileMb={quota.maxFileMb}
+        connectedSponsors={uniqueSponsors}
+        endedSponsors={endedSponsors}
       />
     </div>
   );

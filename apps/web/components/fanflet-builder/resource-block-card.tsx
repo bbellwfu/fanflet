@@ -18,6 +18,13 @@ import { ChevronUp, ChevronDown, Pencil, Trash2, Loader2, Link as LinkIcon } fro
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const typeIcons: Record<string, typeof Link2> = {
   link: Link2,
@@ -47,6 +54,7 @@ export type ResourceBlock = {
   section_name: string | null;
   metadata: Record<string, unknown> | null;
   library_item_id?: string | null;
+  sponsor_account_id?: string | null;
   /** When block is linked from library (dynamic), file_path/file_type may come from here */
   resource_library?: { file_path: string | null; file_type: string | null; file_size_bytes?: number | null } | null;
 };
@@ -109,6 +117,8 @@ interface ResourceBlockCardProps {
   authUserId: string;
   isFirst: boolean;
   isLast: boolean;
+  connectedSponsors?: { id: string; company_name: string }[];
+  endedSponsors?: { id: string; company_name: string; ended_at: string }[];
 }
 
 export function ResourceBlockCard({
@@ -117,6 +127,8 @@ export function ResourceBlockCard({
   authUserId,
   isFirst,
   isLast,
+  connectedSponsors = [],
+  endedSponsors = [],
 }: ResourceBlockCardProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -131,6 +143,9 @@ export function ResourceBlockCard({
   const [sectionName, setSectionName] = useState(block.section_name ?? "Resources");
   const [metadata, setMetadata] = useState<Record<string, unknown>>(
     block.metadata ?? {}
+  );
+  const [sponsorAccountId, setSponsorAccountId] = useState<string | null>(
+    block.sponsor_account_id ?? null
   );
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +207,7 @@ export function ResourceBlockCard({
       image_url: imageUrl || undefined,
       section_name: sectionName || undefined,
       metadata: Object.keys(metadata).length ? metadata : undefined,
+      ...(block.type === "sponsor" && { sponsor_account_id: sponsorAccountId || null }),
     });
     setSaving(false);
     if (result.error) {
@@ -358,6 +374,94 @@ export function ResourceBlockCard({
                 type="url"
                 className="border-[#e2e8f0]"
               />
+            </div>
+          )}
+          {block.type === "sponsor" && (sponsorAccountId || block.sponsor_account_id) && (() => {
+            const linkedId = sponsorAccountId || block.sponsor_account_id;
+            const ended = linkedId ? endedSponsors.find((s) => s.id === linkedId) : null;
+            const isConnected = linkedId ? connectedSponsors.some((s) => s.id === linkedId) : false;
+            if (ended) {
+              return (
+                <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-sm text-slate-700">
+                    Linked to {ended.company_name}. Connection ended on{" "}
+                    {new Date(ended.ended_at).toLocaleDateString()}; no new data is sent to them.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setSaving(true);
+                      const result = await updateResourceBlock(block.id, { sponsor_account_id: null });
+                      setSaving(false);
+                      if (result.error) toast.error(result.error);
+                      else {
+                        setSponsorAccountId(null);
+                        toast.success("Sponsor unlinked");
+                        router.refresh();
+                      }
+                    }}
+                    disabled={saving}
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Unlink"}
+                  </Button>
+                </div>
+              );
+            }
+            if (linkedId && !isConnected) {
+              return (
+                <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50/80 p-3">
+                  <p className="text-sm text-amber-900">
+                    Linked to a sponsor you&apos;re no longer connected to. Unlink to remove the association.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                    onClick={async () => {
+                      setSaving(true);
+                      const result = await updateResourceBlock(block.id, { sponsor_account_id: null });
+                      setSaving(false);
+                      if (result.error) toast.error(result.error);
+                      else {
+                        setSponsorAccountId(null);
+                        toast.success("Sponsor unlinked");
+                        router.refresh();
+                      }
+                    }}
+                    disabled={saving}
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Unlink"}
+                  </Button>
+                </div>
+              );
+            }
+            return null;
+          })()}
+          {block.type === "sponsor" && connectedSponsors.length > 0 && (
+            <div className="space-y-2">
+              <Label>Link to sponsor</Label>
+              <Select
+                value={sponsorAccountId && sponsorAccountId !== "" ? sponsorAccountId : "__none__"}
+                onValueChange={(v) => setSponsorAccountId(v === "__none__" ? null : v)}
+              >
+                <SelectTrigger className="border-[#e2e8f0]">
+                  <SelectValue placeholder="Select a sponsor (for lead attribution)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {connectedSponsors.filter((s) => s?.id).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.company_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Connects this block to the sponsor for engagement and lead reports.
+              </p>
             </div>
           )}
           {block.type === "sponsor" && (

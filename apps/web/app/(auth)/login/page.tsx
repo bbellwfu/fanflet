@@ -178,7 +178,7 @@ export default function LoginPage() {
           )}
         </Button>
       </CardContent>
-      <CardFooter className="flex justify-center">
+      <CardFooter className="flex flex-col items-center gap-2">
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link
@@ -186,6 +186,15 @@ export default function LoginPage() {
             className="font-medium text-[#3BA5D9] hover:underline"
           >
             Sign up
+          </Link>
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Are you a sponsor?{' '}
+          <Link
+            href="/sponsor/signup"
+            className="font-medium text-[#3BA5D9] hover:underline"
+          >
+            Sponsor sign up
           </Link>
         </p>
       </CardFooter>

@@ -268,6 +268,7 @@ export function LandingPage({
               speakerId={speaker.id}
               fanfletId={fanflet.id}
               subscriberCount={subscriberCount}
+              hasSponsorBlocks={sponsorBlocks.length > 0}
             />
           </CardContent>
         </Card>

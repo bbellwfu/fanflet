@@ -11,10 +11,30 @@ export async function login(formData: FormData) {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
   }
-  const { error } = await supabase.auth.signInWithPassword(data)
+  const { data: authData, error } = await supabase.auth.signInWithPassword(data)
   if (error) {
     return { error: error.message }
   }
+
+  const userId = authData.user?.id
+  if (userId) {
+    const { data: sponsor } = await supabase
+      .from('sponsor_accounts')
+      .select('id')
+      .eq('auth_user_id', userId)
+      .single()
+    if (sponsor) {
+      revalidatePath('/', 'layout')
+      redirect('/sponsor/dashboard')
+    }
+
+    const signupRole = authData.user?.user_metadata?.signup_role
+    if (signupRole === 'sponsor') {
+      revalidatePath('/', 'layout')
+      redirect('/sponsor/onboarding')
+    }
+  }
+
   revalidatePath('/', 'layout')
   redirect('/dashboard')
 }

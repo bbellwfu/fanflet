@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -197,8 +197,11 @@ export function FanfletEditor({
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [showSlugWarning, setShowSlugWarning] = useState(false);
-  const [surveySelectMounted, setSurveySelectMounted] = useState(false);
-  useEffect(() => setSurveySelectMounted(true), []);
+  const surveySelectMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   const [title, setTitle] = useState(fanflet.title);
   const [description, setDescription] = useState(fanflet.description ?? "");

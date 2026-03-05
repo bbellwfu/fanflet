@@ -237,7 +237,7 @@ export async function changeSpeakerPlan(
     }
     revalidatePath(`/accounts/${speakerId}`);
     revalidatePath("/accounts");
-    return { success: true };
+    return {};
   }
 
   const { data: plan, error: planError } = await supabase
@@ -260,7 +260,7 @@ export async function changeSpeakerPlan(
     }
     revalidatePath(`/accounts/${speakerId}`);
     revalidatePath("/accounts");
-    return { success: true };
+    return {};
   }
 
   const { data: featureRows } = await supabase
@@ -295,5 +295,5 @@ export async function changeSpeakerPlan(
 
   revalidatePath(`/accounts/${speakerId}`);
   revalidatePath("/accounts");
-  return { success: true };
+  return {};
 }

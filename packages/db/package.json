@@ -12,6 +12,7 @@
     "./middleware": "./src/middleware.ts",
     "./config": "./src/config.ts",
     "./features": "./src/features.ts",
+    "./constants": "./src/constants.ts",
     "./storage": "./src/storage.ts"
   },
   "dependencies": {

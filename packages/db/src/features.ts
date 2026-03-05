@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "./server";
+import { FREE_PLAN_NAME } from "./constants";
 
 export interface SpeakerEntitlements {
   features: Set<string>;
@@ -93,7 +94,7 @@ export const getSpeakerEntitlements = cache(
       const { data: freePlan } = await supabase
         .from("plans")
         .select("name, display_name, limits")
-        .eq("name", "free")
+        .eq("name", FREE_PLAN_NAME)
         .single();
 
       if (freePlan) {

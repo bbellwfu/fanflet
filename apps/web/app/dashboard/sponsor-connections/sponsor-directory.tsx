@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,14 +50,10 @@ function ConnectDialog({
   onOpenChange,
   onSuccess,
 }: ConnectDialogProps) {
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() =>
+    sponsor ? defaultMessage(sponsor.company_name) : ""
+  );
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (open && sponsor) {
-      setMessage(defaultMessage(sponsor.company_name));
-    }
-  }, [open, sponsor]);
 
   if (!sponsor) return null;
 
@@ -236,6 +232,7 @@ export function SponsorDirectory({ sponsors, speakerProfile }: SponsorDirectoryP
   return (
     <div className="space-y-4">
       <ConnectDialog
+        key={connectSponsor?.id ?? "none"}
         sponsor={connectSponsor}
         speakerProfile={speakerProfile}
         open={connectSponsor !== null}

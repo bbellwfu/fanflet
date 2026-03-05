@@ -125,7 +125,7 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
                   {subtitle}
                 </p>
                 {conn.message && (
-                  <p className="text-sm text-slate-600 mt-1">"{conn.message}"</p>
+                  <p className="text-sm text-slate-600 mt-1">&ldquo;{conn.message}&rdquo;</p>
                 )}
               </div>
               <div className="flex items-center gap-2">

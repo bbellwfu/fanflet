@@ -94,7 +94,7 @@ export default async function SponsorDashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{connectionsCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Speakers you're connected with</p>
+            <p className="text-xs text-muted-foreground">Speakers you&apos;re connected with</p>
           </CardContent>
         </Card>
         <Card>

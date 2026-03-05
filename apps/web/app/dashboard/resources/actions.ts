@@ -66,7 +66,7 @@ export async function listLibraryResources(): Promise<{
       return blocks?.map((b) => b.id) ?? []
     })
 
-  let downloadCounts: Record<string, number> = {}
+  const downloadCounts: Record<string, number> = {}
   if (allBlockIds.length > 0) {
     const { data: downloads } = await supabase
       .from('analytics_events')

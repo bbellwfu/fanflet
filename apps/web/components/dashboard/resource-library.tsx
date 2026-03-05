@@ -301,7 +301,7 @@ export function ResourceLibrary({
     try {
       const supabase = createClient();
       const ext = file.name.split(".").pop() || "png";
-      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+      const safeName = `${crypto.randomUUID()}.${ext}`;
       const path = `${authUserId}/library/images/${safeName}`;
 
       const { error: uploadError } = await supabase.storage

@@ -5,15 +5,21 @@ import { createClient } from "@/lib/supabase/server";
 export async function subscribeToSpeaker(
   speakerId: string,
   fanfletId: string,
-  email: string
+  email: string,
+  sponsorConsent: boolean = false
 ) {
   const supabase = await createClient();
 
-  const { error } = await supabase.from("subscribers").insert({
-    email: email.toLowerCase().trim(),
-    speaker_id: speakerId,
-    source_fanflet_id: fanfletId,
-  });
+  const { data, error } = await supabase
+    .from("subscribers")
+    .insert({
+      email: email.toLowerCase().trim(),
+      speaker_id: speakerId,
+      source_fanflet_id: fanfletId,
+      sponsor_consent: sponsorConsent,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     if (error.code === "23505") {
@@ -22,5 +28,5 @@ export async function subscribeToSpeaker(
     return { error: error.message };
   }
 
-  return { success: true };
+  return { success: true, subscriber_id: data?.id ?? undefined };
 }

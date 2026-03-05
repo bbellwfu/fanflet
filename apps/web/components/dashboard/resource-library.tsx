@@ -34,6 +34,23 @@ import {
   deleteLibraryResource,
 } from "@/app/dashboard/resources/actions";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   requestUploadSlot,
   confirmUpload,
   cancelUploadSlot,
@@ -57,6 +74,7 @@ type LibraryResource = {
   image_url: string | null;
   section_name: string | null;
   metadata: Record<string, unknown> | null;
+  default_sponsor_account_id: string | null;
   created_at: string;
   updated_at: string;
   linked_fanflets_count: number;
@@ -164,6 +182,8 @@ interface ResourceLibraryProps {
   storageUsedBytes: number;
   storageLimitMb: number;
   maxFileMb: number;
+  connectedSponsors?: { id: string; company_name: string }[];
+  endedSponsors?: { id: string; company_name: string; ended_at: string }[];
 }
 
 export function ResourceLibrary({
@@ -173,6 +193,8 @@ export function ResourceLibrary({
   storageUsedBytes,
   storageLimitMb,
   maxFileMb,
+  connectedSponsors = [],
+  endedSponsors = [],
 }: ResourceLibraryProps) {
   const resourceTypes = allowSponsorVisibility ? blockTypes : blockTypes.filter((t) => t.type !== "sponsor");
   const router = useRouter();
@@ -182,6 +204,7 @@ export function ResourceLibrary({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; resource: LibraryResource } | null>(null);
 
   // Add form state
   const [title, setTitle] = useState("");
@@ -190,6 +213,7 @@ export function ResourceLibrary({
   const [content, setContent] = useState("");
   const [sectionName, setSectionName] = useState("Resources");
   const [sponsorCta, setSponsorCta] = useState("Learn More");
+  const [defaultSponsorId, setDefaultSponsorId] = useState<string>("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [fileUploading, setFileUploading] = useState(false);
@@ -245,6 +269,7 @@ export function ResourceLibrary({
   const [editSectionName, setEditSectionName] = useState("");
   const [editImageUrl, setEditImageUrl] = useState("");
   const [editMetadata, setEditMetadata] = useState<Record<string, unknown>>({});
+  const [editDefaultSponsorId, setEditDefaultSponsorId] = useState<string>("");
 
   const resetForm = useCallback(() => {
     setSelectedType(null);
@@ -254,6 +279,7 @@ export function ResourceLibrary({
     setContent("");
     setSectionName("Resources");
     setSponsorCta("Learn More");
+    setDefaultSponsorId("");
     setImageUrl("");
     setFileName("");
     setUploadedLibraryItemId(null);
@@ -275,7 +301,7 @@ export function ResourceLibrary({
     try {
       const supabase = createClient();
       const ext = file.name.split(".").pop() || "png";
-      const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+      const safeName = `${crypto.randomUUID()}.${ext}`;
       const path = `${authUserId}/library/images/${safeName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -436,6 +462,7 @@ export function ResourceLibrary({
       payload.url = url || undefined;
       payload.description = description || undefined;
       payload.metadata = { cta_text: sponsorCta || "Learn More" };
+      payload.default_sponsor_account_id = defaultSponsorId || null;
     }
 
     const result = await createLibraryResource(payload);
@@ -457,7 +484,10 @@ export function ResourceLibrary({
     setEditSectionName(r.section_name ?? "Resources");
     setEditImageUrl(r.image_url ?? "");
     setEditMetadata(r.metadata ?? {});
+    setEditDefaultSponsorId(r.default_sponsor_account_id ?? "");
   };
+
+  const editingResource = editingId ? resources.find((r) => r.id === editingId) : null;
 
   const handleSaveEdit = async () => {
     if (!editingId) return;
@@ -469,6 +499,7 @@ export function ResourceLibrary({
       image_url: editImageUrl || undefined,
       section_name: editSectionName || undefined,
       metadata: Object.keys(editMetadata).length ? editMetadata : undefined,
+      default_sponsor_account_id: editingResource?.type === "sponsor" ? (editDefaultSponsorId || null) : undefined,
     });
     setSaving(false);
     if (result.error) {
@@ -480,21 +511,44 @@ export function ResourceLibrary({
     router.refresh();
   };
 
-  const handleDelete = async (id: string, resource: LibraryResource) => {
+  const handleDeleteClick = (id: string, resource: LibraryResource) => {
     const linkedCount = resource.linked_fanflets_count;
-    const message = linkedCount > 0
-      ? `This resource is linked to ${linkedCount} fanflet${linkedCount > 1 ? "s" : ""}. Deleting it will remove it from those fanflets. Continue?`
-      : "Delete this library resource?";
+    if (linkedCount > 0) {
+      setDeleteTarget({ id, resource });
+      return;
+    }
+    const message = "Delete this library resource?";
     if (!confirm(message)) return;
+    executeDelete(id);
+  };
+
+  const executeDelete = async (id: string, handleLinkedBlocks?: 'convert_to_static' | 'remove_from_fanflets') => {
     setDeleting(id);
-    const result = await deleteLibraryResource(id);
+    const result = await deleteLibraryResource(id, handleLinkedBlocks ? { handleLinkedBlocks } : undefined);
     setDeleting(null);
+    setDeleteTarget(null);
     if (result.error) {
       toast.error(result.error);
       return;
     }
-    toast.success("Resource deleted");
+    toast.success(
+      handleLinkedBlocks === 'convert_to_static'
+        ? "Resource deleted. Blocks converted to static copies on fanflets."
+        : handleLinkedBlocks === 'remove_from_fanflets'
+          ? "Resource deleted. Blocks removed from fanflets."
+          : "Resource deleted"
+    );
     router.refresh();
+  };
+
+  const handleDeleteConfirmConvertToStatic = () => {
+    if (!deleteTarget) return;
+    executeDelete(deleteTarget.id, 'convert_to_static');
+  };
+
+  const handleDeleteConfirmRemoveFromFanflets = () => {
+    if (!deleteTarget) return;
+    executeDelete(deleteTarget.id, 'remove_from_fanflets');
   };
 
   const showUrl = selectedType === "link" || selectedType === "sponsor";
@@ -504,7 +558,57 @@ export function ResourceLibrary({
   const hasFileResources = resources.some((r) => r.type === "file" && r.file_size_bytes);
 
   return (
-    <Card className="border-slate-200">
+    <>
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete library resource</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  This resource is linked as a <strong>dynamic</strong> block on{" "}
+                  <strong>
+                    {deleteTarget?.resource.linked_fanflets_count === 1
+                      ? "1 fanflet"
+                      : `${deleteTarget?.resource.linked_fanflets_count ?? 0} fanflets`}
+                  </strong>
+                  . How do you want to handle the blocks on those fanflets?
+                </p>
+                {deleteTarget?.resource.linked_fanflets && deleteTarget.resource.linked_fanflets.length > 0 && (
+                  deleteTarget.resource.linked_fanflets.length === 1 ? (
+                    <p className="text-muted-foreground text-sm">
+                      {deleteTarget.resource.linked_fanflets[0].title}
+                    </p>
+                  ) : (
+                    <ul
+                      className="max-h-32 overflow-y-auto rounded-md border border-border bg-muted/30 px-3 py-2 text-sm list-disc list-inside"
+                      aria-label="Linked fanflets"
+                    >
+                      {deleteTarget.resource.linked_fanflets.map((f) => (
+                        <li key={f.id}>{f.title}</li>
+                      ))}
+                    </ul>
+                  )
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirmRemoveFromFanflets}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove from all fanflets
+            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteConfirmConvertToStatic}>
+              Convert to static copies
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Card className="border-slate-200">
       <CardHeader className="flex flex-col gap-3 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-[#1B365D] flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
@@ -636,6 +740,31 @@ export function ResourceLibrary({
                   placeholder="Learn More"
                   className="bg-white border-white/20 placeholder:text-slate-400"
                 />
+              </div>
+            )}
+
+            {selectedType === "sponsor" && connectedSponsors.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-white/90 font-medium">Link to a Connected Sponsor for tracking?</Label>
+                <Select
+                  value={defaultSponsorId || "none"}
+                  onValueChange={(v) => setDefaultSponsorId(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger className="bg-white border-white/20">
+                    <SelectValue placeholder="None (set when adding to a Fanflet)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {connectedSponsors.filter((s) => s?.id).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-white/60">
+                  When you add this resource to a Fanflet, the block will be linked to this sponsor by default.
+                </p>
               </div>
             )}
 
@@ -890,6 +1019,39 @@ export function ResourceLibrary({
                     />
                   </div>
                 )}
+                {r.type === "sponsor" && (connectedSponsors.length > 0 || endedSponsors.length > 0) && (
+                  <div className="space-y-2">
+                    <Label>Default sponsor</Label>
+                    {editDefaultSponsorId && endedSponsors.some((s) => s.id === editDefaultSponsorId) && (
+                      <p className="text-sm text-slate-600 rounded-md border border-slate-200 bg-slate-50 p-2">
+                        Connection ended on{" "}
+                        {new Date(endedSponsors.find((s) => s.id === editDefaultSponsorId)!.ended_at).toLocaleDateString()};
+                        no new data is sent to them. Choose None below to clear.
+                      </p>
+                    )}
+                    <Select
+                      value={editDefaultSponsorId || "none"}
+                      onValueChange={(v) => setEditDefaultSponsorId(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger className="border-[#e2e8f0]">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {connectedSponsors.filter((s) => s?.id).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.company_name}
+                          </SelectItem>
+                        ))}
+                        {endedSponsors.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.company_name} (ended)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {r.type === "text" && (
                   <div className="space-y-2">
                     <Label>Content</Label>
@@ -1087,7 +1249,7 @@ export function ResourceLibrary({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleDelete(r.id, r)}
+                  onClick={() => handleDeleteClick(r.id, r)}
                   disabled={deleting === r.id}
                   className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
                 >
@@ -1104,5 +1266,6 @@ export function ResourceLibrary({
         })}
       </CardContent>
     </Card>
+    </>
   );
 }

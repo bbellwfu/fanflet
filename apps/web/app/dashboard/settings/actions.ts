@@ -120,6 +120,35 @@ export async function checkSlugAvailability(slug: string) {
   return { available: !existing }
 }
 
+export async function removeSpeakerPhoto() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: currentSpeaker } = await supabase
+    .from('speakers')
+    .select('social_links')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links ?? {})
+  const { photo_frame: _drop, ...socialLinksWithoutFrame } = existingSocialLinks as Record<string, unknown>
+
+  const { error } = await supabase
+    .from('speakers')
+    .update({
+      photo_url: null,
+      social_links: socialLinksWithoutFrame,
+    })
+    .eq('auth_user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/dashboard/settings')
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
 export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFrame | null) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

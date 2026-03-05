@@ -208,13 +208,9 @@ export function SubscribersDashboard({
     setEmailBody("");
   }, [filteredSubscribers, selectedIds, emailSubject, emailBody, speakerEmail]);
 
-  // Stats
+  const [now] = useState(() => Date.now());
   const thisWeek = subscribers.filter(
-    (s) => new Date(s.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  ).length;
-
-  const thisMonth = subscribers.filter(
-    (s) => new Date(s.created_at) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    (s) => new Date(s.created_at) > new Date(now - 7 * 24 * 60 * 60 * 1000)
   ).length;
 
   return (

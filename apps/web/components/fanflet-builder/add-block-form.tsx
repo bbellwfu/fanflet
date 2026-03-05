@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft, Info } from "lucide-react";
 import { addResourceBlock, addLibraryBlockToFanflet } from "@/app/dashboard/fanflets/[id]/actions";
@@ -103,6 +110,11 @@ const libraryTypeLabels: Record<string, string> = {
   sponsor: "Sponsor",
 };
 
+interface ConnectedSponsor {
+  id: string;
+  company_name: string;
+}
+
 interface AddBlockFormProps {
   fanfletId: string;
   authUserId: string;
@@ -112,6 +124,8 @@ interface AddBlockFormProps {
   linkedLibraryItemIds?: Set<string>;
   /** When false, sponsor block type is hidden (gated by plan). */
   allowSponsorVisibility?: boolean;
+  /** Active sponsor connections for linking sponsor blocks to a connected sponsor. */
+  connectedSponsors?: ConnectedSponsor[];
 }
 
 export function AddBlockForm({
@@ -121,6 +135,7 @@ export function AddBlockForm({
   libraryItems = [],
   linkedLibraryItemIds = new Set(),
   allowSponsorVisibility = true,
+  connectedSponsors = [],
 }: AddBlockFormProps) {
   const blockTypes = allowSponsorVisibility
     ? ALL_BLOCK_TYPES
@@ -136,6 +151,7 @@ export function AddBlockForm({
   const [content, setContent] = useState("");
   const [sectionName, setSectionName] = useState("Resources");
   const [sponsorCta, setSponsorCta] = useState("Learn More");
+  const [linkedSponsorId, setLinkedSponsorId] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -151,6 +167,7 @@ export function AddBlockForm({
     setContent("");
     setSectionName("Resources");
     setSponsorCta("Learn More");
+    setLinkedSponsorId("");
     setImageUrl("");
     setOpen(false);
     setShowLibraryPicker(false);
@@ -312,6 +329,7 @@ export function AddBlockForm({
       payload.metadata = {
         cta_text: sponsorCta || "Learn More",
       };
+      if (linkedSponsorId) payload.sponsor_account_id = linkedSponsorId;
     }
 
     const result = await addResourceBlock(fanfletId, payload);
@@ -576,6 +594,38 @@ export function AddBlockForm({
             placeholder="Learn More"
             className="border-[#e2e8f0]"
           />
+        </div>
+      )}
+
+      {selectedType === "sponsor" && connectedSponsors.length > 0 && (
+        <div className="space-y-2">
+          <Label>Link to connected sponsor</Label>
+          <Select
+            value={linkedSponsorId || "none"}
+            onValueChange={(value) => {
+              const id = value === "none" ? "" : value;
+              setLinkedSponsorId(id);
+              if (id && !title) {
+                const sponsor = connectedSponsors.find((s) => s.id === id);
+                if (sponsor) setTitle(sponsor.company_name);
+              }
+            }}
+          >
+            <SelectTrigger className="border-[#e2e8f0]">
+              <SelectValue placeholder="None — manual sponsor only" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None - Not linked to a Connected Sponsor</SelectItem>
+              {connectedSponsors.filter((s) => s?.id).map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.company_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Linking attributes leads and clicks to that sponsor in reports.
+          </p>
         </div>
       )}
 

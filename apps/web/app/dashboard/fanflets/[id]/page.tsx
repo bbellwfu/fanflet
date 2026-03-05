@@ -44,6 +44,42 @@ export default async function FanfletEditorPage({
     .eq("fanflet_id", id)
     .order("display_order", { ascending: true });
 
+  const [activeConnectionsResult, endedConnectionsResult] = await Promise.all([
+    supabase
+      .from("sponsor_connections")
+      .select("sponsor_id, sponsor_accounts(id, company_name)")
+      .eq("speaker_id", speaker.id)
+      .eq("status", "active")
+      .is("ended_at", null),
+    supabase
+      .from("sponsor_connections")
+      .select("sponsor_id, ended_at, sponsor_accounts(id, company_name)")
+      .eq("speaker_id", speaker.id)
+      .eq("status", "active")
+      .not("ended_at", "is", null),
+  ]);
+
+  const connectedSponsors = (activeConnectionsResult.data ?? [])
+    .map((c) => {
+      const row = c as Record<string, unknown>;
+      const acc = row.sponsor_accounts as { id: string; company_name: string } | { id: string; company_name: string }[] | null;
+      return Array.isArray(acc) ? acc[0] ?? null : acc;
+    })
+    .filter(Boolean) as { id: string; company_name: string }[];
+  const uniqueSponsors = Array.from(
+    new Map(connectedSponsors.map((s) => [s.id, s])).values()
+  );
+
+  const endedSponsors = (endedConnectionsResult.data ?? [])
+    .map((c) => {
+      const row = c as Record<string, unknown>;
+      const acc = row.sponsor_accounts as { id: string; company_name: string } | { id: string; company_name: string }[] | null;
+      const sponsor = Array.isArray(acc) ? acc[0] : acc;
+      const endedAt = row.ended_at as string | null;
+      return sponsor && endedAt ? { id: sponsor.id, company_name: sponsor.company_name, ended_at: endedAt } : null;
+    })
+    .filter(Boolean) as { id: string; company_name: string; ended_at: string }[];
+
   // Fetch speaker's survey questions for the selector
   const { data: surveyQuestions } = await supabase
     .from("survey_questions")
@@ -69,6 +105,7 @@ export default async function FanfletEditorPage({
   const hasSurveys = entitlements.features.has("surveys_session_feedback");
   const allowCustomExpiration = entitlements.features.has("custom_expiration");
   const allowSponsorVisibility = entitlements.features.has("sponsor_visibility");
+  const hasSponsorReports = entitlements.features.has("sponsor_reports");
 
   return (
     <FanfletEditor
@@ -84,6 +121,9 @@ export default async function FanfletEditorPage({
       hasSurveys={hasSurveys}
       allowCustomExpiration={allowCustomExpiration}
       allowSponsorVisibility={allowSponsorVisibility}
+      hasSponsorReports={hasSponsorReports}
+      connectedSponsors={uniqueSponsors}
+      endedSponsors={endedSponsors}
     />
   );
 }

@@ -6,18 +6,24 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
-  const next = '/dashboard'
 
   const redirectTo = request.nextUrl.clone()
-  redirectTo.pathname = next
   redirectTo.searchParams.delete('token_hash')
   redirectTo.searchParams.delete('type')
+  redirectTo.searchParams.delete('next')
 
   if (token_hash && type) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
-      redirectTo.searchParams.delete('next')
+      const { data: { user } } = await supabase.auth.getUser()
+      const signupRole = user?.user_metadata?.signup_role
+
+      if (signupRole === 'sponsor') {
+        redirectTo.pathname = '/sponsor/onboarding'
+      } else {
+        redirectTo.pathname = '/dashboard'
+      }
       return NextResponse.redirect(redirectTo)
     }
   }

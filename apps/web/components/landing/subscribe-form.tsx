@@ -5,18 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { subscribeToSpeaker } from "@/app/[speakerSlug]/[fanfletSlug]/actions";
 
+/** SessionStorage key prefix for subscriber_id (suffix = fanfletId). Used by track API for lead attribution. */
+export const SUBSCRIBER_ID_KEY_PREFIX = "fanflet_subscriber_id_";
+
 type SubscribeFormProps = {
   speakerId: string;
   fanfletId: string;
   subscriberCount: number;
+  /** When true, show the sponsor consent checkbox. */
+  hasSponsorBlocks?: boolean;
 };
 
 export function SubscribeForm({
   speakerId,
   fanfletId,
   subscriberCount,
+  hasSponsorBlocks = false,
 }: SubscribeFormProps) {
   const [email, setEmail] = useState("");
+  const [sponsorConsent, setSponsorConsent] = useState(false);
   const [status, setStatus] = useState<
     "idle" | "loading" | "success" | "already_subscribed" | "error"
   >("idle");
@@ -29,11 +36,26 @@ export function SubscribeForm({
     setStatus("loading");
     setErrorMessage(null);
 
-    const result = await subscribeToSpeaker(speakerId, fanfletId, email.trim());
+    const result = await subscribeToSpeaker(
+      speakerId,
+      fanfletId,
+      email.trim(),
+      hasSponsorBlocks ? sponsorConsent : false
+    );
 
     if (result.success) {
       setStatus("success");
       setEmail("");
+      if (result.subscriber_id && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `${SUBSCRIBER_ID_KEY_PREFIX}${fanfletId}`,
+            result.subscriber_id
+          );
+        } catch {
+          // ignore storage errors
+        }
+      }
     } else if (result.error === "already_subscribed") {
       setStatus("already_subscribed");
     } else {
@@ -63,6 +85,23 @@ export function SubscribeForm({
           {status === "loading" ? "..." : "Subscribe"}
         </Button>
       </div>
+
+      {hasSponsorBlocks && (status === "idle" || status === "loading") && (
+        <label className="flex items-start gap-2 cursor-pointer text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={sponsorConsent}
+            onChange={(e) => setSponsorConsent(e.target.checked)}
+            disabled={status === "loading"}
+            aria-label="Share my info with event sponsors"
+            className="mt-1 rounded border-slate-300 text-[#3BA5D9] focus:ring-[#3BA5D9]"
+          />
+          <span>
+            I agree to share my name and email with sponsors whose content I
+            engage with on this page.
+          </span>
+        </label>
+      )}
 
       {status === "success" && (
         <p className="text-sm text-emerald-600 font-medium">

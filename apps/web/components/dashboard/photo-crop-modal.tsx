@@ -228,7 +228,8 @@ export function PhotoCropModal({
     }
   }, [file]);
 
-  const imageSrc = imageUrl ?? existingPhotoUrl ?? "";
+  // When uploading a new file, always prefer its blob URL so we never show a stale existing photo
+  const imageSrc = (file ? imageUrl : null) ?? existingPhotoUrl ?? "";
   const hasImage = Boolean(imageSrc);
 
   // Reset load state when source changes (e.g. open for edit after upload)

@@ -208,6 +208,7 @@ export async function addResourceBlock(
     image_url?: string
     section_name?: string
     metadata?: Record<string, unknown>
+    sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
   const supabase = await createClient()
@@ -219,6 +220,16 @@ export async function addResourceBlock(
   if (data.type === 'sponsor') {
     const entitlements = await getSpeakerEntitlements(speakerId)
     if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor blocks require a higher plan. Upgrade in Settings.' }
+    if (data.sponsor_account_id) {
+      const { data: conn } = await supabase
+        .from('sponsor_connections')
+        .select('id')
+        .eq('speaker_id', speakerId)
+        .eq('sponsor_id', data.sponsor_account_id)
+        .eq('status', 'active')
+        .maybeSingle()
+      if (!conn) return { error: 'Selected sponsor is not connected. Choose a connected sponsor or leave unlinked.' }
+    }
   }
 
   const sectionName = data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources')
@@ -267,6 +278,9 @@ export async function addResourceBlock(
     section_name: sectionName,
     metadata: data.metadata ?? {},
   }
+  if (data.type === 'sponsor' && data.sponsor_account_id) {
+    insertData.sponsor_account_id = data.sponsor_account_id
+  }
 
   const { data: block, error } = await supabase
     .from('resource_blocks')
@@ -295,6 +309,7 @@ export async function updateResourceBlock(
     image_url?: string
     section_name?: string
     metadata?: Record<string, unknown>
+    sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
   const supabase = await createClient()
@@ -318,6 +333,7 @@ export async function updateResourceBlock(
   if (data.image_url !== undefined) updateData.image_url = data.image_url
   if (data.section_name !== undefined) updateData.section_name = data.section_name
   if (data.metadata !== undefined) updateData.metadata = data.metadata
+  if (data.sponsor_account_id !== undefined) updateData.sponsor_account_id = data.sponsor_account_id || null
   updateData.updated_at = new Date().toISOString()
 
   const { error } = await supabase
@@ -374,6 +390,19 @@ export async function addLibraryBlockToFanflet(
 
   if (libError || !libItem) return { error: 'Library resource not found' }
 
+  // If sponsor-type library item has a default sponsor, apply it when speaker still has active connection
+  let sponsorAccountIdToLink: string | null = null
+  if (libItem.type === 'sponsor' && libItem.default_sponsor_account_id && ownership.fanflet) {
+    const { data: conn } = await supabase
+      .from('sponsor_connections')
+      .select('id')
+      .eq('speaker_id', ownership.fanflet.speaker_id)
+      .eq('sponsor_id', libItem.default_sponsor_account_id)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (conn) sponsorAccountIdToLink = libItem.default_sponsor_account_id
+  }
+
   // Calculate next display_order
   const { data: maxOrder } = await supabase
     .from('resource_blocks')
@@ -387,20 +416,23 @@ export async function addLibraryBlockToFanflet(
 
   if (mode === 'static') {
     // Static copy: duplicate all fields, no library_item_id
+    const insertPayload: Record<string, unknown> = {
+      fanflet_id: fanfletId,
+      type: libItem.type,
+      title: libItem.title,
+      description: libItem.description,
+      url: libItem.url,
+      file_path: libItem.file_path,
+      image_url: libItem.image_url,
+      display_order: nextOrder,
+      section_name: libItem.section_name,
+      metadata: libItem.metadata ?? {},
+    }
+    if (sponsorAccountIdToLink) insertPayload.sponsor_account_id = sponsorAccountIdToLink
+
     const { data: block, error } = await supabase
       .from('resource_blocks')
-      .insert({
-        fanflet_id: fanfletId,
-        type: libItem.type,
-        title: libItem.title,
-        description: libItem.description,
-        url: libItem.url,
-        file_path: libItem.file_path,
-        image_url: libItem.image_url,
-        display_order: nextOrder,
-        section_name: libItem.section_name,
-        metadata: libItem.metadata ?? {},
-      })
+      .insert(insertPayload)
       .select('id')
       .single()
 
@@ -411,21 +443,24 @@ export async function addLibraryBlockToFanflet(
     // Dynamic link: store reference to library item.
     // For file-type resources, file_path is NOT copied — the download route
     // resolves it via the library_item_id join.
+    const insertPayload: Record<string, unknown> = {
+      fanflet_id: fanfletId,
+      type: libItem.type,
+      title: libItem.title,
+      description: libItem.description,
+      url: libItem.url,
+      file_path: libItem.type === 'file' ? null : libItem.file_path,
+      image_url: libItem.image_url,
+      display_order: nextOrder,
+      section_name: libItem.section_name,
+      metadata: libItem.metadata ?? {},
+      library_item_id: libraryItemId,
+    }
+    if (sponsorAccountIdToLink) insertPayload.sponsor_account_id = sponsorAccountIdToLink
+
     const { data: block, error } = await supabase
       .from('resource_blocks')
-      .insert({
-        fanflet_id: fanfletId,
-        type: libItem.type,
-        title: libItem.title,
-        description: libItem.description,
-        url: libItem.url,
-        file_path: libItem.type === 'file' ? null : libItem.file_path,
-        image_url: libItem.image_url,
-        display_order: nextOrder,
-        section_name: libItem.section_name,
-        metadata: libItem.metadata ?? {},
-        library_item_id: libraryItemId,
-      })
+      .insert(insertPayload)
       .select('id')
       .single()
 

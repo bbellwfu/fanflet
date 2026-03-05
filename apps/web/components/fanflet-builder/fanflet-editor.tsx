@@ -35,11 +35,13 @@ import {
   FileText,
   Palette,
   LayoutGrid,
+  Users,
 } from "lucide-react";
 import {
   updateFanfletDetails,
   publishFanflet,
   unpublishFanflet,
+  deleteResourceBlock,
 } from "@/app/dashboard/fanflets/[id]/actions";
 import { toast } from "sonner";
 import { ResourceBlockCard } from "./resource-block-card";
@@ -120,6 +122,59 @@ interface FanfletEditorProps {
   allowCustomExpiration?: boolean;
   /** When false, hide sponsor block type. */
   allowSponsorVisibility?: boolean;
+  /** When true, show link to sponsor report page. */
+  hasSponsorReports?: boolean;
+  /** Active sponsor connections for linking sponsor blocks. */
+  connectedSponsors?: { id: string; company_name: string }[];
+  /** Ended sponsor connections (for "Connection ended on [date]" and optional Unlink). */
+  endedSponsors?: { id: string; company_name: string; ended_at: string }[];
+}
+
+/** Shown when a block's library source was deleted. No edit UI — only remove to avoid error-prone state. */
+function OrphanedBlockCard({
+  blockId,
+  fanfletId,
+  onRemoved,
+}: {
+  blockId: string;
+  fanfletId: string;
+  onRemoved: () => void;
+}) {
+  const router = useRouter();
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemove = async () => {
+    if (!confirm("Remove this block from the fanflet? It can't be restored.")) return;
+    setRemoving(true);
+    const result = await deleteResourceBlock(blockId);
+    setRemoving(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Block removed");
+    onRemoved();
+    router.refresh();
+  };
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/80">
+      <CardContent className="flex flex-row items-center justify-between gap-4 py-4">
+        <p className="text-sm text-amber-900">
+          This block&apos;s library source was deleted. Remove it to keep the fanflet valid.
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRemove}
+          disabled={removing}
+          className="shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
+        >
+          {removing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Remove block"}
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function FanfletEditor({
@@ -135,6 +190,9 @@ export function FanfletEditor({
   hasSurveys = true,
   allowCustomExpiration = true,
   allowSponsorVisibility = true,
+  hasSponsorReports = false,
+  connectedSponsors = [],
+  endedSponsors = [],
 }: FanfletEditorProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -377,6 +435,14 @@ export function FanfletEditor({
                 QR Code
               </Link>
             </Button>
+            {hasSponsorReports && (
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/dashboard/fanflets/${fanflet.id}/sponsors`}>
+                  <Users className="w-4 h-4" />
+                  Sponsor report
+                </Link>
+              </Button>
+            )}
             <div className="flex-1" />
             <Button
               size="sm"
@@ -751,16 +817,31 @@ export function FanfletEditor({
         </p>
 
         <div className="space-y-4">
-          {resourceBlocks.map((block, index) => (
-            <ResourceBlockCard
-              key={block.id}
-              block={block}
-              fanfletId={fanflet.id}
-              authUserId={authUserId}
-              isFirst={index === 0}
-              isLast={index === resourceBlocks.length - 1}
-            />
-          ))}
+          {resourceBlocks.map((block, index) => {
+            const isOrphaned = Boolean(block.library_item_id) && !block.resource_library;
+            if (isOrphaned) {
+              return (
+                <OrphanedBlockCard
+                  key={block.id}
+                  blockId={block.id}
+                  fanfletId={fanflet.id}
+                  onRemoved={() => router.refresh()}
+                />
+              );
+            }
+            return (
+              <ResourceBlockCard
+                key={block.id}
+                block={block}
+                fanfletId={fanflet.id}
+                authUserId={authUserId}
+                isFirst={index === 0}
+                isLast={index === resourceBlocks.length - 1}
+                connectedSponsors={connectedSponsors}
+                endedSponsors={endedSponsors}
+              />
+            );
+          })}
 
           <AddBlockForm
             fanfletId={fanflet.id}
@@ -769,6 +850,7 @@ export function FanfletEditor({
             libraryItems={libraryItems}
             linkedLibraryItemIds={new Set(resourceBlocks.map((b) => b.library_item_id).filter(Boolean) as string[])}
             allowSponsorVisibility={allowSponsorVisibility}
+            connectedSponsors={connectedSponsors}
           />
         </div>
       </div>

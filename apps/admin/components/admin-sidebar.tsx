@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -182,6 +183,8 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ email, children }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <div className="flex min-h-screen bg-page">
@@ -203,16 +206,22 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
               Admin
             </span>
           </div>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MenuIcon className="w-5 h-5 text-fg-secondary" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-60 border-r border-border-subtle bg-sidebar">
-              <NavContent pathname={pathname} email={email} />
-            </SheetContent>
-          </Sheet>
+          {mounted ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MenuIcon className="w-5 h-5 text-fg-secondary" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-60 border-r border-border-subtle bg-sidebar">
+                <NavContent pathname={pathname} email={email} />
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-md" aria-hidden>
+              <MenuIcon className="w-5 h-5 text-fg-secondary" />
+            </div>
+          )}
         </header>
 
         <div className="flex-1 p-6 md:p-8 lg:p-10 max-w-6xl">{children}</div>

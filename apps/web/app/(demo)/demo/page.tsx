@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Smartphone,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "Demo | Fanflet",
@@ -27,7 +28,14 @@ export const metadata = {
     "See how a Fanflet looks to your audience — dental CE resources, downloads, and sponsor content.",
 };
 
-export default function DemoPage() {
+export default async function DemoPage() {
+  const supabase = await createClient();
+  const { data: smsFlag } = await supabase
+    .from("feature_flags")
+    .select("is_global")
+    .eq("key", "sms_bookmark")
+    .maybeSingle();
+  const showSmsBookmark = smsFlag?.is_global === true;
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50">
       {/* Demo Banner */}
@@ -139,8 +147,8 @@ export default function DemoPage() {
           </CardContent>
         </Card>
 
-        {/* SMS Bookmark */}
-        <Card className="shadow-lg border-0 bg-gradient-to-r from-slate-900 to-[#1B365D] text-white">
+        {/* SMS Bookmark (feature-flagged) */}
+        {showSmsBookmark && <Card className="shadow-lg border-0 bg-gradient-to-r from-slate-900 to-[#1B365D] text-white">
           <CardContent className="py-5">
             <div className="flex items-start gap-3 mb-3">
               <div className="w-9 h-9 rounded-lg bg-[#3BA5D9]/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -167,7 +175,7 @@ export default function DemoPage() {
               Standard messaging rates apply. One text, no follow-ups.
             </p>
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Resources Section */}
         <div className="space-y-3">

@@ -106,22 +106,22 @@ export default async function FanfletsPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Title
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Speaker
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Slug
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Status
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Published
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
@@ -135,23 +135,23 @@ export default async function FanfletsPage({
               {rows.map((fanflet) => (
                 <tr
                   key={fanflet.id}
-                  className="hover:bg-surface-elevated/50 transition-colors"
+                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
                 >
-                  <td className="px-5 py-3.5 font-medium text-fg">
+                  <td className="px-5 py-3.5 font-medium text-fg whitespace-nowrap align-middle">
                     {fanflet.title}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 align-middle">
                     <Link
                       href={`/accounts/${fanflet.speaker_id}`}
-                      className="text-primary-soft hover:text-primary transition-colors"
+                      className="text-primary-soft hover:text-primary transition-colors py-2 -my-2 block whitespace-nowrap"
                     >
                       {fanflet.speakers?.[0]?.name || fanflet.speakers?.[0]?.email || "—"}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-fg-muted font-mono text-[11px]">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-muted font-mono text-[11px] align-middle">
                     {fanflet.slug}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                     <span
                       className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                         fanflet.status === "published"
@@ -162,15 +162,15 @@ export default async function FanfletsPage({
                       {fanflet.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {fanflet.published_at
                       ? new Date(fanflet.published_at).toLocaleDateString()
                       : "—"}
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(fanflet.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-5 py-3.5 text-right align-middle">
                     {fanflet.status === "published" && fanflet.speakers?.[0]?.slug && (
                       <a
                         href={`https://fanflet.com/${fanflet.speakers[0].slug}/${fanflet.slug}?preview`}

@@ -14,6 +14,7 @@ import {
   CreditCardIcon,
   LogOutIcon,
   MenuIcon,
+  CogIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -77,6 +78,12 @@ const navItems: NavItem[] = [
     icon: <CreditCardIcon className="w-[18px] h-[18px]" />,
     disabled: true,
     badge: "Soon",
+  },
+  {
+    id: "settings",
+    href: "/settings",
+    label: "Settings",
+    icon: <CogIcon className="w-[18px] h-[18px]" />,
   },
 ];
 
@@ -184,7 +191,10 @@ interface AdminSidebarProps {
 export function AdminSidebar({ email, children }: AdminSidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
   useEffect(() => setMounted(true), []);
+  useEffect(() => setSheetOpen(false), [pathname]);
 
   return (
     <div className="flex min-h-screen bg-page">
@@ -207,7 +217,7 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
             </span>
           </div>
           {mounted ? (
-            <Sheet>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <MenuIcon className="w-5 h-5 text-fg-secondary" />

@@ -10,6 +10,7 @@ interface SpeakerWithCounts {
   slug: string | null;
   status: string;
   created_at: string;
+  auth_user_id: string;
   fanflet_count: number;
   subscriber_count: number;
 }
@@ -22,9 +23,17 @@ export default async function AccountsPage({
   const params = await searchParams;
   const supabase = createServiceClient();
 
+  // Fetch sponsor auth_user_ids so we can exclude sponsor-only accounts
+  const { data: sponsorRows } = await supabase
+    .from("sponsor_accounts")
+    .select("auth_user_id");
+  const sponsorAuthIds = new Set(
+    (sponsorRows ?? []).map((r) => r.auth_user_id)
+  );
+
   let query = supabase
     .from("speakers")
-    .select("id, name, email, slug, status, created_at")
+    .select("id, name, email, slug, status, created_at, auth_user_id")
     .order("created_at", { ascending: false });
 
   if (params.search) {
@@ -43,7 +52,10 @@ export default async function AccountsPage({
     query = query.gte("created_at", since);
   }
 
-  const { data: speakers, error } = await query;
+  const { data: allSpeakers, error } = await query;
+  const speakers = (allSpeakers ?? []).filter(
+    (s) => !sponsorAuthIds.has(s.auth_user_id)
+  );
 
   if (error) {
     return (
@@ -119,25 +131,25 @@ export default async function AccountsPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Name
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Email
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Slug
                 </th>
                 <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Fanflets
                 </th>
-                <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Subs
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Status
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
@@ -149,32 +161,32 @@ export default async function AccountsPage({
               {speakersWithCounts.map((speaker) => (
                 <tr
                   key={speaker.id}
-                  className="hover:bg-surface-elevated/50 transition-colors"
+                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
                 >
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 min-h-[44px] align-middle">
                     <Link
                       href={`/accounts/${speaker.id}`}
-                      className="font-medium text-fg hover:text-primary transition-colors"
+                      className="font-medium text-fg hover:text-primary transition-colors whitespace-nowrap block py-2 -my-2"
                     >
                       {speaker.name || "Unnamed"}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary">
+                  <td className="px-5 py-3.5 text-fg-secondary whitespace-nowrap align-middle">
                     {speaker.email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-muted font-mono text-[11px]">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-muted font-mono text-[11px] align-middle">
                     {speaker.slug ?? "—"}
                   </td>
-                  <td className="px-5 py-3.5 text-center text-fg">
+                  <td className="px-5 py-3.5 text-center text-fg align-middle">
                     {speaker.fanflet_count}
                   </td>
-                  <td className="px-5 py-3.5 text-center text-fg">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-center text-fg align-middle">
                     {speaker.subscriber_count}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                     <StatusBadge status={speaker.status} />
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(speaker.created_at).toLocaleDateString()}
                   </td>
                 </tr>

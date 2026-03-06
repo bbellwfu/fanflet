@@ -73,6 +73,7 @@ type LandingPageProps = {
   speaker: Speaker;
   fanflet: Fanflet;
   subscriberCount: number;
+  showSmsBookmark?: boolean;
 };
 
 function getDownloadUrl(block: ResourceBlock, fanfletId: string): string {
@@ -101,6 +102,7 @@ export function LandingPage({
   speaker,
   fanflet,
   subscriberCount,
+  showSmsBookmark = false,
 }: LandingPageProps) {
   const themeId = resolveThemeId(fanflet.theme_config);
   const themeVars = getThemeCSSVariables(themeId);
@@ -274,8 +276,8 @@ export function LandingPage({
           </CardContent>
         </Card>
 
-        {/* SMS Bookmark */}
-        <SmsBookmarkForm fanfletId={fanflet.id} />
+        {/* SMS Bookmark (feature-flagged) */}
+        {showSmsBookmark && <SmsBookmarkForm fanfletId={fanflet.id} />}
 
         {/* Resource Blocks by Section */}
         {Object.entries(blocksBySection).map(([sectionName, blocks]) => (

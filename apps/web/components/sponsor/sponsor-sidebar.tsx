@@ -83,6 +83,7 @@ function SponsorSidebarContent({
                 width={36}
                 height={36}
                 className="w-full h-full object-contain"
+                unoptimized
               />
             ) : (
               <span className="text-sm font-semibold text-white">{initials}</span>

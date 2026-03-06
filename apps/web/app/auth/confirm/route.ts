@@ -1,6 +1,7 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { notifyAdmins } from '@/lib/admin-notifications'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -23,6 +24,20 @@ export async function GET(request: NextRequest) {
         redirectTo.pathname = '/sponsor/onboarding'
       } else {
         redirectTo.pathname = '/dashboard'
+        if (user?.id) {
+          const { data: speaker } = await supabase
+            .from('speakers')
+            .select('id, name, email')
+            .eq('auth_user_id', user.id)
+            .maybeSingle()
+          if (speaker) {
+            notifyAdmins('speaker_signup', {
+              speakerId: speaker.id,
+              email: speaker.email ?? user.email ?? '',
+              name: speaker.name ?? '',
+            }).catch(() => {})
+          }
+        }
       }
       return NextResponse.redirect(redirectTo)
     }

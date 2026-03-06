@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { notifyAdmins } from '@/lib/admin-notifications'
 
 function slugify(text: string): string {
   return text
@@ -36,16 +37,24 @@ export async function createSponsorProfile(formData: FormData) {
 
   if (existing) return { error: 'That URL slug is already taken. Please choose another.' }
 
-  const { error } = await supabase.from('sponsor_accounts').insert({
+  const { data: inserted, error } = await supabase.from('sponsor_accounts').insert({
     auth_user_id: user.id,
     company_name: companyName,
     slug,
     contact_email: contactEmail,
     industry: industry || null,
     logo_url: logoUrl || null,
-  })
+  }).select('id').single()
 
   if (error) return { error: error.message }
+
+  if (inserted?.id) {
+    notifyAdmins('sponsor_signup', {
+      sponsorId: inserted.id,
+      companyName,
+      contactEmail,
+    }).catch(() => {})
+  }
 
   redirect('/sponsor/dashboard')
 }

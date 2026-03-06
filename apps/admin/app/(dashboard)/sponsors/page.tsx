@@ -109,25 +109,25 @@ export default async function SponsorsPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Company
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Contact
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Industry
                 </th>
-                <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Connections
                 </th>
-                <th className="px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-center text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Leads
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Status
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
@@ -139,12 +139,12 @@ export default async function SponsorsPage({
               {sponsorsWithCounts.map((sponsor) => (
                 <tr
                   key={sponsor.id}
-                  className="hover:bg-surface-elevated/50 transition-colors"
+                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
                 >
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 align-middle">
                     <Link
                       href={`/sponsors/${sponsor.id}`}
-                      className="font-medium text-fg hover:text-primary transition-colors flex items-center gap-2"
+                      className="font-medium text-fg hover:text-primary transition-colors flex items-center gap-2 py-2 -my-2 whitespace-nowrap"
                     >
                       {sponsor.logo_url ? (
                         <img
@@ -160,22 +160,22 @@ export default async function SponsorsPage({
                       {sponsor.company_name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary">
+                  <td className="px-5 py-3.5 text-fg-secondary whitespace-nowrap align-middle">
                     {sponsor.contact_email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-secondary align-middle">
                     {sponsor.industry ?? "—"}
                   </td>
-                  <td className="px-5 py-3.5 text-center text-fg">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-center text-fg align-middle">
                     {sponsor.connection_count}
                   </td>
-                  <td className="px-5 py-3.5 text-center text-fg">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-center text-fg align-middle">
                     {sponsor.lead_count}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                     <VerificationBadge verified={sponsor.is_verified} />
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(sponsor.created_at).toLocaleDateString()}
                   </td>
                 </tr>

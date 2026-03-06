@@ -52,13 +52,13 @@ export default async function SubscribersPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Email
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Name
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
@@ -73,23 +73,23 @@ export default async function SubscribersPage() {
               {rows.map((sub) => (
                 <tr
                   key={sub.id}
-                  className="hover:bg-surface-elevated/50 transition-colors"
+                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
                 >
-                  <td className="px-5 py-3.5 text-fg">
+                  <td className="px-5 py-3.5 text-fg whitespace-nowrap align-middle">
                     {sub.email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary">
+                  <td className="px-5 py-3.5 text-fg-secondary align-middle">
                     {sub.name ?? "—"}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 align-middle">
                     <Link
                       href={`/accounts/${sub.speaker_id}`}
-                      className="text-primary-soft hover:text-primary transition-colors"
+                      className="text-primary-soft hover:text-primary transition-colors py-2 -my-2 block whitespace-nowrap"
                     >
                       {sub.speakers?.name || sub.speakers?.email || "—"}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(sub.created_at).toLocaleDateString()}
                   </td>
                 </tr>

@@ -29,6 +29,7 @@ export async function updateFanfletDetails(
   const title = formData.get('title') as string
   const description = formData.get('description') as string || null
   const event_name = formData.get('event_name') as string
+  const show_event_name = formData.get('show_event_name') !== 'false'
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
   const entitlements = await getSpeakerEntitlements(speakerId)
@@ -67,6 +68,7 @@ export async function updateFanfletDetails(
     title,
     description: description || null,
     event_name,
+    show_event_name,
     event_date: event_date || null,
     slug,
     survey_question_id: survey_question_id || null,

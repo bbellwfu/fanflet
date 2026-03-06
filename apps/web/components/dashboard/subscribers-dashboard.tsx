@@ -37,6 +37,7 @@ interface SubscribersDashboardProps {
   subscribers: SubscriberRow[];
   speakerName: string;
   speakerEmail: string;
+  initialSourceFilter?: string;
 }
 
 type SortField = "created_at" | "email" | "source";
@@ -61,10 +62,11 @@ export function SubscribersDashboard({
   subscribers: initialSubscribers,
   speakerName,
   speakerEmail,
+  initialSourceFilter,
 }: SubscribersDashboardProps) {
   const [subscribers, setSubscribers] = useState(initialSubscribers);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter ?? "all");
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

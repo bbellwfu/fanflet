@@ -62,6 +62,7 @@ type Fanflet = {
   description: string | null;
   event_name: string;
   event_date: string | null;
+  show_event_name: boolean;
   slug: string;
   status: string;
   survey_question_id: string | null;
@@ -206,6 +207,7 @@ export function FanfletEditor({
   const [title, setTitle] = useState(fanflet.title);
   const [description, setDescription] = useState(fanflet.description ?? "");
   const [eventName, setEventName] = useState(fanflet.event_name);
+  const [showEventName, setShowEventName] = useState(fanflet.show_event_name !== false);
   const [eventDate, setEventDate] = useState(
     fanflet.event_date ? fanflet.event_date.slice(0, 10) : ""
   );
@@ -301,6 +303,7 @@ export function FanfletEditor({
     formData.set("title", title);
     formData.set("description", description);
     formData.set("event_name", eventName);
+    formData.set("show_event_name", showEventName ? "true" : "false");
     formData.set("event_date", eventDate || "");
     formData.set("slug", slug);
     formData.set("survey_question_id", surveyQuestionId === "none" ? "" : surveyQuestionId);
@@ -564,13 +567,24 @@ export function FanfletEditor({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Event Name</Label>
+                <Label>Event Name or Purpose</Label>
                 <Input
                   value={eventName}
                   onChange={(e) => setEventName(e.target.value)}
-                  placeholder="Event name"
                   className="border-[#e2e8f0]"
                 />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="show_event_name"
+                    checked={showEventName}
+                    onChange={(e) => setShowEventName(e.target.checked)}
+                    className="h-4 w-4 rounded border-[#e2e8f0]"
+                  />
+                  <Label htmlFor="show_event_name" className="text-sm font-normal cursor-pointer">
+                    Display event name on Fanflet page
+                  </Label>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Event Date</Label>

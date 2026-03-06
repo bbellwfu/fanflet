@@ -15,6 +15,7 @@ import {
   LogOutIcon,
   MenuIcon,
   CogIcon,
+  EyeIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -78,6 +79,12 @@ const navItems: NavItem[] = [
     icon: <CreditCardIcon className="w-[18px] h-[18px]" />,
     disabled: true,
     badge: "Soon",
+  },
+  {
+    id: "impersonation-log",
+    href: "/impersonation-log",
+    label: "Impersonation Log",
+    icon: <EyeIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "settings",

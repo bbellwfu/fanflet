@@ -1,30 +1,15 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import {
-  STORAGE_BUCKET,
   isAllowedFileType,
   getStorageQuota,
   buildStoragePath,
   ALLOWED_EXTENSIONS,
 } from '@fanflet/db/storage'
 import { revalidatePath } from 'next/cache'
-
-async function getSpeakerContext() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!speaker) return null
-  return { supabase, user, speakerId: speaker.id }
-}
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export type UploadSlotResult = {
   allowed: true
@@ -49,10 +34,8 @@ export async function requestUploadSlot(params: {
   description?: string
   sectionName?: string
 }): Promise<UploadSlotResult> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { allowed: false, error: 'Not authenticated' }
-
-  const { supabase, speakerId } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
   const entitlements = await getSpeakerEntitlements(speakerId)
   const quota = getStorageQuota(entitlements.limits)
 
@@ -99,6 +82,7 @@ export async function requestUploadSlot(params: {
     return { allowed: false, error: insertError?.message ?? 'Failed to create library entry' }
   }
 
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'requestUploadSlot', speaker_id: speakerId, library_item_id: libItem.id })
   const storagePath = buildStoragePath(speakerId, libItem.id, params.fileName)
 
   return {
@@ -120,10 +104,8 @@ export async function confirmUpload(params: {
   fileType: string
   title?: string
 }): Promise<{ error?: string; success?: boolean }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-
-  const { supabase, speakerId } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   const updateData: Record<string, unknown> = {
     file_path: params.filePath,
@@ -143,6 +125,7 @@ export async function confirmUpload(params: {
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'confirmUpload', speaker_id: speakerId, library_item_id: params.libraryItemId })
   revalidatePath('/dashboard/resources')
   return { success: true }
 }
@@ -152,13 +135,14 @@ export async function confirmUpload(params: {
  * Called if the client-side upload fails and we need to clean up.
  */
 export async function cancelUploadSlot(libraryItemId: string): Promise<void> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
-  await ctx.supabase
+  await supabase
     .from('resource_library')
     .delete()
     .eq('id', libraryItemId)
-    .eq('speaker_id', ctx.speakerId)
+    .eq('speaker_id', speakerId)
     .is('file_path', null)
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'cancelUploadSlot', speaker_id: speakerId, library_item_id: libraryItemId })
 }

@@ -103,10 +103,16 @@ export function ResetAccountButton({
             size="sm"
             onClick={handleContinueToFinal}
             disabled={!nameMatches || loading}
+            className="cursor-pointer"
           >
             Continue
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleCancelStep1}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCancelStep1}
+            className="cursor-pointer"
+          >
             Cancel
           </Button>
         </div>
@@ -120,9 +126,9 @@ export function ResetAccountButton({
         variant="outline"
         size="sm"
         onClick={handleOpenStep1}
-        className="border-border-subtle text-fg-secondary hover:text-fg"
+        className="cursor-pointer border-border-subtle text-fg-secondary hover:text-fg"
       >
-        <RotateCcw className="w-4 h-4 mr-1.5" />
+        <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
         Reset Account
       </Button>
       <AlertDialog open={finalDialogOpen} onOpenChange={setFinalDialogOpen}>
@@ -136,7 +142,7 @@ export function ResetAccountButton({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel variant="outline" size="default" disabled={loading}>
+            <AlertDialogCancel variant="outline" size="default" disabled={loading} className="cursor-pointer">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -147,6 +153,7 @@ export function ResetAccountButton({
                 handleConfirmReset();
               }}
               disabled={loading}
+              className="cursor-pointer"
             >
               {loading ? "Resetting..." : "Reset Account"}
             </AlertDialogAction>

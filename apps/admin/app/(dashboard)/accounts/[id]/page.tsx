@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, UserIcon, AlertTriangleIcon } from "lucide-rea
 import { SuspendButton } from "./suspend-button";
 import { ResetAccountButton } from "./reset-account-button";
 import { PlanSelector } from "./plan-selector";
+import { ImpersonateButton } from "./impersonate-button";
 
 export default async function AccountDetailPage({
   params,
@@ -151,6 +152,14 @@ export default async function AccountDetailPage({
               analyticsEventsCount: totalEvents,
             }}
           />
+          {speaker.auth_user_id && (
+            <ImpersonateButton
+              targetUserId={speaker.auth_user_id}
+              targetRole="speaker"
+              targetName={speaker.name || "Unnamed Speaker"}
+              targetEmail={speaker.email}
+            />
+          )}
         </div>
       </div>
 

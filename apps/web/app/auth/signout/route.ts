@@ -9,5 +9,7 @@ export async function POST(req: NextRequest) {
     await supabase.auth.signOut()
   }
   revalidatePath('/', 'layout')
-  return NextResponse.redirect(new URL('/login', req.url), { status: 302 })
+  const response = NextResponse.redirect(new URL('/login', req.url), { status: 302 })
+  response.cookies.delete('active_role')
+  return response
 }

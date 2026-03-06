@@ -1,30 +1,15 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
-
-async function getSpeakerId() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  return speaker?.id ?? null
-}
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function listSurveyQuestions(): Promise<{
   data?: { id: string; question_text: string; question_type: string; is_default: boolean; created_at: string }[]
   error?: string
 }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data, error } = await supabase
     .from('survey_questions')
@@ -40,9 +25,8 @@ export async function createSurveyQuestion(
   questionText: string,
   questionType: string
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   if (!questionText.trim()) return { error: 'Question text is required' }
   if (!['nps', 'yes_no', 'rating'].includes(questionType)) {
@@ -63,6 +47,7 @@ export async function createSurveyQuestion(
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'createSurveyQuestion', speaker_id: speakerId, id: data.id })
   revalidatePath('/dashboard/settings')
   return { success: true, id: data.id }
 }
@@ -72,9 +57,8 @@ export async function updateSurveyQuestion(
   questionText: string,
   questionType: string
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   if (!questionText.trim()) return { error: 'Question text is required' }
 
@@ -90,6 +74,7 @@ export async function updateSurveyQuestion(
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'updateSurveyQuestion', speaker_id: speakerId, questionId })
   revalidatePath('/dashboard/settings')
   return { success: true }
 }
@@ -97,9 +82,8 @@ export async function updateSurveyQuestion(
 export async function deleteSurveyQuestion(
   questionId: string
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const speakerId = await getSpeakerId()
-  if (!speakerId) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { error } = await supabase
     .from('survey_questions')
@@ -109,6 +93,7 @@ export async function deleteSurveyQuestion(
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'deleteSurveyQuestion', speaker_id: speakerId, questionId })
   revalidatePath('/dashboard/settings')
   return { success: true }
 }

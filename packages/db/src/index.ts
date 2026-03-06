@@ -6,6 +6,8 @@ export { getSiteUrl } from "./config";
 export { getSpeakerEntitlements, hasFeature, getSpeakerLimits } from "./features";
 export { FREE_PLAN_NAME } from "./constants";
 export type { SpeakerEntitlements } from "./features";
+export { getSponsorEntitlements } from "./sponsor-features";
+export type { SponsorEntitlements } from "./sponsor-features";
 export {
   STORAGE_BUCKET,
   PUBLIC_BUCKET,

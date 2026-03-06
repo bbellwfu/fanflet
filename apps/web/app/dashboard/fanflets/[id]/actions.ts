@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { requireFanfletOwner } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { ensureUrl } from '@/lib/utils'
@@ -10,45 +11,27 @@ import {
   parseExpirationFromForm,
   resolveExpirationDate,
 } from '@/lib/expiration'
-
-async function verifyOwnership(supabase: Awaited<ReturnType<typeof createClient>>, fanfletId: string) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: fanflet } = await supabase
-    .from('fanflets')
-    .select('id, speaker_id')
-    .eq('id', fanfletId)
-    .single()
-
-  if (!fanflet) return { error: 'Fanflet not found' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .eq('id', fanflet.speaker_id)
-    .single()
-
-  if (!speaker) return { error: 'Not authorized to edit this fanflet' }
-
-  return { fanflet }
-}
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function updateFanfletDetails(
   id: string,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const ownership = await verifyOwnership(supabase, id)
-  if ('error' in ownership) return { error: ownership.error }
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
 
   const title = formData.get('title') as string
   const description = formData.get('description') as string || null
   const event_name = formData.get('event_name') as string
   const event_date = formData.get('event_date') as string || null
   const slug = formData.get('slug') as string
-  const entitlements = await getSpeakerEntitlements(ownership.fanflet!.speaker_id)
+  const entitlements = await getSpeakerEntitlements(speakerId)
   const hasSurveys = entitlements.features.has('surveys_session_feedback')
   const survey_question_id_raw = formData.get('survey_question_id') as string || null
   const survey_question_id = hasSurveys ? survey_question_id_raw : null
@@ -71,7 +54,7 @@ export async function updateFanfletDetails(
   const { data: existing } = await supabase
     .from('fanflets')
     .select('id')
-    .eq('speaker_id', ownership.fanflet!.speaker_id)
+    .eq('speaker_id', speakerId)
     .eq('slug', slug)
     .neq('id', id)
     .maybeSingle()
@@ -121,6 +104,7 @@ export async function updateFanfletDetails(
 
   if (result.error) return { error: result.error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'updateFanfletDetails', fanflet_id: id, speaker_id: speakerId })
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath(`/dashboard/fanflets/${id}/qr`)
   revalidatePath('/dashboard/fanflets')
@@ -128,14 +112,19 @@ export async function updateFanfletDetails(
 }
 
 export async function publishFanflet(id: string): Promise<{ error?: string; success?: boolean; firstPublished?: boolean }> {
-  const supabase = await createClient()
-  const ownership = await verifyOwnership(supabase, id)
-  if ('error' in ownership) return { error: ownership.error }
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
 
   const { count: existingPublishedCount } = await supabase
     .from('fanflets')
     .select('id', { count: 'exact', head: true })
-    .eq('speaker_id', ownership.fanflet!.speaker_id)
+    .eq('speaker_id', speakerId)
     .eq('status', 'published')
 
   const publishedAt = new Date()
@@ -170,6 +159,7 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
 
   if (result.error) return { error: result.error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'publishFanflet', fanflet_id: id, speaker_id: speakerId })
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
   revalidatePath('/dashboard', 'layout')
@@ -177,9 +167,14 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
 }
 
 export async function unpublishFanflet(id: string): Promise<{ error?: string; success?: boolean }> {
-  const supabase = await createClient()
-  const ownership = await verifyOwnership(supabase, id)
-  if ('error' in ownership) return { error: ownership.error }
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
 
   const { error } = await supabase
     .from('fanflets')
@@ -191,6 +186,7 @@ export async function unpublishFanflet(id: string): Promise<{ error?: string; su
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'unpublishFanflet', fanflet_id: id, speaker_id: speakerId })
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
   revalidatePath('/dashboard', 'layout')
@@ -211,11 +207,14 @@ export async function addResourceBlock(
     sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  const supabase = await createClient()
-  const ownership = await verifyOwnership(supabase, fanfletId)
-  if ('error' in ownership) return { error: ownership.error }
-
-  const speakerId = ownership.fanflet!.speaker_id
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(fanfletId)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
 
   if (data.type === 'sponsor') {
     const entitlements = await getSpeakerEntitlements(speakerId)
@@ -294,6 +293,7 @@ export async function addResourceBlock(
     return { error: error.message }
   }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'addResourceBlock', fanflet_id: fanfletId, block_id: block.id, speaker_id: speakerId })
   revalidatePath(`/dashboard/fanflets/${fanfletId}`)
   revalidatePath('/dashboard/resources')
   return { success: true, id: block.id }
@@ -312,6 +312,7 @@ export async function updateResourceBlock(
     sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
+  await blockImpersonationWrites()
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -322,8 +323,13 @@ export async function updateResourceBlock(
 
   if (!block) return { error: 'Block not found' }
 
-  const ownership = await verifyOwnership(supabase, block.fanflet_id)
-  if ('error' in ownership) return { error: ownership.error }
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(block.fanflet_id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { supabase: authSupabase } = ctx
 
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
@@ -336,18 +342,20 @@ export async function updateResourceBlock(
   if (data.sponsor_account_id !== undefined) updateData.sponsor_account_id = data.sponsor_account_id || null
   updateData.updated_at = new Date().toISOString()
 
-  const { error } = await supabase
+  const { error } = await authSupabase
     .from('resource_blocks')
     .update(updateData)
     .eq('id', blockId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${block.fanflet_id}`, { action: 'updateResourceBlock', block_id: blockId, fanflet_id: block.fanflet_id })
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }
 
 export async function deleteResourceBlock(blockId: string): Promise<{ error?: string; success?: boolean }> {
+  await blockImpersonationWrites()
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -358,16 +366,22 @@ export async function deleteResourceBlock(blockId: string): Promise<{ error?: st
 
   if (!block) return { error: 'Block not found' }
 
-  const ownership = await verifyOwnership(supabase, block.fanflet_id)
-  if ('error' in ownership) return { error: ownership.error }
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(block.fanflet_id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { supabase: authSupabase } = ctx
 
-  const { error } = await supabase
+  const { error } = await authSupabase
     .from('resource_blocks')
     .delete()
     .eq('id', blockId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${block.fanflet_id}`, { action: 'deleteResourceBlock', block_id: blockId, fanflet_id: block.fanflet_id })
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }
@@ -377,9 +391,14 @@ export async function addLibraryBlockToFanflet(
   libraryItemId: string,
   mode: 'static' | 'dynamic'
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  const supabase = await createClient()
-  const ownership = await verifyOwnership(supabase, fanfletId)
-  if ('error' in ownership) return { error: ownership.error }
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(fanfletId)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
 
   // Fetch the library item
   const { data: libItem, error: libError } = await supabase
@@ -392,11 +411,11 @@ export async function addLibraryBlockToFanflet(
 
   // If sponsor-type library item has a default sponsor, apply it when speaker still has active connection
   let sponsorAccountIdToLink: string | null = null
-  if (libItem.type === 'sponsor' && libItem.default_sponsor_account_id && ownership.fanflet) {
+  if (libItem.type === 'sponsor' && libItem.default_sponsor_account_id) {
     const { data: conn } = await supabase
       .from('sponsor_connections')
       .select('id')
-      .eq('speaker_id', ownership.fanflet.speaker_id)
+      .eq('speaker_id', speakerId)
       .eq('sponsor_id', libItem.default_sponsor_account_id)
       .eq('status', 'active')
       .maybeSingle()
@@ -437,6 +456,7 @@ export async function addLibraryBlockToFanflet(
       .single()
 
     if (error) return { error: error.message }
+    await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'addLibraryBlockToFanflet', fanflet_id: fanfletId, library_item_id: libraryItemId, block_id: block.id, speaker_id: speakerId })
     revalidatePath(`/dashboard/fanflets/${fanfletId}`)
     return { success: true, id: block.id }
   } else {
@@ -465,6 +485,7 @@ export async function addLibraryBlockToFanflet(
       .single()
 
     if (error) return { error: error.message }
+    await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'addLibraryBlockToFanflet', fanflet_id: fanfletId, library_item_id: libraryItemId, block_id: block.id, speaker_id: speakerId })
     revalidatePath(`/dashboard/fanflets/${fanfletId}`)
     return { success: true, id: block.id }
   }
@@ -474,6 +495,7 @@ export async function reorderBlock(
   blockId: string,
   direction: 'up' | 'down'
 ): Promise<{ error?: string; success?: boolean }> {
+  await blockImpersonationWrites()
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -484,10 +506,15 @@ export async function reorderBlock(
 
   if (!block) return { error: 'Block not found' }
 
-  const ownership = await verifyOwnership(supabase, block.fanflet_id)
-  if ('error' in ownership) return { error: ownership.error }
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(block.fanflet_id)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { supabase: authSupabase } = ctx
 
-  const { data: blocks } = await supabase
+  const { data: blocks } = await authSupabase
     .from('resource_blocks')
     .select('id, display_order')
     .eq('fanflet_id', block.fanflet_id)
@@ -504,20 +531,21 @@ export async function reorderBlock(
   const myOrder = blocks[myIndex].display_order
   const swapOrder = blocks[swapIndex].display_order
 
-  const { error: err1 } = await supabase
+  const { error: err1 } = await authSupabase
     .from('resource_blocks')
     .update({ display_order: swapOrder, updated_at: new Date().toISOString() })
     .eq('id', blockId)
 
   if (err1) return { error: err1.message }
 
-  const { error: err2 } = await supabase
+  const { error: err2 } = await authSupabase
     .from('resource_blocks')
     .update({ display_order: myOrder, updated_at: new Date().toISOString() })
     .eq('id', blocks[swapIndex].id)
 
   if (err2) return { error: err2.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${block.fanflet_id}`, { action: 'reorderBlock', block_id: blockId, fanflet_id: block.fanflet_id })
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }

@@ -1,14 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { z } from 'zod'
+import { rateLimit } from '@/lib/rate-limit'
+
+const SurveyResponseSchema = z.object({
+  fanflet_id: z.string().uuid(),
+  question_id: z.string().uuid(),
+  response_value: z.union([z.string(), z.number()]).transform(String),
+})
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(request, 'survey', 20, 60_000)
+  if (rl.limited) return rl.response!
+
   try {
     const body = await request.json()
-    const { fanflet_id, question_id, response_value } = body
+    const parsed = SurveyResponseSchema.safeParse(body)
 
-    if (!fanflet_id || !question_id || response_value === undefined || response_value === null) {
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
+
+    const { fanflet_id, question_id, response_value } = parsed.data
 
     // Generate visitor hash from IP + User-Agent + date (daily uniqueness)
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'

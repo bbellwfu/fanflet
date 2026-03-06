@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/admin-notifications'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 function slugify(text: string): string {
   return text
@@ -15,6 +16,7 @@ function slugify(text: string): string {
 }
 
 export async function createSponsorProfile(formData: FormData) {
+  await blockImpersonationWrites()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -47,6 +49,13 @@ export async function createSponsorProfile(formData: FormData) {
   }).select('id').single()
 
   if (error) return { error: error.message }
+  await logImpersonationAction('mutation', '/sponsor/onboarding', { action: 'createSponsorProfile', sponsorId: inserted?.id })
+
+  // Append "sponsor" to the user's roles in app_metadata (supports dual-role)
+  await supabase.rpc('append_user_role', {
+    target_user_id: user.id,
+    new_role: 'sponsor',
+  })
 
   if (inserted?.id) {
     notifyAdmins('sponsor_signup', {

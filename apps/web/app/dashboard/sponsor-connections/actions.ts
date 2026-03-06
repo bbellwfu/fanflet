@@ -1,7 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 interface AvailableSponsor {
   id: string
@@ -16,21 +17,12 @@ export async function listAvailableSponsors(): Promise<{
   sponsors: AvailableSponsor[]
   error?: string
 }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { sponsors: [], error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { sponsors: [], error: 'Speaker not found' }
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: existingConnections } = await supabase
     .from('sponsor_connections')
     .select('sponsor_id, status, ended_at')
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .in('status', ['pending', 'active'])
 
   const excludedIds = (existingConnections ?? [])
@@ -58,16 +50,8 @@ export async function requestSponsorConnection(
   message: string | null,
   mode: 'id' | 'slug' = 'slug'
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   let sponsorId: string
 
@@ -91,7 +75,7 @@ export async function requestSponsorConnection(
     .from('sponsor_connections')
     .select('id, status, ended_at')
     .eq('sponsor_id', sponsorId)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .maybeSingle()
 
   if (existing) {
@@ -113,12 +97,13 @@ export async function requestSponsorConnection(
       .eq('id', existing.id)
 
     if (updateError) return { error: updateError.message }
+    await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'requestSponsorConnection', speaker_id: speakerId, sponsor_id: sponsorId, connection_id: existing.id, reused: true })
     return {}
   }
 
   const { error } = await supabase.from('sponsor_connections').insert({
     sponsor_id: sponsorId,
-    speaker_id: speaker.id,
+    speaker_id: speakerId,
     status: 'pending',
     initiated_by: 'speaker',
     message: message?.trim() || null,
@@ -128,22 +113,15 @@ export async function requestSponsorConnection(
     if (error.code === '23505') return { error: 'You already have a connection request with this sponsor.' }
     return { error: error.message }
   }
+  await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'requestSponsorConnection', speaker_id: speakerId, sponsor_id: sponsorId })
   return {}
 }
 
 export async function rescindSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: conn, error: fetchError } = await supabase
     .from('sponsor_connections')
@@ -152,7 +130,7 @@ export async function rescindSponsorConnection(
     .single()
 
   if (fetchError || !conn) return { error: 'Connection not found' }
-  if (conn.speaker_id !== speaker.id) return { error: 'Not authorized to cancel this request' }
+  if (conn.speaker_id !== speakerId) return { error: 'Not authorized to cancel this request' }
   if (conn.status !== 'pending') return { error: 'Only pending requests can be cancelled' }
   if (conn.initiated_by !== 'speaker') return { error: 'Only requests you sent can be cancelled' }
 
@@ -162,6 +140,7 @@ export async function rescindSponsorConnection(
     .eq('id', connectionId)
 
   if (updateError) return { error: updateError.message }
+  await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'rescindSponsorConnection', speaker_id: speakerId, connection_id: connectionId })
   revalidatePath('/dashboard/sponsor-connections')
   return {}
 }
@@ -169,16 +148,8 @@ export async function rescindSponsorConnection(
 export async function endSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: conn, error: fetchError } = await supabase
     .from('sponsor_connections')
@@ -187,7 +158,7 @@ export async function endSponsorConnection(
     .single()
 
   if (fetchError || !conn) return { error: 'Connection not found' }
-  if (conn.speaker_id !== speaker.id) return { error: 'Not authorized to end this connection' }
+  if (conn.speaker_id !== speakerId) return { error: 'Not authorized to end this connection' }
   if (conn.status !== 'active') return { error: 'Only active connections can be ended' }
   if (conn.ended_at) return { error: 'This connection is already ended' }
 
@@ -197,6 +168,7 @@ export async function endSponsorConnection(
     .eq('id', connectionId)
 
   if (updateError) return { error: updateError.message }
+  await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'endSponsorConnection', speaker_id: speakerId, connection_id: connectionId })
   revalidatePath('/dashboard/sponsor-connections')
   return {}
 }
@@ -204,16 +176,8 @@ export async function endSponsorConnection(
 export async function hideSponsorConnectionFromView(
   connectionId: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
@@ -221,7 +185,7 @@ export async function hideSponsorConnectionFromView(
     .eq('id', connectionId)
     .single()
 
-  if (!conn || conn.speaker_id !== speaker.id) return { error: 'Connection not found' }
+  if (!conn || conn.speaker_id !== speakerId) return { error: 'Connection not found' }
 
   const { error } = await supabase
     .from('sponsor_connections')
@@ -229,6 +193,7 @@ export async function hideSponsorConnectionFromView(
     .eq('id', connectionId)
 
   if (error) return { error: error.message }
+  await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'hideSponsorConnectionFromView', speaker_id: speakerId, connection_id: connectionId })
   revalidatePath('/dashboard/sponsor-connections')
   return {}
 }

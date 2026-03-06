@@ -43,7 +43,7 @@ export default async function SponsorOnboardingPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <SponsorOnboardingForm />
+          <SponsorOnboardingForm authUserId={user.id} />
         </CardContent>
       </Card>
     </div>

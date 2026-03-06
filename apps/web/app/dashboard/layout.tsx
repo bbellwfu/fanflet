@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib/speaker-preferences";
@@ -21,6 +22,18 @@ export default async function DashboardLayout({
     .select("*")
     .eq("auth_user_id", user.id)
     .single();
+
+  if (!speaker) {
+    const { data: sponsor } = await supabase
+      .from("sponsor_accounts")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+    if (sponsor) {
+      redirect("/sponsor/dashboard");
+    }
+    redirect("/login");
+  }
 
   let fanfletCount = 0;
   let publishedFanfletCount = 0;
@@ -88,6 +101,9 @@ export default async function DashboardLayout({
     }
   }
 
+  const cookieStore = await cookies();
+  const activeRole = cookieStore.get("active_role")?.value ?? "speaker";
+
   return (
     <Sidebar
       user={user}
@@ -96,6 +112,7 @@ export default async function DashboardLayout({
       publishedFanfletCount={publishedFanfletCount}
       surveyQuestionCount={surveyQuestionCount}
       resourceLibraryCount={resourceLibraryCount}
+      activeRole={activeRole}
     >
       {children}
     </Sidebar>

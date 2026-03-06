@@ -1,33 +1,33 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import { notifyAdmins } from '@/lib/admin-notifications'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { getStoredDefaultThemePreset } from '@/lib/speaker-preferences'
 import { parseExpirationFromForm, resolveExpirationDate } from '@/lib/expiration'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function createFanflet(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: speaker } = await supabase
     .from('speakers')
     .select('id, slug, name, email, social_links')
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
     .single()
 
   if (!speaker) return { error: 'Speaker profile not found' }
 
-  const entitlements = await getSpeakerEntitlements(speaker.id)
+  const entitlements = await getSpeakerEntitlements(speakerId)
   const maxFanflets = entitlements.limits.max_fanflets
   if (typeof maxFanflets === 'number' && maxFanflets !== -1) {
     const { count, error: countError } = await supabase
       .from('fanflets')
       .select('id', { count: 'exact', head: true })
-      .eq('speaker_id', speaker.id)
+      .eq('speaker_id', speakerId)
     if (countError) return { error: 'Could not check fanflet limit' }
     if ((count ?? 0) >= maxFanflets) {
       return {
@@ -44,7 +44,7 @@ export async function createFanflet(formData: FormData) {
   const { data: existing } = await supabase
     .from('fanflets')
     .select('id')
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .eq('slug', slug)
     .maybeSingle()
 
@@ -69,7 +69,7 @@ export async function createFanflet(formData: FormData) {
   const expiration_date = resolveExpirationDate(expiration, referenceDate)
 
   const baseInsert: Record<string, unknown> = {
-    speaker_id: speaker.id,
+    speaker_id: speakerId,
     title,
     event_name,
     event_date: event_date || null,
@@ -100,10 +100,11 @@ export async function createFanflet(formData: FormData) {
   if (result.error) return { error: result.error.message }
   const fanflet = result.data
 
+  await logImpersonationAction('mutation', '/dashboard/fanflets/new', { action: 'createFanflet', fanflet_id: fanflet.id, speaker_id: speakerId })
   notifyAdmins('fanflet_created', {
     fanfletId: fanflet.id,
     title,
-    speakerId: speaker.id,
+    speakerId,
     speakerName: speaker.name ?? speaker.slug ?? '',
     speakerEmail: speaker.email ?? '',
   }).catch(() => {})

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit } from "@/lib/rate-limit";
 
 const SubscribeSchema = z.object({
   email: z.string().min(1, "Email is required").email("Please enter a valid email"),
@@ -8,6 +9,9 @@ const SubscribeSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(request, "subscribe", 10, 60_000);
+  if (rl.limited) return rl.response!;
+
   try {
     const body = await request.json();
     const parsed = SubscribeSchema.safeParse(body);

@@ -9,6 +9,7 @@ import Image from "next/image";
 import { readPhotoFrame } from "@/lib/photo-frame";
 import { FramedAvatar } from "@/components/dashboard/framed-avatar";
 import { SetupChecklistPanel } from "@/components/dashboard/setup-checklist-panel";
+import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 import { hasStoredDefaultThemePreset, isOnboardingDismissed } from "@/lib/speaker-preferences";
 
 const sidebarItems = [
@@ -43,9 +44,11 @@ interface SidebarContentProps {
   photoUrl?: string;
   photoFrame: ReturnType<typeof readPhotoFrame>;
   initials: string;
+  roles?: string[];
+  activeRole?: string;
 }
 
-function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials }: SidebarContentProps) {
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials, roles, activeRole }: SidebarContentProps) {
   return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -89,6 +92,9 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
             <p className="text-xs text-slate-400 truncate">{displayEmail}</p>
           </div>
         </div>
+        {roles && activeRole && (
+          <RoleSwitcher roles={roles} activeRole={activeRole} />
+        )}
         <form action="/auth/signout" method="POST" className="w-full">
           <Button
             type="submit"
@@ -106,7 +112,7 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
 }
 
 interface SidebarProps {
-  user: { email?: string; user_metadata?: { full_name?: string } };
+  user: { email?: string; user_metadata?: { full_name?: string }; app_metadata?: Record<string, unknown> };
   speaker: {
     id?: string;
     name?: string;
@@ -126,6 +132,7 @@ interface SidebarProps {
   publishedFanfletCount: number;
   surveyQuestionCount: number;
   resourceLibraryCount: number;
+  activeRole?: string;
   children: React.ReactNode;
 }
 
@@ -136,6 +143,7 @@ export function Sidebar({
   publishedFanfletCount,
   surveyQuestionCount,
   resourceLibraryCount,
+  activeRole,
   children,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -145,6 +153,8 @@ export function Sidebar({
   const photoUrl = speaker?.photo_url ?? undefined;
   const photoFrame = readPhotoFrame(speaker?.social_links ?? null);
   const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
+  const roles = (Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : []) as string[];
+  const resolvedActiveRole = activeRole ?? roles[0] ?? "speaker";
   const isChecklistDismissed = isOnboardingDismissed(speaker?.social_links ?? null);
   const hasCreatedFanflet =
     fanfletCount > 0 ||
@@ -165,7 +175,7 @@ export function Sidebar({
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
-        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} />
       </aside>
 
       {/* Main Content */}
@@ -178,12 +188,12 @@ export function Sidebar({
           </div>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" suppressHydrationWarning>
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} />
             </SheetContent>
           </Sheet>
         </header>

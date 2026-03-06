@@ -105,7 +105,7 @@ export function SubscribeForm({
 
       {status === "success" && (
         <p className="text-sm text-emerald-600 font-medium">
-          You&apos;re subscribed! Check your inbox.
+          You&apos;re subscribed! You&apos;ll hear from this speaker soon.
         </p>
       )}
       {status === "already_subscribed" && (

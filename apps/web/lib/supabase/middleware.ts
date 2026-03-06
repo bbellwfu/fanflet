@@ -1,6 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const ROLE_ROUTE_MAP: Record<string, string[]> = {
+  speaker: ["/dashboard"],
+  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/settings"],
+};
+
+const ROLE_HOME: Record<string, string> = {
+  speaker: "/dashboard",
+  sponsor: "/sponsor/dashboard",
+};
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -29,34 +39,151 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the auth token
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users from protected routes to login
+  const pathname = request.nextUrl.pathname;
+
+  // Allow impersonation API routes without additional checks
+  if (pathname.startsWith("/api/impersonate/")) {
+    return supabaseResponse;
+  }
+
+  // Check for expired impersonation session and auto-redirect to stop
+  const impersonationMeta = request.cookies.get("impersonation_meta")?.value;
+  if (impersonationMeta) {
+    try {
+      const meta = JSON.parse(impersonationMeta);
+      if (new Date(meta.expiresAt) < new Date()) {
+        return NextResponse.redirect(
+          new URL("/api/impersonate/stop", request.url)
+        );
+      }
+    } catch {
+      // Malformed cookie — continue normally
+    }
+  }
+
   const isProtected =
-    request.nextUrl.pathname.startsWith("/dashboard") ||
-    request.nextUrl.pathname.startsWith("/sponsor/dashboard") ||
-    request.nextUrl.pathname.startsWith("/sponsor/onboarding");
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/sponsor/dashboard") ||
+    pathname.startsWith("/sponsor/onboarding") ||
+    pathname.startsWith("/sponsor/leads") ||
+    pathname.startsWith("/sponsor/connections") ||
+    pathname.startsWith("/sponsor/settings") ||
+    pathname.startsWith("/become-speaker");
+
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    url.searchParams.set("redirect", request.nextUrl.pathname);
+    url.searchParams.set("redirect", pathname);
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from login/signup to their correct portal
-  if (
-    user &&
-    (request.nextUrl.pathname === "/login" ||
-      request.nextUrl.pathname === "/signup")
-  ) {
+  if (user && (pathname === "/login" || pathname === "/signup")) {
+    const roles = resolveRoles(user);
+    const activeRole = resolveActiveRole(request, roles);
     const url = request.nextUrl.clone();
-    const signupRole = user.user_metadata?.signup_role;
-    url.pathname = signupRole === "sponsor" ? "/sponsor/dashboard" : "/dashboard";
+    url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  if (user && isProtected) {
+    const roles = resolveRoles(user);
+    const activeRole = resolveActiveRole(request, roles);
+
+    // Sponsor onboarding: allow if user has "sponsor" in roles (adding role or completing onboarding)
+    if (pathname.startsWith("/sponsor/onboarding")) {
+      const signupRole = user.user_metadata?.signup_role;
+      const isSponsorSignup = signupRole === "sponsor";
+      const hasSponsorRole = roles.includes("sponsor");
+      if (!isSponsorSignup && !hasSponsorRole) {
+        const url = request.nextUrl.clone();
+        url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
+        return NextResponse.redirect(url);
+      }
+      return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
+    }
+
+    // Become-speaker: only for users who don't already have the speaker role
+    if (pathname.startsWith("/become-speaker")) {
+      if (roles.includes("speaker")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
+      return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
+    }
+
+    // Check if the active role allows this route
+    const allowedPrefixes = ROLE_ROUTE_MAP[activeRole] ?? [];
+    const routeAllowed = allowedPrefixes.some((prefix) =>
+      pathname.startsWith(prefix)
+    );
+
+    if (!routeAllowed) {
+      // Check if ANY of the user's roles would allow this route
+      const correctRole = roles.find((role) => {
+        const prefixes = ROLE_ROUTE_MAP[role] ?? [];
+        return prefixes.some((prefix) => pathname.startsWith(prefix));
+      });
+
+      if (correctRole) {
+        // Switch to the correct role and allow the request
+        const response = NextResponse.redirect(request.nextUrl);
+        response.cookies.set("active_role", correctRole, {
+          httpOnly: true,
+          sameSite: "strict",
+          path: "/",
+          secure: process.env.NODE_ENV === "production",
+        });
+        return response;
+      }
+
+      // User doesn't have any role that allows this route
+      const url = request.nextUrl.clone();
+      url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
   }
 
   return supabaseResponse;
+}
+
+function resolveRoles(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }): string[] {
+  const meta = user.app_metadata;
+  if (meta && Array.isArray(meta.roles) && meta.roles.length > 0) {
+    return meta.roles as string[];
+  }
+  // Fallback for users created before the roles migration
+  const signupRole = user.user_metadata?.signup_role;
+  return [typeof signupRole === "string" && signupRole === "sponsor" ? "sponsor" : "speaker"];
+}
+
+function resolveActiveRole(request: NextRequest, roles: string[]): string {
+  const cookieRole = request.cookies.get("active_role")?.value;
+  if (cookieRole && roles.includes(cookieRole)) {
+    return cookieRole;
+  }
+  return roles[0] ?? "speaker";
+}
+
+function maybeSetActiveRoleCookie(
+  response: NextResponse,
+  request: NextRequest,
+  activeRole: string
+): NextResponse {
+  const currentCookie = request.cookies.get("active_role")?.value;
+  if (currentCookie !== activeRole) {
+    response.cookies.set("active_role", activeRole, {
+      httpOnly: true,
+      sameSite: "strict",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+    });
+  }
+  return response;
 }

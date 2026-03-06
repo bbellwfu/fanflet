@@ -1,22 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-
-async function getSpeakerContext() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id, name, email')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!speaker) return null
-  return { supabase, user, speaker }
-}
+import { requireSpeaker } from '@/lib/auth-context'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export type SubscriberRow = {
   id: string
@@ -31,15 +17,12 @@ export async function listSubscribers(): Promise<{
   data?: SubscriberRow[]
   error?: string
 }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-
-  const { supabase, speaker } = ctx
+  const { supabase, speakerId } = await requireSpeaker()
 
   const { data: subscribers, error } = await supabase
     .from('subscribers')
     .select('id, email, name, created_at, source_fanflet_id')
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
@@ -76,18 +59,18 @@ export async function listSubscribers(): Promise<{
 export async function deleteSubscriber(
   subscriberId: string
 ): Promise<{ error?: string; success?: boolean }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speaker } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   const { error } = await supabase
     .from('subscribers')
     .delete()
     .eq('id', subscriberId)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/subscribers', { action: 'deleteSubscriber', speaker_id: speakerId, subscriber_id: subscriberId })
   revalidatePath('/dashboard/subscribers')
   return { success: true }
 }
@@ -95,9 +78,8 @@ export async function deleteSubscriber(
 export async function deleteSubscribers(
   subscriberIds: string[]
 ): Promise<{ error?: string; success?: boolean; deletedCount?: number }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speaker } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   if (subscriberIds.length === 0) return { error: 'No subscribers selected' }
 
@@ -105,10 +87,11 @@ export async function deleteSubscribers(
     .from('subscribers')
     .delete({ count: 'exact' })
     .in('id', subscriberIds)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/subscribers', { action: 'deleteSubscribers', speaker_id: speakerId, subscriber_ids: subscriberIds, deleted_count: count ?? 0 })
   revalidatePath('/dashboard/subscribers')
   return { success: true, deletedCount: count ?? 0 }
 }

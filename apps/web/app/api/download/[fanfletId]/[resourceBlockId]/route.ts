@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@fanflet/db/service'
 import { STORAGE_BUCKET, extractFilename, getStorageQuota } from '@fanflet/db/storage'
+import { rateLimit } from '@/lib/rate-limit'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -32,13 +34,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ fanfletId: string; resourceBlockId: string }> }
 ) {
+  const rl = rateLimit(request, 'download', 30, 60_000)
+  if (rl.limited) return rl.response!
+
   const { fanfletId, resourceBlockId } = await params
 
   if (!UUID_RE.test(fanfletId) || !UUID_RE.test(resourceBlockId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
-  const supabase = createServiceClient()
+  // Use the anon client for the data query -- RLS allows reading published fanflets
+  const supabase = await createClient()
 
   const { data: row, error } = await supabase
     .from('resource_blocks')
@@ -81,9 +87,18 @@ export async function GET(
     return NextResponse.json({ error: 'file_not_found' }, { status: 404 })
   }
 
-  // Resolve signed URL duration from speaker's plan
-  let signedUrlSeconds = 15 * 60 // default 15 minutes
-  const { data: sub } = await supabase
+  // Service client required for: (1) plan lookup (speaker_subscriptions has auth-only SELECT)
+  // and (2) generating signed URLs for private storage
+  let serviceClient: ReturnType<typeof createServiceClient>
+  try {
+    serviceClient = createServiceClient()
+  } catch {
+    console.error('[download] SUPABASE_SERVICE_ROLE_KEY is not configured — file downloads unavailable')
+    return NextResponse.json({ error: 'service_unavailable' }, { status: 503 })
+  }
+
+  let signedUrlSeconds = 15 * 60
+  const { data: sub } = await serviceClient
     .from('speaker_subscriptions')
     .select('plans ( limits )')
     .eq('speaker_id', fanflet.speaker_id)
@@ -99,7 +114,7 @@ export async function GET(
   }
 
   const originalFilename = extractFilename(filePath)
-  const { data: signed, error: signError } = await supabase.storage
+  const { data: signed, error: signError } = await serviceClient.storage
     .from(STORAGE_BUCKET)
     .createSignedUrl(filePath, signedUrlSeconds, {
       download: originalFilename,
@@ -121,7 +136,7 @@ export async function GET(
   const isTablet = /iPad|Tablet/i.test(ua)
   const deviceType = isTablet ? 'tablet' : isMobile ? 'mobile' : 'desktop'
 
-  void supabase.from('analytics_events').insert({
+  void supabase.from('analytics_events').insert({  // anon client; RLS allows public INSERT for published fanflets
     fanflet_id: fanfletId,
     event_type: 'resource_download',
     resource_block_id: resourceBlockId,

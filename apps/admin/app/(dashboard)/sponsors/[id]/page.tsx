@@ -3,6 +3,7 @@ import { createServiceClient } from "@fanflet/db/service";
 import Link from "next/link";
 import { ArrowLeft, BuildingIcon, GlobeIcon, MailIcon } from "lucide-react";
 import { VerifyButton } from "./verify-button";
+import { ImpersonateButton } from "./impersonate-button";
 
 export default async function SponsorDetailPage({
   params,
@@ -85,12 +86,20 @@ export default async function SponsorDetailPage({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <VerificationBadge verified={sponsor.is_verified} />
           <VerifyButton
             sponsorId={sponsor.id}
             isVerified={sponsor.is_verified}
           />
+          {sponsor.auth_user_id && (
+            <ImpersonateButton
+              targetUserId={sponsor.auth_user_id}
+              targetRole="sponsor"
+              targetName={sponsor.company_name}
+              targetEmail={sponsor.contact_email}
+            />
+          )}
         </div>
       </div>
 

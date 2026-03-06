@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@fanflet/db/server";
-import { getSiteUrl } from "@fanflet/db/config";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -25,7 +24,8 @@ export async function login(formData: FormData) {
 
 export async function signInWithGoogle() {
   const supabase = await createClient();
-  const siteUrl = getSiteUrl();
+  const adminUrl =
+    process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3001";
 
   // Clear any stale session before starting OAuth
   await supabase.auth.signOut();
@@ -33,7 +33,7 @@ export async function signInWithGoogle() {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${siteUrl}/auth/callback`,
+      redirectTo: `${adminUrl}/auth/callback`,
     },
   });
 

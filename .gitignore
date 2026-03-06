@@ -26,8 +26,12 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
+.claude/
 *.swp
 *.swo
+
+# Local files (not part of repo)
+_local/
 
 # Local MCP config
 mcp/

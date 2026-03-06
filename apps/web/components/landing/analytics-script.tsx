@@ -14,27 +14,31 @@ export function isPreviewMode(): boolean {
 
 export function AnalyticsScript({ fanfletId }: AnalyticsScriptProps) {
   useEffect(() => {
-    // Skip tracking for speaker preview visits
     if (isPreviewMode()) return
 
-    const referrer = document.referrer
-    const eventType = !referrer ? 'qr_scan' : 'page_view'
+    const referrer = document.referrer || undefined
+    const params = new URLSearchParams(window.location.search)
+    const isQrVisit = params.get('ref') === 'qr'
 
-    const payload = JSON.stringify({
-      fanflet_id: fanfletId,
-      event_type: eventType,
-      referrer: referrer || undefined,
-    })
+    function beacon(payload: Record<string, string | undefined>) {
+      const body = JSON.stringify(payload)
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }))
+      } else {
+        fetch('/api/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        }).catch(() => {})
+      }
+    }
 
-    // Prefer sendBeacon for better performance (non-blocking, survives page unload)
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/track', new Blob([payload], { type: 'application/json' }))
-    } else {
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      }).catch(() => {})
+    // Always fire a page_view
+    beacon({ fanflet_id: fanfletId, event_type: 'page_view', referrer })
+
+    // Additionally fire qr_scan when the visit came through a QR code link
+    if (isQrVisit) {
+      beacon({ fanflet_id: fanfletId, event_type: 'qr_scan', referrer })
     }
   }, [fanfletId])
 

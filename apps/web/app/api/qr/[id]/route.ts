@@ -71,7 +71,7 @@ export async function GET(
   }
 
   const siteUrl = getSiteUrl()
-  const fanfletUrl = `${siteUrl}/${speaker.slug}/${fanflet.slug}`
+  const fanfletUrl = `${siteUrl}/${speaker.slug}/${fanflet.slug}?ref=qr`
 
   if (format === 'svg') {
     let svg = await QRCode.toString(fanfletUrl, {

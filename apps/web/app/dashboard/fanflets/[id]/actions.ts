@@ -551,3 +551,32 @@ export async function reorderBlock(
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }
+
+/**
+ * Update the per-fanflet confirmation email config.
+ * Pass null to revert to using the speaker's default.
+ */
+export async function updateFanfletEmailConfig(
+  fanfletId: string,
+  config: { enabled?: boolean; body?: string } | null
+): Promise<{ error?: string; success?: boolean }> {
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(fanfletId)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { supabase } = ctx
+
+  const { error } = await supabase
+    .from('fanflets')
+    .update({ confirmation_email_config: config })
+    .eq('id', fanfletId)
+
+  if (error) return { error: error.message }
+
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'updateFanfletEmailConfig', fanflet_id: fanfletId })
+  revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+  return { success: true }
+}

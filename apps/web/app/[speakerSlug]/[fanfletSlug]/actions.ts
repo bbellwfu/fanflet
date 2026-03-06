@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { sendSubscriberConfirmation } from "@/lib/subscriber-confirmation";
 
 export async function subscribeToSpeaker(
   speakerId: string,
@@ -30,5 +31,72 @@ export async function subscribeToSpeaker(
     return { error: "Something went wrong. Please try again later." };
   }
 
+  // Fire-and-forget confirmation email (don't block the response)
+  void sendConfirmationEmailForSubscription(
+    supabase,
+    fanfletId,
+    speakerId,
+    email.toLowerCase().trim()
+  );
+
   return { success: true, subscriber_id: id };
+}
+
+/**
+ * Fetch fanflet + speaker data and send confirmation email.
+ * Runs asynchronously after the subscription is recorded.
+ */
+async function sendConfirmationEmailForSubscription(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  fanfletId: string,
+  speakerId: string,
+  subscriberEmail: string
+): Promise<void> {
+  try {
+    // Fetch fanflet with speaker in a single query
+    const { data: fanflet, error: fanfletError } = await supabase
+      .from("fanflets")
+      .select(
+        `
+        title,
+        slug,
+        confirmation_email_config,
+        speakers!inner (
+          name,
+          photo_url,
+          slug,
+          social_links
+        )
+      `
+      )
+      .eq("id", fanfletId)
+      .eq("speaker_id", speakerId)
+      .single();
+
+    if (fanfletError || !fanflet) {
+      console.error("[sendConfirmationEmail] Failed to fetch fanflet:", fanfletError?.message);
+      return;
+    }
+
+    const speaker = fanflet.speakers as {
+      name: string | null;
+      photo_url: string | null;
+      slug: string;
+      social_links: unknown;
+    };
+
+    await sendSubscriberConfirmation({
+      fanfletId,
+      speakerId,
+      subscriberEmail,
+      fanflet: {
+        title: fanflet.title,
+        slug: fanflet.slug,
+        confirmation_email_config: fanflet.confirmation_email_config,
+      },
+      speaker,
+    });
+  } catch (err) {
+    console.error("[sendConfirmationEmail] Error:", err);
+  }
 }

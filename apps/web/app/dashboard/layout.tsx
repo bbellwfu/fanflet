@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib/speaker-preferences";
+import { notifyAdmins } from "@/lib/admin-notifications";
 
 export default async function DashboardLayout({
   children,
@@ -49,6 +51,41 @@ export default async function DashboardLayout({
       .select("id", { count: "exact", head: true })
       .eq("speaker_id", speaker.id);
     resourceLibraryCount = resourceCount ?? 0;
+
+    const hasCreatedFanflet = fanfletCount > 0;
+    const allOnboardingComplete =
+      Boolean(speaker.name?.trim()) &&
+      Boolean(speaker.photo_url) &&
+      Boolean(speaker.slug?.trim()) &&
+      hasStoredDefaultThemePreset(speaker.social_links ?? null) &&
+      surveyQuestionCount > 0 &&
+      resourceLibraryCount > 0 &&
+      hasCreatedFanflet &&
+      publishedFanfletCount > 0;
+
+    if (allOnboardingComplete && !isOnboardingNotificationSent(speaker.social_links ?? null)) {
+      notifyAdmins("onboarding_completed", {
+        speakerId: speaker.id,
+        speakerName: speaker.name ?? "",
+        speakerEmail: speaker.email ?? "",
+      }).catch(() => {});
+
+      const currentSocialLinks = (speaker.social_links && typeof speaker.social_links === "object")
+        ? (speaker.social_links as Record<string, unknown>)
+        : {};
+      const onboarding = (currentSocialLinks.onboarding && typeof currentSocialLinks.onboarding === "object")
+        ? (currentSocialLinks.onboarding as Record<string, unknown>)
+        : {};
+      await supabase
+        .from("speakers")
+        .update({
+          social_links: {
+            ...currentSocialLinks,
+            onboarding: { ...onboarding, notification_sent: true },
+          },
+        })
+        .eq("id", speaker.id);
+    }
   }
 
   return (

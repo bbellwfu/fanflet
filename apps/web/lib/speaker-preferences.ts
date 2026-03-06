@@ -37,3 +37,12 @@ export function isOnboardingDismissed(socialLinks: SocialLinksValue): boolean {
 
   return Boolean((onboarding as Record<string, unknown>).dismissed);
 }
+
+export function isOnboardingNotificationSent(socialLinks: SocialLinksValue): boolean {
+  const record = toSocialLinksRecord(socialLinks);
+  const onboarding = record.onboarding;
+  if (!onboarding || typeof onboarding !== "object") {
+    return false;
+  }
+  return Boolean((onboarding as Record<string, unknown>).notification_sent);
+}

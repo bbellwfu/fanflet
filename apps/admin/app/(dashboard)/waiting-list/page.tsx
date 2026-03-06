@@ -117,16 +117,16 @@ export default async function WaitingListPage({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-[13px] min-w-[600px]">
             <thead>
               <tr className="border-b border-border-subtle">
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Email
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Source
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Interest
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
@@ -138,15 +138,15 @@ export default async function WaitingListPage({
               {rows.map((row) => (
                 <tr
                   key={row.id}
-                  className="hover:bg-surface-elevated/50 transition-colors"
+                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
                 >
-                  <td className="px-5 py-3.5 text-fg">
+                  <td className="px-5 py-3.5 text-fg whitespace-nowrap align-middle">
                     {row.email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary text-[12px]">
+                  <td className="px-5 py-3.5 text-fg-secondary text-[12px] align-middle">
                     {row.source}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-3.5 whitespace-nowrap align-middle">
                     {row.interest_tier ? (
                       <span
                         className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
@@ -161,7 +161,7 @@ export default async function WaitingListPage({
                       <span className="text-fg-muted">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted">
+                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(row.created_at).toLocaleDateString()}
                   </td>
                 </tr>

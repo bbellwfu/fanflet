@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getSpeakerEntitlements } from '@fanflet/db'
+import { notifyAdmins } from '@/lib/admin-notifications'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { getStoredDefaultThemePreset } from '@/lib/speaker-preferences'
 import { parseExpirationFromForm, resolveExpirationDate } from '@/lib/expiration'
@@ -14,7 +15,7 @@ export async function createFanflet(formData: FormData) {
 
   const { data: speaker } = await supabase
     .from('speakers')
-    .select('id, slug, social_links')
+    .select('id, slug, name, email, social_links')
     .eq('auth_user_id', user.id)
     .single()
 
@@ -98,6 +99,14 @@ export async function createFanflet(formData: FormData) {
 
   if (result.error) return { error: result.error.message }
   const fanflet = result.data
+
+  notifyAdmins('fanflet_created', {
+    fanfletId: fanflet.id,
+    title,
+    speakerId: speaker.id,
+    speakerName: speaker.name ?? speaker.slug ?? '',
+    speakerEmail: speaker.email ?? '',
+  }).catch(() => {})
 
   redirect(`/dashboard/fanflets/${fanflet.id}`)
 }

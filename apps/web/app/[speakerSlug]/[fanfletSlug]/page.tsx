@@ -161,6 +161,14 @@ export default async function AudienceLandingPage({ params }: Props) {
     surveyQuestion = data;
   }
 
+  // SMS Bookmark is feature-flagged (requires Twilio setup)
+  const { data: smsFlag } = await supabase
+    .from("feature_flags")
+    .select("is_global")
+    .eq("key", "sms_bookmark")
+    .maybeSingle();
+  const showSmsBookmark = smsFlag?.is_global === true;
+
   const fanfletWithBlocks = {
     ...fanflet,
     resource_blocks: resourceBlocks,
@@ -184,6 +192,7 @@ export default async function AudienceLandingPage({ params }: Props) {
         speaker={speaker}
         fanflet={fanfletWithBlocks}
         subscriberCount={subscriberCount ?? 0}
+        showSmsBookmark={showSmsBookmark}
       />
     </div>
   );

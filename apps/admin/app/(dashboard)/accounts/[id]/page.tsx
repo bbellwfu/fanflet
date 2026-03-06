@@ -15,6 +15,7 @@ export default async function AccountDetailPage({
 }) {
   const { id } = await params;
   const supabase = createServiceClient();
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
 
   const { data: speaker, error } = await supabase
     .from("speakers")
@@ -276,7 +277,7 @@ export default async function AccountDetailPage({
                   </span>
                   {fanflet.status === "published" && speaker.slug && (
                     <a
-                      href={`https://fanflet.com/${speaker.slug}/${fanflet.slug}?preview`}
+                      href={`${webUrl}/${speaker.slug}/${fanflet.slug}?preview`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary-soft hover:text-primary transition-colors flex items-center gap-1"

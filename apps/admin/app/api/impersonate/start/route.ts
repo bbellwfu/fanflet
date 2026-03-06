@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     });
 
     const webUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+      process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
     const establishParams = new URLSearchParams({ token: rawToken });
     if (returnPath) {
       establishParams.set("returnPath", returnPath);

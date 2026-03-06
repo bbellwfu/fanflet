@@ -78,7 +78,8 @@ async function sendConfirmationEmailForSubscription(
       return;
     }
 
-    const speaker = fanflet.speakers as {
+    const speakerData = fanflet.speakers;
+    const speaker = (Array.isArray(speakerData) ? speakerData[0] : speakerData) as {
       name: string | null;
       photo_url: string | null;
       slug: string;

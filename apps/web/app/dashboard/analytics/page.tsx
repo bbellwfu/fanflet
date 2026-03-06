@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Eye, MousePointerClick, Users, TrendingUp } from "lucide-react";
+import { BarChart3, Eye, MousePointerClick, Users, Percent } from "lucide-react";
 import { ResourceClickBreakdown } from "@/components/analytics/resource-click-breakdown";
 import { SurveyResults, type SurveyResultData } from "@/components/analytics/survey-results";
 
@@ -65,68 +65,75 @@ export default async function AnalyticsPage() {
   const fanfletIds = (fanflets || []).map((f) => f.id);
 
   // Get aggregate stats
-  let totalViews = 0;
+  let totalUniqueViews = 0;
   let totalClicks = 0;
-  let totalSignups = 0;
   let totalSubscribers = 0;
 
+  // Per-fanflet unique-view and click counts (built from batch queries)
+  const viewsByFanflet: Record<string, number> = {};
+  const clicksByFanflet: Record<string, number> = {};
+  const subsByFanflet: Record<string, number> = {};
+
   if (fanfletIds.length > 0) {
-    const { count: views } = await supabase
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .in("fanflet_id", fanfletIds)
-      .eq("event_type", "page_view");
-    totalViews = views || 0;
+    // Batch-fetch page_view events with visitor_hash for unique counting
+    const [pageViewResult, clickResult, subsResult, perFanfletSubsResult] =
+      await Promise.all([
+        supabase
+          .from("analytics_events")
+          .select("fanflet_id, visitor_hash")
+          .in("fanflet_id", fanfletIds)
+          .eq("event_type", "page_view"),
+        supabase
+          .from("analytics_events")
+          .select("fanflet_id")
+          .in("fanflet_id", fanfletIds)
+          .eq("event_type", "resource_click"),
+        supabase
+          .from("subscribers")
+          .select("*", { count: "exact", head: true })
+          .eq("speaker_id", speaker.id),
+        supabase
+          .from("subscribers")
+          .select("source_fanflet_id")
+          .eq("speaker_id", speaker.id),
+      ]);
 
-    const { count: clicks } = await supabase
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .in("fanflet_id", fanfletIds)
-      .eq("event_type", "resource_click");
-    totalClicks = clicks || 0;
+    // Unique views: deduplicate by visitor_hash per fanflet
+    const globalUniqueHashes = new Set<string>();
+    const perFanfletHashes: Record<string, Set<string>> = {};
+    for (const evt of pageViewResult.data || []) {
+      globalUniqueHashes.add(evt.visitor_hash);
+      const fid = evt.fanflet_id as string;
+      if (!perFanfletHashes[fid]) perFanfletHashes[fid] = new Set();
+      perFanfletHashes[fid].add(evt.visitor_hash);
+    }
+    totalUniqueViews = globalUniqueHashes.size;
+    for (const [fid, hashes] of Object.entries(perFanfletHashes)) {
+      viewsByFanflet[fid] = hashes.size;
+    }
 
-    const { count: signups } = await supabase
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .in("fanflet_id", fanfletIds)
-      .eq("event_type", "email_signup");
-    totalSignups = signups || 0;
+    // Clicks per fanflet (total, not unique)
+    for (const evt of clickResult.data || []) {
+      const fid = evt.fanflet_id as string;
+      clicksByFanflet[fid] = (clicksByFanflet[fid] || 0) + 1;
+    }
+    totalClicks = (clickResult.data || []).length;
 
-    const { count: subs } = await supabase
-      .from("subscribers")
-      .select("*", { count: "exact", head: true })
-      .eq("speaker_id", speaker.id);
-    totalSubscribers = subs || 0;
+    totalSubscribers = subsResult.count || 0;
+
+    // Subscribers per fanflet
+    for (const sub of perFanfletSubsResult.data || []) {
+      const fid = sub.source_fanflet_id as string;
+      if (fid) subsByFanflet[fid] = (subsByFanflet[fid] || 0) + 1;
+    }
   }
 
-  // Per-fanflet analytics
-  const fanfletStats = await Promise.all(
-    (fanflets || []).map(async (f) => {
-      const { count: views } = await supabase
-        .from("analytics_events")
-        .select("*", { count: "exact", head: true })
-        .eq("fanflet_id", f.id)
-        .eq("event_type", "page_view");
-
-      const { count: clicks } = await supabase
-        .from("analytics_events")
-        .select("*", { count: "exact", head: true })
-        .eq("fanflet_id", f.id)
-        .eq("event_type", "resource_click");
-
-      const { count: subs } = await supabase
-        .from("subscribers")
-        .select("*", { count: "exact", head: true })
-        .eq("source_fanflet_id", f.id);
-
-      return {
-        ...f,
-        views: views || 0,
-        clicks: clicks || 0,
-        subscribers: subs || 0,
-      };
-    })
-  );
+  const fanfletStats = (fanflets || []).map((f) => ({
+    ...f,
+    views: viewsByFanflet[f.id] || 0,
+    clicks: clicksByFanflet[f.id] || 0,
+    subscribers: subsByFanflet[f.id] || 0,
+  }));
 
   // Per-resource click breakdown (only for fanflets with clicks)
   type ResourceClickStat = {
@@ -271,11 +278,11 @@ export default async function AnalyticsPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="h-full">
           <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium leading-tight">Page Views</CardTitle>
+            <CardTitle className="text-sm font-medium leading-tight">Unique Views</CardTitle>
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{totalUniqueViews.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card className="h-full">
@@ -289,11 +296,16 @@ export default async function AnalyticsPage() {
         </Card>
         <Card className="h-full">
           <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium leading-tight">Email Signups</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium leading-tight">Conversion Rate</CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalSignups.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              {totalUniqueViews > 0
+                ? `${((totalSubscribers / totalUniqueViews) * 100).toFixed(1)}%`
+                : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Subscribers / Unique Views</p>
           </CardContent>
         </Card>
         <Card className="h-full">

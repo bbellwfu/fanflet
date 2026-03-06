@@ -99,11 +99,7 @@ export function SubscribersDashboard({
     }
 
     if (sourceFilter !== "all") {
-      if (sourceFilter === "unknown") {
-        result = result.filter((s) => !s.source_fanflet_id);
-      } else {
-        result = result.filter((s) => s.source_fanflet_id === sourceFilter);
-      }
+      result = result.filter((s) => s.source_fanflet_id === sourceFilter);
     }
 
     result = [...result].sort((a, b) => {
@@ -289,7 +285,6 @@ export function SubscribersDashboard({
                     {f.title}
                   </SelectItem>
                 ))}
-                <SelectItem value="unknown">Unknown source</SelectItem>
               </SelectContent>
             </Select>
 

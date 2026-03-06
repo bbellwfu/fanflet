@@ -237,6 +237,7 @@ export function SponsorSettingsForm({ sponsor, authUserId, userEmail }: SponsorS
                 width={80}
                 height={80}
                 className="w-full h-full object-contain"
+                unoptimized
               />
             ) : (
               <Building2 className="w-8 h-8 text-gray-300" />

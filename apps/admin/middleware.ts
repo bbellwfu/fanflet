@@ -29,23 +29,49 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh the auth token — this is the key call that keeps the session alive
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  const pathname = request.nextUrl.pathname;
+  const isLoginOrCallback =
+    pathname === "/login" ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/api/auth");
+
+  if (isLoginOrCallback) {
+    return supabaseResponse;
+  }
+
+  // All non-login routes require authentication + platform_admin role
+  if (!user) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
+  const appMetadataRole = (user.app_metadata as Record<string, unknown> | undefined)?.role;
+  if (appMetadataRole === "platform_admin") {
+    return supabaseResponse;
+  }
+
+  // Check user_roles table as fallback (for admins not set via app_metadata)
+  const { data: roleRow } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("auth_user_id", user.id)
+    .eq("role", "platform_admin")
+    .maybeSingle();
+
+  if (roleRow) {
+    return supabaseResponse;
+  }
+
+  return NextResponse.redirect(
+    new URL("/login?error=admin_required", request.url)
+  );
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - Static assets
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

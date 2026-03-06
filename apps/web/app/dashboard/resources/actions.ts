@@ -1,25 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import { STORAGE_BUCKET } from '@fanflet/db/storage'
 import { ensureUrl } from '@/lib/utils'
-
-async function getSpeakerContext() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!speaker) return null
-  return { supabase, user, speakerId: speaker.id }
-}
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export type LinkedFanflet = { id: string; title: string }
 
@@ -47,9 +33,7 @@ export async function listLibraryResources(): Promise<{
   data?: LibraryResource[]
   error?: string
 }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speakerId } = ctx
+  const { supabase, speakerId } = await requireSpeaker()
 
   const { data: items, error } = await supabase
     .from('resource_library')
@@ -128,11 +112,10 @@ export async function getSpeakerStorageUsage(): Promise<{
   usedBytes: number
   error?: string
 }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { usedBytes: 0, error: 'Not authenticated' }
+  const { supabase, speakerId } = await requireSpeaker()
 
-  const { data } = await ctx.supabase.rpc('speaker_storage_used_bytes', {
-    p_speaker_id: ctx.speakerId,
+  const { data } = await supabase.rpc('speaker_storage_used_bytes', {
+    p_speaker_id: speakerId,
   })
 
   return { usedBytes: typeof data === 'number' ? data : 0 }
@@ -149,9 +132,8 @@ export async function createLibraryResource(data: {
   metadata?: Record<string, unknown>
   default_sponsor_account_id?: string | null
 }): Promise<{ error?: string; success?: boolean; id?: string }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speakerId } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   if (!data.title?.trim()) return { error: 'Title is required' }
   if (!['link', 'file', 'text', 'sponsor'].includes(data.type)) {
@@ -195,6 +177,7 @@ export async function createLibraryResource(data: {
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'createLibraryResource', speaker_id: speakerId, id: item.id })
   revalidatePath('/dashboard/resources')
   return { success: true, id: item.id }
 }
@@ -212,9 +195,8 @@ export async function updateLibraryResource(
     default_sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speakerId } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   if (data.default_sponsor_account_id !== undefined) {
     const { data: item } = await supabase
@@ -254,6 +236,7 @@ export async function updateLibraryResource(
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'updateLibraryResource', speaker_id: speakerId, id })
   revalidatePath('/dashboard/resources')
   return { success: true }
 }
@@ -267,9 +250,8 @@ export async function deleteLibraryResource(
   id: string,
   options?: DeleteLibraryResourceOptions
 ): Promise<{ error?: string; success?: boolean; needsChoice?: boolean }> {
-  const ctx = await getSpeakerContext()
-  if (!ctx) return { error: 'Not authenticated' }
-  const { supabase, speakerId } = ctx
+  await blockImpersonationWrites()
+  const { supabase, speakerId } = await requireSpeaker()
 
   // Fetch the full library item (for storage cleanup and for convert_to_static)
   const { data: item, error: fetchError } = await supabase
@@ -333,6 +315,7 @@ export async function deleteLibraryResource(
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/resources', { action: 'deleteLibraryResource', speaker_id: speakerId, id })
   if (item.type === 'file' && item.file_path && !item.file_path.startsWith('http')) {
     await supabase.storage.from(STORAGE_BUCKET).remove([item.file_path])
   }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
+import { cookies } from "next/headers";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,17 +30,56 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const impersonationRaw = cookieStore.get("impersonation_display")?.value;
+  let impersonation: {
+    targetName: string;
+    targetEmail: string;
+    targetRole: "speaker" | "sponsor";
+    writeEnabled: boolean;
+    expiresAt: string;
+  } | null = null;
+
+  if (impersonationRaw) {
+    try {
+      const parsed = JSON.parse(impersonationRaw);
+      if (new Date(parsed.expiresAt) > new Date()) {
+        impersonation = parsed;
+      }
+    } catch {
+      // Ignore malformed cookie
+    }
+  }
+
+  const adminUrl =
+    process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3001";
+
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
-        {children}
+        {impersonation && (
+          <ImpersonationBanner
+            targetName={impersonation.targetName}
+            targetEmail={impersonation.targetEmail}
+            targetRole={impersonation.targetRole}
+            writeEnabled={impersonation.writeEnabled}
+            expiresAt={impersonation.expiresAt}
+            adminUrl={adminUrl}
+          />
+        )}
+        {impersonation ? (
+          <div style={{ paddingTop: "40px" }}>{children}</div>
+        ) : (
+          children
+        )}
         <Toaster position="top-right" richColors />
       </body>
     </html>

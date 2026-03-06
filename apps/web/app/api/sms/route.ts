@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { rateLimit } from '@/lib/rate-limit'
 
 const SmsBookmarkSchema = z.object({
   fanflet_id: z.string().uuid(),
@@ -17,6 +18,9 @@ function normalizePhone(raw: string): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(request, 'sms', 5, 60_000)
+  if (rl.limited) return rl.response!
+
   try {
     const body = await request.json()
     const parsed = SmsBookmarkSchema.safeParse(body)

@@ -13,11 +13,13 @@
     "./config": "./src/config.ts",
     "./features": "./src/features.ts",
     "./constants": "./src/constants.ts",
-    "./storage": "./src/storage.ts"
+    "./storage": "./src/storage.ts",
+    "./impersonation": "./src/impersonation.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.95.3"
+    "@supabase/supabase-js": "^2.95.3",
+    "jose": "^6.2.0"
   },
   "devDependencies": {
     "typescript": "^5"

@@ -1,7 +1,8 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSiteUrl } from '@/lib/config'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 const REPORT_TOKEN_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 const REPORT_TOKEN_LENGTH = 21
@@ -18,22 +19,13 @@ export async function exportSponsorReportCsv(
   fanfletId: string,
   sponsorId: string | null
 ): Promise<{ error?: string; csv?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: fanflet } = await supabase
     .from('fanflets')
     .select('id')
     .eq('id', fanfletId)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .single()
   if (!fanflet) return { error: 'Fanflet not found' }
 
@@ -83,22 +75,14 @@ export async function createSponsorReportToken(
   fanfletId: string,
   sponsorId: string
 ): Promise<{ error?: string; token?: string; url?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: fanflet } = await supabase
     .from('fanflets')
     .select('id')
     .eq('id', fanfletId)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .single()
   if (!fanflet) return { error: 'Fanflet not found' }
 
@@ -111,12 +95,13 @@ export async function createSponsorReportToken(
     token,
     fanflet_id: fanfletId,
     sponsor_id: sponsorId,
-    created_by_speaker_id: speaker.id,
+    created_by_speaker_id: speakerId,
     expires_at: expiresAt.toISOString(),
   })
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}/sponsors`, { action: 'createSponsorReportToken', fanflet_id: fanfletId, sponsor_id: sponsorId, speaker_id: speakerId })
   const base = getSiteUrl()
   const url = `${base}/reports/${token}`
 

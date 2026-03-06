@@ -1,18 +1,10 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSponsor } from '@/lib/auth-context'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function exportSponsorLeadsCsv(): Promise<{ error?: string; csv?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: sponsor } = await supabase
-    .from('sponsor_accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!sponsor) return { error: 'Sponsor not found' }
+  const { sponsorId, supabase } = await requireSponsor()
 
   const [leadsResult, hiddenResult] = await Promise.all([
     supabase
@@ -22,12 +14,12 @@ export async function exportSponsorLeadsCsv(): Promise<{ error?: string; csv?: s
         subscribers!inner ( email, name ),
         fanflets ( title, speaker_id, speakers ( name ) )
       `)
-      .eq('sponsor_id', sponsor.id)
+      .eq('sponsor_id', sponsorId)
       .order('created_at', { ascending: false }),
     supabase
       .from('sponsor_connections')
       .select('speaker_id')
-      .eq('sponsor_id', sponsor.id)
+      .eq('sponsor_id', sponsorId)
       .eq('hidden_by_sponsor', true),
   ])
 

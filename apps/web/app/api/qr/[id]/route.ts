@@ -5,6 +5,15 @@ import { createClient } from '@/lib/supabase/server'
 import { getSiteUrl } from '@/lib/config'
 import path from 'path'
 import { readFile } from 'fs/promises'
+import { z } from 'zod'
+import { rateLimit } from '@/lib/rate-limit'
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const QrParamsSchema = z.object({
+  format: z.enum(['png', 'svg']).default('png'),
+  size: z.coerce.number().int().min(100).max(2000).default(400),
+})
 
 // Cache the logo buffer so we don't read from disk on every request
 let logoBufCache: Buffer | null = null
@@ -19,7 +28,26 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const rl = rateLimit(request, 'qr', 10, 60_000)
+  if (rl.limited) return rl.response!
+
   const { id } = await params
+
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: 'Invalid ID' }, { status: 400 })
+  }
+
+  const paramsParsed = QrParamsSchema.safeParse({
+    format: request.nextUrl.searchParams.get('format') ?? undefined,
+    size: request.nextUrl.searchParams.get('size') ?? undefined,
+  })
+
+  if (!paramsParsed.success) {
+    return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
+  }
+
+  const { format, size } = paramsParsed.data
+
   const supabase = await createClient()
 
   const { data: fanflet } = await supabase
@@ -44,9 +72,6 @@ export async function GET(
 
   const siteUrl = getSiteUrl()
   const fanfletUrl = `${siteUrl}/${speaker.slug}/${fanflet.slug}`
-
-  const format = request.nextUrl.searchParams.get('format') || 'png'
-  const size = parseInt(request.nextUrl.searchParams.get('size') || '400')
 
   if (format === 'svg') {
     let svg = await QRCode.toString(fanfletUrl, {

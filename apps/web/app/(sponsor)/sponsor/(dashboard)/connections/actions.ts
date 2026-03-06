@@ -1,27 +1,20 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSponsor } from '@/lib/auth-context'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function respondToConnection(
   connectionId: string,
   accept: boolean
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: sponsor } = await supabase
-    .from('sponsor_accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!sponsor) return { error: 'Sponsor not found' }
+  await blockImpersonationWrites()
+  const { sponsorId, supabase } = await requireSponsor()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
     .select('id, status')
     .eq('id', connectionId)
-    .eq('sponsor_id', sponsor.id)
+    .eq('sponsor_id', sponsorId)
     .single()
 
   if (!conn || conn.status !== 'pending') return { error: 'Connection not found or already responded.' }
@@ -36,28 +29,21 @@ export async function respondToConnection(
     .eq('id', connectionId)
 
   if (error) return { error: error.message }
+  await logImpersonationAction('mutation', '/sponsor/dashboard/connections', { action: 'respondToConnection', connectionId, sponsorId })
   return {}
 }
 
 export async function endSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: sponsor } = await supabase
-    .from('sponsor_accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!sponsor) return { error: 'Sponsor not found' }
+  await blockImpersonationWrites()
+  const { sponsorId, supabase } = await requireSponsor()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
     .select('id, sponsor_id, status, ended_at')
     .eq('id', connectionId)
-    .eq('sponsor_id', sponsor.id)
+    .eq('sponsor_id', sponsorId)
     .single()
 
   if (!conn) return { error: 'Connection not found' }
@@ -70,28 +56,21 @@ export async function endSponsorConnection(
     .eq('id', connectionId)
 
   if (error) return { error: error.message }
+  await logImpersonationAction('mutation', '/sponsor/dashboard/connections', { action: 'endSponsorConnection', connectionId, sponsorId })
   return {}
 }
 
 export async function hideSpeakerConnectionFromView(
   connectionId: string
 ): Promise<{ error?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: sponsor } = await supabase
-    .from('sponsor_accounts')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!sponsor) return { error: 'Sponsor not found' }
+  await blockImpersonationWrites()
+  const { sponsorId, supabase } = await requireSponsor()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
     .select('id, sponsor_id')
     .eq('id', connectionId)
-    .eq('sponsor_id', sponsor.id)
+    .eq('sponsor_id', sponsorId)
     .single()
 
   if (!conn) return { error: 'Connection not found' }
@@ -102,5 +81,6 @@ export async function hideSpeakerConnectionFromView(
     .eq('id', connectionId)
 
   if (error) return { error: error.message }
+  await logImpersonationAction('mutation', '/sponsor/dashboard/connections', { action: 'hideSpeakerConnectionFromView', connectionId, sponsorId })
   return {}
 }

@@ -2,6 +2,8 @@ import { createServiceClient } from "@fanflet/db/service";
 import Link from "next/link";
 import { ExternalLink, FileTextIcon } from "lucide-react";
 
+type SpeakerEmbed = { name: string | null; email: string; slug: string | null };
+
 type FanfletRow = {
   id: string;
   title: string;
@@ -10,8 +12,16 @@ type FanfletRow = {
   published_at: string | null;
   created_at: string;
   speaker_id: string;
-  speakers: { name: string | null; email: string; slug: string | null }[] | null;
+  speakers: SpeakerEmbed | SpeakerEmbed[] | null;
 };
+
+function resolveSpeaker(
+  speakers: FanfletRow["speakers"],
+): SpeakerEmbed | null {
+  if (!speakers) return null;
+  if (Array.isArray(speakers)) return speakers[0] ?? null;
+  return speakers;
+}
 
 export default async function FanfletsPage({
   searchParams,
@@ -19,6 +29,7 @@ export default async function FanfletsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const params = await searchParams;
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3000";
   const supabase = createServiceClient();
 
   let query = supabase
@@ -127,67 +138,73 @@ export default async function FanfletsPage({
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Created
                 </th>
-                <th className="px-5 py-3 text-right text-[12px] font-medium uppercase tracking-wider text-fg-muted">
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
-              {rows.map((fanflet) => (
-                <tr
-                  key={fanflet.id}
-                  className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
-                >
-                  <td className="px-5 py-3.5 font-medium text-fg whitespace-nowrap align-middle">
-                    {fanflet.title}
-                  </td>
-                  <td className="px-5 py-3.5 align-middle">
-                    <Link
-                      href={`/accounts/${fanflet.speaker_id}`}
-                      className="text-primary-soft hover:text-primary transition-colors py-2 -my-2 block whitespace-nowrap"
-                    >
-                      {fanflet.speakers?.[0]?.name || fanflet.speakers?.[0]?.email || "—"}
-                    </Link>
-                  </td>
-                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-muted font-mono text-[11px] align-middle">
-                    {fanflet.slug}
-                  </td>
-                  <td className="px-5 py-3.5 whitespace-nowrap align-middle">
-                    <span
-                      className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
-                        fanflet.status === "published"
-                          ? "bg-success/10 text-success"
-                          : "bg-surface-elevated text-fg-muted"
-                      }`}
-                    >
-                      {fanflet.status}
-                    </span>
-                  </td>
-                  <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                    {fanflet.published_at
-                      ? new Date(fanflet.published_at).toLocaleDateString()
-                      : "—"}
-                  </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                    {new Date(fanflet.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-5 py-3.5 text-right align-middle">
-                    {fanflet.status === "published" && fanflet.speakers?.[0]?.slug && (
-                      <a
-                        href={`https://fanflet.com/${fanflet.speakers[0].slug}/${fanflet.slug}?preview`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-soft hover:text-primary transition-colors inline-flex items-center gap-1 text-[12px]"
+              {rows.map((fanflet) => {
+                const speaker = resolveSpeaker(fanflet.speakers);
+                const publicUrl =
+                  speaker?.slug
+                    ? `${webUrl}/${speaker.slug}/${fanflet.slug}?preview`
+                    : null;
+
+                return (
+                  <tr
+                    key={fanflet.id}
+                    className="hover:bg-surface-elevated/50 transition-colors min-h-[44px]"
+                  >
+                    <td className="px-5 py-3.5 font-medium text-fg whitespace-nowrap align-middle">
+                      {fanflet.title}
+                    </td>
+                    <td className="px-5 py-3.5 align-middle">
+                      <Link
+                        href={`/accounts/${fanflet.speaker_id}`}
+                        className="text-primary-soft hover:text-primary transition-colors py-2 -my-2 block whitespace-nowrap"
                       >
-                        View <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        {speaker?.name || speaker?.email || "—"}
+                      </Link>
+                    </td>
+                    <td className="hidden sm:table-cell px-5 py-3.5 font-mono text-[11px] align-middle">
+                      {publicUrl ? (
+                        <a
+                          href={publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-soft hover:text-primary transition-colors inline-flex items-center gap-1"
+                        >
+                          {fanflet.slug}
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="text-fg-muted">{fanflet.slug}</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap align-middle">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
+                          fanflet.status === "published"
+                            ? "bg-success/10 text-success"
+                            : "bg-surface-elevated text-fg-muted"
+                        }`}
+                      >
+                        {fanflet.status}
+                      </span>
+                    </td>
+                    <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
+                      {fanflet.published_at
+                        ? new Date(fanflet.published_at).toLocaleDateString()
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
+                      {new Date(fanflet.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                );
+              })}
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-5 py-10 text-center text-[13px] text-fg-muted"
                   >
                     No fanflets found

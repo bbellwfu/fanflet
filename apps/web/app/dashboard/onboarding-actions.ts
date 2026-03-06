@@ -1,18 +1,18 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { toSocialLinksRecord } from '@/lib/speaker-preferences'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 async function setChecklistDismissed(dismissed: boolean) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: speaker } = await supabase
     .from('speakers')
     .select('social_links')
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
     .maybeSingle()
 
   const currentSocialLinks = toSocialLinksRecord(speaker?.social_links)
@@ -32,10 +32,11 @@ async function setChecklistDismissed(dismissed: boolean) {
         },
       },
     })
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard', { action: 'setChecklistDismissed', speaker_id: speakerId, dismissed })
   revalidatePath('/dashboard', 'layout')
   revalidatePath('/dashboard')
   return { success: true }

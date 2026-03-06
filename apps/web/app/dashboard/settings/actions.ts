@@ -1,24 +1,17 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import type { PhotoFrame } from '@/lib/photo-frame'
 import { DEFAULT_THEME_ID, THEME_PRESETS } from '@/lib/themes'
 import { toSocialLinksRecord } from '@/lib/speaker-preferences'
 import { ensureUrl } from '@/lib/utils'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function updateSpeakerProfile(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-  if (!speaker) return { error: 'Speaker profile not found' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const name = formData.get('name') as string
   const bio = formData.get('bio') as string
@@ -35,7 +28,7 @@ export async function updateSpeakerProfile(formData: FormData) {
     .from('speakers')
     .select('id')
     .eq('slug', slug)
-    .neq('auth_user_id', user.id)
+    .neq('id', speakerId)
     .maybeSingle()
 
   if (existing) {
@@ -45,7 +38,7 @@ export async function updateSpeakerProfile(formData: FormData) {
   const { data: currentSpeaker } = await supabase
     .from('speakers')
     .select('social_links')
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
     .maybeSingle()
 
   const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links)
@@ -54,7 +47,7 @@ export async function updateSpeakerProfile(formData: FormData) {
       ? existingSocialLinks.photo_frame
       : null
   const validThemePresetIds = new Set(THEME_PRESETS.map((theme) => theme.id))
-  const allowMultipleThemes = (await getSpeakerEntitlements(speaker.id)).features.has('multiple_theme_colors')
+  const allowMultipleThemes = (await getSpeakerEntitlements(speakerId)).features.has('multiple_theme_colors')
   const safeThemePreset =
     allowMultipleThemes && validThemePresetIds.has(defaultThemePreset)
       ? defaultThemePreset
@@ -89,7 +82,7 @@ export async function updateSpeakerProfile(formData: FormData) {
   const { error } = await supabase
     .from('speakers')
     .update(updateData)
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
 
   if (error) {
     // Catch unique-constraint violation on slug and return a friendly message
@@ -99,14 +92,13 @@ export async function updateSpeakerProfile(formData: FormData) {
     return { error: error.message }
   }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'updateSpeakerProfile', speaker_id: speakerId })
   revalidatePath('/dashboard/settings')
   return { success: true }
 }
 
 export async function checkSlugAvailability(slug: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { available: false }
+  const { speakerId, supabase } = await requireSpeaker()
 
   if (!slug || !slug.trim()) return { available: false }
 
@@ -114,21 +106,20 @@ export async function checkSlugAvailability(slug: string) {
     .from('speakers')
     .select('id')
     .eq('slug', slug)
-    .neq('auth_user_id', user.id)
+    .neq('id', speakerId)
     .maybeSingle()
 
   return { available: !existing }
 }
 
 export async function removeSpeakerPhoto() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: currentSpeaker } = await supabase
     .from('speakers')
     .select('social_links')
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
     .maybeSingle()
 
   const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links ?? {})
@@ -140,24 +131,24 @@ export async function removeSpeakerPhoto() {
       photo_url: null,
       social_links: socialLinksWithoutFrame,
     })
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'removeSpeakerPhoto', speaker_id: speakerId })
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')
   return { success: true }
 }
 
 export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFrame | null) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
   const { data: currentSpeaker } = await supabase
     .from('speakers')
     .select('social_links')
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
     .maybeSingle()
 
   const existingSocialLinks = toSocialLinksRecord(currentSpeaker?.social_links)
@@ -171,10 +162,11 @@ export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFra
         ...(photoFrame ? { photo_frame: photoFrame } : {}),
       },
     })
-    .eq('auth_user_id', user.id)
+    .eq('id', speakerId)
 
   if (error) return { error: error.message }
 
+  await logImpersonationAction('mutation', '/dashboard/settings', { action: 'updateSpeakerPhoto', speaker_id: speakerId })
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')
   return { success: true }

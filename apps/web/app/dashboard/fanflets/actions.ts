@@ -1,30 +1,22 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
+import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function cloneFanflet(
   sourceFanfletId: string
 ): Promise<{ error?: string; newFanfletId?: string }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
+  await blockImpersonationWrites()
+  const { speakerId, supabase } = await requireSpeaker()
 
-  const { data: speaker } = await supabase
-    .from('speakers')
-    .select('id')
-    .eq('auth_user_id', user.id)
-    .single()
-
-  if (!speaker) return { error: 'Speaker profile not found' }
-
-  const entitlements = await getSpeakerEntitlements(speaker.id)
+  const entitlements = await getSpeakerEntitlements(speakerId)
   const maxFanflets = entitlements.limits.max_fanflets
   if (typeof maxFanflets === 'number' && maxFanflets !== -1) {
     const { count, error: countError } = await supabase
       .from('fanflets')
       .select('id', { count: 'exact', head: true })
-      .eq('speaker_id', speaker.id)
+      .eq('speaker_id', speakerId)
     if (countError) return { error: 'Could not check fanflet limit' }
     if ((count ?? 0) >= maxFanflets) {
       return {
@@ -37,7 +29,7 @@ export async function cloneFanflet(
     .from('fanflets')
     .select('id, speaker_id, title, description, event_name, event_date, slug, theme_config, survey_question_id, expiration_date, expiration_preset, show_expiration_notice')
     .eq('id', sourceFanfletId)
-    .eq('speaker_id', speaker.id)
+    .eq('speaker_id', speakerId)
     .single()
 
   if (sourceError || !source) {
@@ -50,7 +42,7 @@ export async function cloneFanflet(
     const { data: existing } = await supabase
       .from('fanflets')
       .select('id')
-      .eq('speaker_id', speaker.id)
+      .eq('speaker_id', speakerId)
       .eq('slug', candidateSlug)
       .maybeSingle()
     if (!existing) break
@@ -61,7 +53,7 @@ export async function cloneFanflet(
   const { data: newFanflet, error: insertError } = await supabase
     .from('fanflets')
     .insert({
-      speaker_id: speaker.id,
+      speaker_id: speakerId,
       title: `${source.title} (Copy)`,
       description: source.description,
       event_name: source.event_name,
@@ -113,5 +105,6 @@ export async function cloneFanflet(
     }
   }
 
+  await logImpersonationAction('mutation', '/dashboard/fanflets', { action: 'cloneFanflet', source_fanflet_id: sourceFanfletId, new_fanflet_id: newFanflet.id, speaker_id: speakerId })
   return { newFanfletId: newFanflet.id }
 }

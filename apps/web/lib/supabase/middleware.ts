@@ -34,25 +34,27 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Redirect unauthenticated users from dashboard to login
-  if (
-    !user &&
-    request.nextUrl.pathname.startsWith("/dashboard")
-  ) {
+  // Redirect unauthenticated users from protected routes to login
+  const isProtected =
+    request.nextUrl.pathname.startsWith("/dashboard") ||
+    request.nextUrl.pathname.startsWith("/sponsor/dashboard") ||
+    request.nextUrl.pathname.startsWith("/sponsor/onboarding");
+  if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", request.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users from login/signup to dashboard
+  // Redirect authenticated users from login/signup to their correct portal
   if (
     user &&
     (request.nextUrl.pathname === "/login" ||
       request.nextUrl.pathname === "/signup")
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    const signupRole = user.user_metadata?.signup_role;
+    url.pathname = signupRole === "sponsor" ? "/sponsor/dashboard" : "/dashboard";
     return NextResponse.redirect(url);
   }
 

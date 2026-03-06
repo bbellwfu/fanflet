@@ -10,23 +10,25 @@ export async function subscribeToSpeaker(
 ) {
   const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("subscribers")
-    .insert({
-      email: email.toLowerCase().trim(),
-      speaker_id: speakerId,
-      source_fanflet_id: fanfletId,
-      sponsor_consent: sponsorConsent,
-    })
-    .select("id")
-    .single();
+  // Generate the ID server-side so we can return it without INSERT ... RETURNING.
+  // RETURNING requires a SELECT RLS policy, which anon users don't have on subscribers.
+  const id = crypto.randomUUID();
+
+  const { error } = await supabase.from("subscribers").insert({
+    id,
+    email: email.toLowerCase().trim(),
+    speaker_id: speakerId,
+    source_fanflet_id: fanfletId,
+    sponsor_consent: sponsorConsent,
+  });
 
   if (error) {
     if (error.code === "23505") {
       return { error: "already_subscribed" };
     }
-    return { error: error.message };
+    console.error("[subscribeToSpeaker] Supabase error:", error.code, error.message);
+    return { error: "Something went wrong. Please try again later." };
   }
 
-  return { success: true, subscriber_id: data?.id ?? undefined };
+  return { success: true, subscriber_id: id };
 }

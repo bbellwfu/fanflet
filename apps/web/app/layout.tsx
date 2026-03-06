@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import { cookies } from "next/headers";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -81,6 +82,7 @@ export default async function RootLayout({
           children
         )}
         <Toaster position="top-right" richColors />
+        <Analytics />
       </body>
     </html>
   );

@@ -22,6 +22,8 @@ export async function updateSpeakerProfile(formData: FormData) {
   const twitter = formData.get('twitter') as string
   const website = formData.get('website') as string
   const defaultThemePreset = formData.get('default_theme_preset') as string
+  const confirmationEmailEnabled = formData.get('confirmation_email_enabled') === 'true'
+  const confirmationEmailBody = (formData.get('confirmation_email_body') as string) ?? ''
 
   // Validate slug uniqueness
   const { data: existing } = await supabase
@@ -61,6 +63,10 @@ export async function updateSpeakerProfile(formData: FormData) {
     twitter: ensureUrl(twitter),
     website: ensureUrl(website),
     default_theme_preset: safeThemePreset,
+    confirmation_email: {
+      enabled: confirmationEmailEnabled,
+      body: confirmationEmailBody.trim() || undefined,
+    },
   }
   if (!removePhoto && existingPhotoFrame) {
     socialLinks.photo_frame = existingPhotoFrame

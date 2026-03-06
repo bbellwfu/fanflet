@@ -36,6 +36,7 @@ import {
   Palette,
   LayoutGrid,
   Users,
+  Mail,
 } from "lucide-react";
 import {
   updateFanfletDetails,
@@ -56,6 +57,12 @@ import {
   todayUtcDateOnly,
 } from "@/lib/expiration";
 
+type ConfirmationEmailConfig = {
+  enabled?: boolean;
+  subject?: string;
+  body?: string;
+} | null;
+
 type Fanflet = {
   id: string;
   title: string;
@@ -71,6 +78,7 @@ type Fanflet = {
   expiration_preset: string;
   show_expiration_notice: boolean;
   published_at: string | null;
+  confirmation_email_config?: ConfirmationEmailConfig;
 };
 
 type SurveyQuestion = {
@@ -231,6 +239,18 @@ export function FanfletEditor({
     fanflet.show_expiration_notice ?? true
   );
   const [activeShortcutId, setActiveShortcutId] = useState("fanflet-details-section");
+
+  // Subscriber confirmation email override
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const initialEmailConfig = fanflet.confirmation_email_config;
+  const [emailOverrideEnabled, setEmailOverrideEnabled] = useState(
+    initialEmailConfig != null && typeof initialEmailConfig.enabled === "boolean"
+  );
+  const [emailOverrideBody, setEmailOverrideBody] = useState(
+    initialEmailConfig?.body ?? ""
+  );
+  const hasEmailOverride =
+    initialEmailConfig != null && typeof initialEmailConfig.enabled === "boolean";
 
   const referenceDate = fanflet.published_at
     ? new Date(fanflet.published_at)
@@ -695,6 +715,112 @@ export function FanfletEditor({
                   </Label>
                 </div>
               </div>
+
+              {/* Subscriber Confirmation Email */}
+              <div className="space-y-2 pt-4 mt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-slate-500" />
+                    <span className="text-sm font-medium text-[#1B365D]">
+                      Subscriber Confirmation Email
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">
+                      {hasEmailOverride ? "Custom message" : "Using default"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailModal(true)}
+                      className="text-xs text-[#3BA5D9] hover:text-[#1B365D] font-medium"
+                    >
+                      {hasEmailOverride ? "Edit" : "Customize"}
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  When someone subscribes, they receive a confirmation email with a link to this Fanflet.
+                </p>
+              </div>
+
+              {/* Email Override Modal */}
+              <AlertDialog open={showEmailModal} onOpenChange={setShowEmailModal}>
+                <AlertDialogContent className="max-w-md">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Subscriber Confirmation Email</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Customize the confirmation email for this Fanflet, or use your default message from Settings.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="email_override"
+                          checked={!emailOverrideEnabled}
+                          onChange={() => setEmailOverrideEnabled(false)}
+                          className="h-4 w-4 border-slate-300 text-[#1B365D] focus:ring-[#3BA5D9]"
+                        />
+                        <span className="text-sm text-[#1B365D]">
+                          Use default message (from Settings)
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="email_override"
+                          checked={emailOverrideEnabled}
+                          onChange={() => setEmailOverrideEnabled(true)}
+                          className="h-4 w-4 border-slate-300 text-[#1B365D] focus:ring-[#3BA5D9]"
+                        />
+                        <span className="text-sm text-[#1B365D]">
+                          Custom message for this Fanflet
+                        </span>
+                      </label>
+                    </div>
+
+                    {emailOverrideEnabled && (
+                      <div className="space-y-2 pl-7">
+                        <textarea
+                          value={emailOverrideBody}
+                          onChange={(e) => setEmailOverrideBody(e.target.value.slice(0, 500))}
+                          placeholder="Thanks for attending! I hope these resources help you put what we discussed into practice."
+                          maxLength={500}
+                          rows={4}
+                          className="w-full rounded-md border border-[#e2e8f0] px-3 py-2 text-sm focus:border-[#3BA5D9] focus:outline-none focus:ring-1 focus:ring-[#3BA5D9]/30 resize-none"
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>The link to this Fanflet is always included.</span>
+                          <span>{emailOverrideBody.length}/500</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={async () => {
+                        const { updateFanfletEmailConfig } = await import("@/app/dashboard/fanflets/[id]/actions");
+                        const config = emailOverrideEnabled
+                          ? { enabled: true, body: emailOverrideBody.trim() || undefined }
+                          : null;
+                        const result = await updateFanfletEmailConfig(fanflet.id, config);
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          toast.success("Email settings saved");
+                          setShowEmailModal(false);
+                          router.refresh();
+                        }
+                      }}
+                      className="bg-[#1B365D] hover:bg-[#1B365D]/90 text-white"
+                    >
+                      Save
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {/* Slug change confirmation dialog */}
               <AlertDialog open={showSlugWarning} onOpenChange={setShowSlugWarning}>

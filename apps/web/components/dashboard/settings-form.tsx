@@ -21,6 +21,12 @@ import { getDefaultThemePreset } from "@/lib/speaker-preferences";
 import { toast } from "sonner";
 import { Check, X, Loader2, Upload, Trash2 } from "lucide-react";
 
+type ConfirmationEmailSettings = {
+  enabled?: boolean;
+  subject?: string;
+  body?: string;
+};
+
 type SpeakerProfile = {
   id: string;
   name: string | null;
@@ -33,6 +39,7 @@ type SpeakerProfile = {
     website?: string;
     photo_frame?: PhotoFrame;
     default_theme_preset?: string;
+    confirmation_email?: ConfirmationEmailSettings;
   } | null;
 };
 
@@ -80,6 +87,14 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
   const [twitter, setTwitter] = useState(speaker?.social_links?.twitter ?? "");
   const [website, setWebsite] = useState(speaker?.social_links?.website ?? "");
   const [defaultThemePreset, setDefaultThemePreset] = useState(getDefaultThemePreset(speaker?.social_links ?? null));
+
+  // Confirmation email settings
+  const [confirmationEmailEnabled, setConfirmationEmailEnabled] = useState(
+    speaker?.social_links?.confirmation_email?.enabled ?? true
+  );
+  const [confirmationEmailBody, setConfirmationEmailBody] = useState(
+    speaker?.social_links?.confirmation_email?.body ?? ""
+  );
 
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -271,6 +286,8 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
     formData.set("twitter", twitter.trim());
     formData.set("website", website.trim());
     formData.set("default_theme_preset", defaultThemePreset);
+    formData.set("confirmation_email_enabled", confirmationEmailEnabled.toString());
+    formData.set("confirmation_email_body", confirmationEmailBody);
 
     const result = await updateSpeakerProfile(formData);
 
@@ -522,6 +539,68 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
               className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Subscriber Emails */}
+      <Card id="subscriber-emails-section" className="border-[#e2e8f0]">
+        <CardHeader>
+          <CardTitle className="text-[#1B365D]">Subscriber Emails</CardTitle>
+          <CardDescription>
+            When someone subscribes to your Fanflet, they receive a confirmation email with a link to your resources.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmationEmailEnabled}
+              onChange={(e) => setConfirmationEmailEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-[#1B365D] focus:ring-[#3BA5D9]"
+            />
+            <span className="text-sm text-[#1B365D]">
+              Send confirmation emails when subscribers sign up
+            </span>
+          </label>
+
+          {confirmationEmailEnabled && (
+            <div className="space-y-2 pt-2">
+              <Label htmlFor="confirmation-email-body" className="text-[#1B365D]">
+                Custom Message (optional)
+              </Label>
+              <Textarea
+                id="confirmation-email-body"
+                value={confirmationEmailBody}
+                onChange={(e) => setConfirmationEmailBody(e.target.value.slice(0, 500))}
+                placeholder="Thanks for attending! I hope these resources help you put what we discussed into practice."
+                maxLength={500}
+                rows={4}
+                className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30 resize-none"
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  The link to your Fanflet is always included automatically.
+                </span>
+                <span>{confirmationEmailBody.length}/500</span>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setConfirmationEmailBody((prev) => prev + "{{speaker_name}}")}
+                  className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  + Speaker Name
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmationEmailBody((prev) => prev + "{{fanflet_title}}")}
+                  className="text-xs px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                >
+                  + Fanflet Title
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -41,6 +41,7 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [expirationPreset, setExpirationPreset] = useState<ExpirationPreset>("none");
   const [expirationCustomDate, setExpirationCustomDate] = useState("");
+  const [showEventName, setShowEventName] = useState(true);
   const [showExpirationNotice, setShowExpirationNotice] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -92,11 +93,11 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error("Talk title is required.");
+      toast.error("Title is required.");
       return;
     }
     if (!eventName.trim()) {
-      toast.error("Event name is required.");
+      toast.error("Event name or purpose is required.");
       return;
     }
     if (!slug.trim()) {
@@ -112,6 +113,7 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
     formData.set("slug", slug.trim());
     formData.set("expiration_preset", expirationPreset);
     formData.set("expiration_custom_date", expirationPreset === "custom" ? expirationCustomDate : "");
+    formData.set("show_event_name", showEventName ? "true" : "false");
     formData.set("show_expiration_notice", showExpirationNotice ? "true" : "false");
 
     const result = await createFanflet(formData);
@@ -136,13 +138,12 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title" className="text-[#1B365D]">
-              Talk Title <span className="text-destructive">*</span>
+              Title <span className="text-destructive">*</span>
             </Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="The Future of Patient-Centric Design"
               required
               className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30"
             />
@@ -150,16 +151,27 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
 
           <div className="space-y-2">
             <Label htmlFor="event_name" className="text-[#1B365D]">
-              Event Name <span className="text-destructive">*</span>
+              Event Name or Purpose <span className="text-destructive">*</span>
             </Label>
             <Input
               id="event_name"
               value={eventName}
               onChange={(e) => setEventName(e.target.value)}
-              placeholder="HealthTech Summit 2026"
               required
               className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30"
             />
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="show_event_name"
+                checked={showEventName}
+                onChange={(e) => setShowEventName(e.target.checked)}
+                className="h-4 w-4 rounded border-[#e2e8f0]"
+              />
+              <Label htmlFor="show_event_name" className="text-sm font-normal cursor-pointer">
+                Display event name on Fanflet page
+              </Label>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -190,7 +202,7 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
                 id="slug"
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
-                placeholder="future-of-patient-design"
+                placeholder="unique-fanflet-id"
                 className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30 font-mono flex-1"
               />
             </div>

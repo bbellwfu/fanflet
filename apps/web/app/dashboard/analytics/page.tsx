@@ -308,15 +308,17 @@ export default async function AnalyticsPage() {
             <p className="text-xs text-muted-foreground mt-1">Subscribers / Unique Views</p>
           </CardContent>
         </Card>
-        <Card className="h-full">
-          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium leading-tight">Total Subscribers</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalSubscribers.toLocaleString()}</div>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/subscribers" className="h-full">
+          <Card className="h-full transition-colors hover:border-slate-400">
+            <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium leading-tight">Total Subscribers</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalSubscribers.toLocaleString()}</div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Per-Fanflet Breakdown */}
@@ -350,10 +352,13 @@ export default async function AnalyticsPage() {
                     <p className="font-semibold text-slate-900">{f.clicks}</p>
                     <p className="text-xs">Clicks</p>
                   </div>
-                  <div className="text-left md:text-center">
+                  <Link
+                    href={`/dashboard/subscribers?source=${f.id}`}
+                    className="text-left md:text-center hover:text-[#1B365D]"
+                  >
                     <p className="font-semibold text-slate-900">{f.subscribers}</p>
-                    <p className="text-xs">Subs</p>
-                  </div>
+                    <p className="text-xs hover:underline">Subs</p>
+                  </Link>
                 </div>
                 <div
                   className={`justify-self-start md:justify-self-end text-xs font-medium px-2 py-1 rounded ${

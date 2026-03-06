@@ -3,7 +3,11 @@ import { redirect } from "next/navigation";
 import { listSubscribers } from "./actions";
 import { SubscribersDashboard } from "@/components/dashboard/subscribers-dashboard";
 
-export default async function SubscribersPage() {
+export default async function SubscribersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,6 +28,8 @@ export default async function SubscribersPage() {
   }
 
   const result = await listSubscribers();
+  const params = await searchParams;
+  const initialSource = typeof params.source === "string" ? params.source : undefined;
 
   return (
     <div className="w-full min-w-0 space-y-8 max-w-5xl mx-auto">
@@ -40,6 +46,7 @@ export default async function SubscribersPage() {
         subscribers={result.data ?? []}
         speakerName={speaker.name ?? ""}
         speakerEmail={speaker.email ?? user.email ?? ""}
+        initialSourceFilter={initialSource}
       />
     </div>
   );

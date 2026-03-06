@@ -63,6 +63,7 @@ type Fanflet = {
   description: string | null;
   event_name: string;
   event_date: string | null;
+  show_event_name?: boolean;
   resource_blocks: ResourceBlock[];
   theme_config?: Record<string, unknown> | null;
   expiration_date?: string | null;
@@ -149,7 +150,7 @@ export function LandingPage({
 
         <div className="relative z-10 px-5 sm:px-8 pt-10 sm:pt-12 pb-16 max-w-lg md:max-w-2xl mx-auto">
           {/* Event badge */}
-          {fanflet.event_name && (
+          {fanflet.show_event_name !== false && fanflet.event_name && (
             <div className="flex justify-center mb-6">
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-1.5 rounded-full text-sm font-semibold text-[var(--theme-hero-text)] border border-white/15">
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />

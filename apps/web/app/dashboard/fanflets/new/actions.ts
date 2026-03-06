@@ -39,6 +39,7 @@ export async function createFanflet(formData: FormData) {
   const title = formData.get('title') as string
   const event_name = formData.get('event_name') as string
   const event_date = formData.get('event_date') as string || null
+  const show_event_name = formData.get('show_event_name') !== 'false'
   const slug = formData.get('slug') as string
 
   const { data: existing } = await supabase
@@ -73,6 +74,7 @@ export async function createFanflet(formData: FormData) {
     title,
     event_name,
     event_date: event_date || null,
+    show_event_name,
     slug,
     status: 'draft',
     theme_config: themeConfig,

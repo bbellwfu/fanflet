@@ -67,7 +67,7 @@ export default async function FanfletsPage({
       </div>
 
       {/* Status filter */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Link
           href="/fanflets"
           className={`px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${

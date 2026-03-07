@@ -96,14 +96,14 @@ export function ConnectionRow({
 
   return (
     <>
-      <li className="py-3 flex items-center justify-between gap-4">
-        <div>
-          <p className="font-medium">{companyName}</p>
+      <li className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <p className="font-medium truncate">{companyName}</p>
           <p className="text-xs text-muted-foreground">
             {subtitle}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {canRescind && (
             <Button
               variant="ghost"

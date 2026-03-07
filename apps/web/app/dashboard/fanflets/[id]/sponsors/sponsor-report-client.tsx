@@ -110,25 +110,25 @@ export function SponsorReportClient({
       {sponsors.map((sponsor) => (
         <Card key={sponsor.id}>
           <CardHeader className="pb-2">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 min-w-0">
                 {sponsor.logo_url ? (
                   <img
                     src={sponsor.logo_url}
                     alt=""
-                    className="h-10 w-10 rounded object-contain bg-slate-50"
+                    className="h-10 w-10 rounded object-contain bg-slate-50 shrink-0"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded bg-slate-200 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded bg-slate-200 flex items-center justify-center shrink-0">
                     <Users className="w-5 h-5 text-slate-500" />
                   </div>
                 )}
-                <div>
-                  <CardTitle className="text-lg">{sponsor.company_name}</CardTitle>
+                <div className="min-w-0">
+                  <CardTitle className="text-lg truncate">{sponsor.company_name}</CardTitle>
                   <CardDescription>Sponsor engagement and leads</CardDescription>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
@@ -200,9 +200,9 @@ export function SponsorReportClient({
                       <thead>
                         <tr className="bg-slate-50">
                           <th className="text-left p-3 font-medium">Email</th>
-                          <th className="text-left p-3 font-medium">Name</th>
-                          <th className="text-left p-3 font-medium">Resource</th>
-                          <th className="text-left p-3 font-medium">Engagement</th>
+                          <th className="hidden sm:table-cell text-left p-3 font-medium">Name</th>
+                          <th className="hidden md:table-cell text-left p-3 font-medium">Resource</th>
+                          <th className="hidden md:table-cell text-left p-3 font-medium">Engagement</th>
                           <th className="text-left p-3 font-medium">Date</th>
                         </tr>
                       </thead>
@@ -210,9 +210,9 @@ export function SponsorReportClient({
                         {sponsor.leads.map((lead) => (
                           <tr key={lead.id} className="border-t border-slate-100">
                             <td className="p-3">{lead.email}</td>
-                            <td className="p-3">{lead.name ?? "—"}</td>
-                            <td className="p-3">{lead.resource_title ?? "—"}</td>
-                            <td className="p-3">{lead.engagement_type}</td>
+                            <td className="hidden sm:table-cell p-3">{lead.name ?? "—"}</td>
+                            <td className="hidden md:table-cell p-3">{lead.resource_title ?? "—"}</td>
+                            <td className="hidden md:table-cell p-3">{lead.engagement_type}</td>
                             <td className="p-3 text-muted-foreground">
                               {new Date(lead.created_at).toLocaleDateString()}
                             </td>

@@ -337,7 +337,7 @@ export function SponsorDirectory({ sponsors, speakerProfile }: SponsorDirectoryP
               rows={2}
               disabled={slugLoading}
             />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="submit" size="sm" disabled={slugLoading || !slug.trim()}>
                 {slugLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                 Send request

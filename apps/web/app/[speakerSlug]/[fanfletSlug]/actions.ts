@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendSubscriberConfirmation } from "@/lib/subscriber-confirmation";
 
@@ -35,13 +36,15 @@ export async function subscribeToSpeaker(
   console.error(`[DEBUG-e3217b] subscribeToSpeaker: insert succeeded, about to call email fn`, { fanfletId, speakerId, email: '***' });
   // #endregion
 
-  // Fire-and-forget confirmation email (don't block the response)
-  void sendConfirmationEmailForSubscription(
-    supabase,
-    fanfletId,
-    speakerId,
-    email.toLowerCase().trim()
-  );
+  // Run email work after the response is sent (keeps the serverless function alive)
+  after(async () => {
+    await sendConfirmationEmailForSubscription(
+      supabase,
+      fanfletId,
+      speakerId,
+      email.toLowerCase().trim()
+    );
+  });
 
   return { success: true, subscriber_id: id };
 }

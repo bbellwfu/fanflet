@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@fanflet/db/server";
+import { Resend } from "resend";
 import { revalidatePath } from "next/cache";
 
 export type NotificationPreferenceKey =
@@ -9,20 +10,13 @@ export type NotificationPreferenceKey =
   | "fanflet_created"
   | "onboarding_completed";
 
-export async function updateNotificationPreferences(updates: {
-  speaker_signup?: boolean;
-  sponsor_signup?: boolean;
-  fanflet_created?: boolean;
-  onboarding_completed?: boolean;
-}): Promise<{ error?: string }> {
+async function requireAdmin() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
+  if (!user) throw new Error("Not authenticated");
 
   const appMetadata = user.app_metadata ?? {};
   const { data: roleRow } = await supabase
@@ -33,15 +27,29 @@ export async function updateNotificationPreferences(updates: {
     .maybeSingle();
 
   const isAdmin = roleRow != null || appMetadata.role === "platform_admin";
-  if (!isAdmin) {
-    return { error: "Not authorized" };
+  if (!isAdmin) throw new Error("Not authorized");
+
+  return { user, supabase };
+}
+
+export async function updateNotificationPreferences(updates: {
+  speaker_signup?: boolean;
+  sponsor_signup?: boolean;
+  fanflet_created?: boolean;
+  onboarding_completed?: boolean;
+}): Promise<{ error?: string }> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
-  const { error } = await supabase
+  const { error } = await admin.supabase
     .from("admin_notification_preferences")
     .upsert(
       {
-        admin_user_id: user.id,
+        admin_user_id: admin.user.id,
         ...updates,
         updated_at: new Date().toISOString(),
       },
@@ -55,4 +63,43 @@ export async function updateNotificationPreferences(updates: {
 
   revalidatePath("/settings");
   return {};
+}
+
+export async function sendTestNotification(): Promise<{ error?: string; success?: string }> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey?.trim()) {
+    return { error: "RESEND_API_KEY is not configured on this deployment." };
+  }
+
+  const email = admin.user.email;
+  if (!email) {
+    return { error: "No email address found for your account." };
+  }
+
+  const resend = new Resend(apiKey);
+  const from = process.env.RESEND_FROM ?? "Fanflet <onboarding@resend.dev>";
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL ?? "https://admin.fanflet.com";
+
+  const { error: sendError } = await resend.emails.send({
+    from,
+    to: [email],
+    subject: "Fanflet test notification",
+    html: `<p>This is a test notification from your Fanflet admin portal.</p>
+<p>If you received this email, your notification pipeline is working correctly.</p>
+<p><a href="${adminUrl}/settings">Back to settings</a></p>`,
+  });
+
+  if (sendError) {
+    console.error("[admin settings] sendTestNotification failed:", sendError);
+    return { error: `Resend API error: ${sendError.message}` };
+  }
+
+  return { success: `Test email sent to ${email}` };
 }

@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { requireSpeaker } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
 import { notifyAdmins } from '@/lib/admin-notifications'
@@ -103,13 +104,15 @@ export async function createFanflet(formData: FormData) {
   const fanflet = result.data
 
   await logImpersonationAction('mutation', '/dashboard/fanflets/new', { action: 'createFanflet', fanflet_id: fanflet.id, speaker_id: speakerId })
-  notifyAdmins('fanflet_created', {
-    fanfletId: fanflet.id,
-    title,
-    speakerId,
-    speakerName: speaker.name ?? speaker.slug ?? '',
-    speakerEmail: speaker.email ?? '',
-  }).catch(() => {})
+  after(async () => {
+    await notifyAdmins('fanflet_created', {
+      fanfletId: fanflet.id,
+      title,
+      speakerId,
+      speakerName: speaker.name ?? speaker.slug ?? '',
+      speakerEmail: speaker.email ?? '',
+    })
+  })
 
   redirect(`/dashboard/fanflets/${fanflet.id}`)
 }

@@ -31,6 +31,10 @@ export async function subscribeToSpeaker(
     return { error: "Something went wrong. Please try again later." };
   }
 
+  // #region agent log
+  console.error(`[DEBUG-e3217b] subscribeToSpeaker: insert succeeded, about to call email fn`, { fanfletId, speakerId, email: '***' });
+  // #endregion
+
   // Fire-and-forget confirmation email (don't block the response)
   void sendConfirmationEmailForSubscription(
     supabase,
@@ -52,6 +56,9 @@ async function sendConfirmationEmailForSubscription(
   speakerId: string,
   subscriberEmail: string
 ): Promise<void> {
+  // #region agent log
+  console.error(`[DEBUG-e3217b] sendConfirmationEmailForSubscription: ENTERED`, { fanfletId, speakerId });
+  // #endregion
   try {
     // Fetch fanflet with speaker in a single query
     const { data: fanflet, error: fanfletError } = await supabase
@@ -73,6 +80,9 @@ async function sendConfirmationEmailForSubscription(
       .eq("speaker_id", speakerId)
       .single();
 
+    // #region agent log
+    console.error(`[DEBUG-e3217b] sendConfirmationEmailForSubscription: query result`, { hasFanflet: !!fanflet, fanfletError: fanfletError?.message ?? null, fanfletTitle: fanflet?.title ?? null });
+    // #endregion
     if (fanfletError || !fanflet) {
       console.error("[sendConfirmationEmail] Failed to fetch fanflet:", fanfletError?.message);
       return;

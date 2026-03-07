@@ -140,8 +140,10 @@ function getAdminUrl(): string {
 
 /**
  * Notify admins who have opted in for the given event. Sends one email per
- * admin. Fire-and-forget: does not throw; logs and returns on missing config
- * or errors.
+ * admin. Does not throw; logs and returns on missing config or errors.
+ *
+ * IMPORTANT: Call this inside next/server `after()` so the serverless function
+ * stays alive long enough to complete the async email work.
  */
 export async function notifyAdmins(
   event: AdminNotificationEvent,
@@ -150,20 +152,26 @@ export async function notifyAdmins(
   try {
     const resend = getResendClient();
     if (!resend) {
-      if (process.env.NODE_ENV === "development") {
-        console.log("[admin-notifications] RESEND_API_KEY not set; skipping email");
-      }
+      console.warn("[admin-notifications] RESEND_API_KEY not set; skipping", event);
       return;
     }
 
     const emails = await getAdminEmailsForEvent(event);
-    if (emails.length === 0) return;
+    if (emails.length === 0) {
+      console.warn("[admin-notifications] No admin emails found for event:", event);
+      return;
+    }
 
     const { subject, html } = buildSubjectAndBody(event, payload);
     const from = getFromAddress();
 
-    await resend.emails.send({ from, to: emails, subject, html });
+    const { error } = await resend.emails.send({ from, to: emails, subject, html });
+    if (error) {
+      console.error("[admin-notifications] Resend API error for", event, ":", error);
+    } else {
+      console.log("[admin-notifications] Sent", event, "to", emails.length, "admin(s)");
+    }
   } catch (err) {
-    console.error("[admin-notifications] Failed to send:", err);
+    console.error("[admin-notifications] Failed to send", event, ":", err);
   }
 }

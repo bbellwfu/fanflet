@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -77,11 +78,13 @@ export default async function DashboardLayout({
       publishedFanfletCount > 0;
 
     if (allOnboardingComplete && !isOnboardingNotificationSent(speaker.social_links ?? null)) {
-      notifyAdmins("onboarding_completed", {
-        speakerId: speaker.id,
-        speakerName: speaker.name ?? "",
-        speakerEmail: speaker.email ?? "",
-      }).catch(() => {});
+      after(async () => {
+        await notifyAdmins("onboarding_completed", {
+          speakerId: speaker.id,
+          speakerName: speaker.name ?? "",
+          speakerEmail: speaker.email ?? "",
+        })
+      });
 
       const currentSocialLinks = (speaker.social_links && typeof speaker.social_links === "object")
         ? (speaker.social_links as Record<string, unknown>)

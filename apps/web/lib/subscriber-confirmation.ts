@@ -181,9 +181,15 @@ function getFromAddress(): string {
  * logs errors and returns silently on missing config or failures.
  */
 export async function sendConfirmationEmail(data: ConfirmationEmailData): Promise<void> {
+  // #region agent log
+  console.error(`[DEBUG-e3217b] sendConfirmationEmail: ENTERED`, { fanfletUrl: data.fanfletUrl, hasResendKey: !!process.env.RESEND_API_KEY, resendKeyLength: process.env.RESEND_API_KEY?.length ?? 0, fromAddress: getFromAddress(), nodeEnv: process.env.NODE_ENV });
+  // #endregion
   try {
     const resend = getResendClient();
     if (!resend) {
+      // #region agent log
+      console.error(`[DEBUG-e3217b] sendConfirmationEmail: NO RESEND CLIENT — key missing or empty`);
+      // #endregion
       if (process.env.NODE_ENV === "development") {
         console.log("[subscriber-confirmation] RESEND_API_KEY not set; skipping email");
         console.log("[subscriber-confirmation] Would send to:", data.subscriberEmail);
@@ -194,13 +200,22 @@ export async function sendConfirmationEmail(data: ConfirmationEmailData): Promis
 
     const subject = replaceTokens(data.customSubject || DEFAULT_SUBJECT, data);
     const html = buildEmailHtml(data);
+    const from = getFromAddress();
 
-    const { error } = await resend.emails.send({
-      from: getFromAddress(),
+    // #region agent log
+    console.error(`[DEBUG-e3217b] sendConfirmationEmail: about to call resend.emails.send`, { from, subject });
+    // #endregion
+
+    const { error, data: sendResult } = await resend.emails.send({
+      from,
       to: data.subscriberEmail,
       subject,
       html,
     });
+
+    // #region agent log
+    console.error(`[DEBUG-e3217b] sendConfirmationEmail: Resend response`, { error: error ?? null, sendResultId: sendResult?.id ?? null });
+    // #endregion
 
     if (error) {
       console.error("[subscriber-confirmation] Resend error:", error);
@@ -238,7 +253,14 @@ export interface SendConfirmationParams {
 export async function sendSubscriberConfirmation(params: SendConfirmationParams): Promise<void> {
   const { fanflet, speaker, subscriberEmail } = params;
 
+  // #region agent log
+  console.error(`[DEBUG-e3217b] sendSubscriberConfirmation: ENTERED`, { fanfletTitle: fanflet.title, speakerSlug: speaker.slug, email: '***' });
+  // #endregion
+
   const config = getConfirmationEmailConfig(fanflet, speaker);
+  // #region agent log
+  console.error(`[DEBUG-e3217b] sendSubscriberConfirmation: config resolved`, { enabled: config.enabled, hasSubject: !!config.subject, hasBody: !!config.body });
+  // #endregion
   if (!config.enabled) {
     return;
   }

@@ -101,7 +101,7 @@ export function QRDownload({
               alt="QR code preview"
               width={400}
               height={400}
-              className="rounded-lg border border-slate-200"
+              className="rounded-lg border border-slate-200 max-w-full h-auto"
             />
           </div>
 

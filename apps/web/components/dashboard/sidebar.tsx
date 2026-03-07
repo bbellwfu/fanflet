@@ -172,7 +172,7 @@ export function Sidebar({
   const showChecklistPanel = hasPendingChecklistSteps && (!isChecklistDismissed || pathname === "/dashboard");
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
         <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} />
@@ -198,7 +198,7 @@ export function Sidebar({
           </Sheet>
         </header>
 
-        <div className="flex-1 p-6 md:p-8">
+        <div className="flex-1 p-4 sm:p-6 md:p-8">
           <div className="mx-auto max-w-[1400px]">
             {showChecklistPanel && (
               <div className="xl:hidden mb-4">

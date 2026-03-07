@@ -191,19 +191,16 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
             <Label htmlFor="slug" className="text-[#1B365D]">
               URL Slug
             </Label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground whitespace-nowrap shrink-0">
-                fanflet.com/
-              </span>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
               <span className="text-sm text-muted-foreground">
-                {speakerSlug ? `${speakerSlug}/` : "[your-slug]/"}
+                fanflet.com/{speakerSlug ? `${speakerSlug}/` : "[your-slug]/"}
               </span>
               <Input
                 id="slug"
                 value={slug}
                 onChange={(e) => handleSlugChange(e.target.value)}
                 placeholder="unique-fanflet-id"
-                className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30 font-mono flex-1"
+                className="border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30 font-mono sm:flex-1"
               />
             </div>
             <p className="text-xs text-muted-foreground">

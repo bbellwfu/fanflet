@@ -225,6 +225,7 @@ export default async function FanfletsPage() {
                         Edit
                       </Link>
                     </Button>
+                    <CloneFanfletButton fanfletId={fanflet.id} />
                     {viewUrl && (
                       <Button variant="outline" size="sm" asChild>
                         <a href={viewUrl} target="_blank" rel="noopener noreferrer">
@@ -233,7 +234,6 @@ export default async function FanfletsPage() {
                         </a>
                       </Button>
                     )}
-                    <CloneFanfletButton fanfletId={fanflet.id} />
                   </div>
                 </CardContent>
               </Card>

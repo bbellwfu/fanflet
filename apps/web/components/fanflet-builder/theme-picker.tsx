@@ -20,7 +20,7 @@ export function ThemePicker({
   upgradeHref = "/pricing",
 }: ThemePickerProps) {
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {THEME_PRESETS.map((theme) => {
         const isSelected = selectedThemeId === theme.id;
         const isBaseTheme = theme.id === DEFAULT_THEME_ID;

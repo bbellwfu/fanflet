@@ -123,13 +123,13 @@ export default async function WaitingListPage({
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Email
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Source
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Interest
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Signed up
                 </th>
               </tr>
@@ -143,7 +143,7 @@ export default async function WaitingListPage({
                   <td className="px-5 py-3.5 text-fg whitespace-nowrap align-middle">
                     {row.email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary text-[12px] align-middle">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-secondary text-[12px] align-middle">
                     {row.source}
                   </td>
                   <td className="px-5 py-3.5 whitespace-nowrap align-middle">
@@ -161,7 +161,7 @@ export default async function WaitingListPage({
                       <span className="text-fg-muted">—</span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(row.created_at).toLocaleDateString()}
                   </td>
                 </tr>

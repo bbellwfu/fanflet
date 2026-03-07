@@ -625,13 +625,13 @@ export function ResourceBlockCard({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={handleMoveUp}
             disabled={isFirst}
-            className="h-8 w-8"
+            className="h-10 w-10 md:h-8 md:w-8"
           >
             <ChevronUp className="w-4 h-4" />
           </Button>
@@ -640,7 +640,7 @@ export function ResourceBlockCard({
             size="icon-sm"
             onClick={handleMoveDown}
             disabled={isLast}
-            className="h-8 w-8"
+            className="h-10 w-10 md:h-8 md:w-8"
           >
             <ChevronDown className="w-4 h-4" />
           </Button>
@@ -648,7 +648,7 @@ export function ResourceBlockCard({
             variant="ghost"
             size="icon-sm"
             onClick={() => setEditing(true)}
-            className="h-8 w-8"
+            className="h-10 w-10 md:h-8 md:w-8"
           >
             <Pencil className="w-4 h-4" />
           </Button>
@@ -657,7 +657,7 @@ export function ResourceBlockCard({
             size="icon-sm"
             onClick={handleDelete}
             disabled={deleting}
-            className="h-8 w-8 text-destructive hover:text-destructive"
+            className="h-10 w-10 md:h-8 md:w-8 text-destructive hover:text-destructive"
           >
             {deleting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

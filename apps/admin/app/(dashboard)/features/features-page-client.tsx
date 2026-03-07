@@ -72,7 +72,7 @@ export function FeaturesPageClient({
         </p>
       </div>
 
-      <div className="flex gap-1 p-1 rounded-lg bg-surface-elevated border border-border-subtle w-fit">
+      <div className="flex gap-1 p-1 rounded-lg bg-surface-elevated border border-border-subtle w-fit overflow-x-auto scrollbar-hide">
         <button
           type="button"
           onClick={() => setActiveTab("features")}

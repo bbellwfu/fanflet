@@ -139,6 +139,14 @@ When reviewing PRs, prioritize:
 4. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
 5. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)
 
+## Security & Infrastructure Audits
+
+For security audits, use Supabase and Vercel MCP tools directly (not via agents) to inspect live infrastructure:
+- **Supabase MCP**: Execute SQL to audit RLS policies, list tables, check storage bucket configs, review auth settings, inspect logs
+- **Vercel MCP**: Inspect project settings, environment variables, deployment configs, security headers
+- **npm audit**: Run `npm audit --audit-level=high` for dependency vulnerabilities
+- **Codebase scanning**: Use Grep/Read to check for service role key exposure, missing input validation, PII leaks in logs/analytics
+
 ## Implementation Status (AI and CI)
 
 **Canonical project context and implementation status:** This document. For the full AI Team Lead phase plan, cost analysis, and decisions, see `AI_TEAM_LEAD_VISION.md`.
@@ -154,13 +162,9 @@ When reviewing PRs, prioritize:
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | PR to main/develop, push to develop | Lint, type-check, build, migration idempotency check |
-| `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations to linked Supabase project (dev on develop, prod on main) |
-| `claude-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | AI code review using ANTHROPIC_API_KEY, Sonnet, CLAUDE.md + engineering guidelines |
-| `security-review.yml` | Manual (`workflow_dispatch`) only — PR triggers commented out | Security scan using anthropics/claude-code-security-review |
-| `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App |
-| `claude-code-review.yml` | PR opened/synchronized/reopened | Code review on every PR using CLAUDE_CODE_OAUTH_TOKEN and code-review plugin |
-
-So there are two review setups: (1) `claude-review.yml` (API key, custom prompt, manual run) and (2) `claude-code-review.yml` (OAuth, plugin, runs automatically on PR).
+| `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations with `--include-all` to linked Supabase project (dev on develop, prod on main) |
+| `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App (CLAUDE_CODE_OAUTH_TOKEN) |
+| `claude-code-review.yml` | Manual (`workflow_dispatch`) | Plugin-based code review using CLAUDE_CODE_OAUTH_TOKEN; invoke manually or via `@claude` |
 
 ### Branch protection
 
@@ -188,7 +192,6 @@ Branch protection on `main` and `develop` is not configured (no required status 
 - **Sponsor portal UI**: Build the sponsor-facing app, connection discovery/search, and resource sharing interface. Schema is ready (see `docs/SPONSOR_PORTAL_ARCHITECTURE.md`).
 - **Email sending integration**: The subscriber email compose currently opens the user's email client via `mailto:`. Wire up a server-side email service (e.g., Resend) for in-app sending with templates and tracking.
 - **Twilio verification**: The toll-free number requires Twilio verification before it can send to unverified numbers. Trial accounts are limited to verified caller IDs.
-- Re-enable PR triggers in `claude-review.yml` and `security-review.yml` if you want automated AI review and security checks on every PR.
 - Add `npm audit --audit-level=high` and gitleaks to `ci.yml` per engineering guidelines.
 - Optionally configure branch protection (required status checks) once the check suite is stable.
 - Optionally add a promote-to-production workflow (develop → main PR creation and checks) as in Phase 3 of the vision doc.

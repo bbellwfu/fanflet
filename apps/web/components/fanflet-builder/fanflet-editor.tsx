@@ -403,7 +403,7 @@ export function FanfletEditor({
   return (
     <div className="w-full">
       {/* Sticky header bar */}
-      <div className="sticky top-16 md:top-0 z-30 bg-slate-50 -mx-6 md:-mx-8 px-6 md:px-8 pt-2 pb-4 border-b border-slate-200/80">
+      <div className="sticky top-16 md:top-0 z-30 bg-slate-50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 pt-2 pb-4 border-b border-slate-200/80">
         <div className="w-full">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" className="shrink-0">
@@ -422,59 +422,63 @@ export function FanfletEditor({
             {statusBadge}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            {fanflet.status === "draft" && (
-              <Button
-                size="sm"
-                onClick={handlePublish}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Publish
-              </Button>
-            )}
-            {fanflet.status === "published" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleUnpublish}
-              >
-                Unpublish
-              </Button>
-            )}
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/dashboard/fanflets/${fanflet.id}/preview`} target="_blank">
-                <Eye className="w-4 h-4" />
-                Preview
-              </Link>
-            </Button>
-            {fanflet.status === "published" && publicUrl && (
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 mt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {fanflet.status === "draft" && (
+                <Button
+                  size="sm"
+                  onClick={handlePublish}
+                  className="hidden md:inline-flex bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  Publish
+                </Button>
+              )}
+              {fanflet.status === "published" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleUnpublish}
+                >
+                  Unpublish
+                </Button>
+              )}
               <Button size="sm" variant="outline" asChild>
-                <a href={`${publicUrl}?preview`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4" />
-                  View Live
-                </a>
-              </Button>
-            )}
-            <Button size="sm" variant="outline" asChild>
-              <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
-                <QrCode className="w-4 h-4" />
-                QR Code
-              </Link>
-            </Button>
-            {hasSponsorReports && (
-              <Button size="sm" variant="outline" asChild>
-                <Link href={`/dashboard/fanflets/${fanflet.id}/sponsors`}>
-                  <Users className="w-4 h-4" />
-                  Sponsor report
+                <Link href={`/dashboard/fanflets/${fanflet.id}/preview`} target="_blank">
+                  <Eye className="w-4 h-4" />
+                  Preview
                 </Link>
               </Button>
-            )}
-            <div className="flex-1" />
+              {fanflet.status === "published" && publicUrl && (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={`${publicUrl}?preview`} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="w-4 h-4" />
+                    View Live
+                  </a>
+                </Button>
+              )}
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
+                  <QrCode className="w-4 h-4" />
+                  <span className="hidden sm:inline">QR Code</span>
+                  <span className="sm:hidden">QR</span>
+                </Link>
+              </Button>
+              {hasSponsorReports && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={`/dashboard/fanflets/${fanflet.id}/sponsors`}>
+                    <Users className="w-4 h-4" />
+                    <span className="hidden sm:inline">Sponsor report</span>
+                    <span className="sm:hidden">Sponsors</span>
+                  </Link>
+                </Button>
+              )}
+            </div>
+            <div className="hidden sm:block sm:flex-1" />
             <Button
               size="sm"
               onClick={handleSaveClick}
               disabled={saving}
-              className="bg-[#1B365D] hover:bg-[#152b4d]"
+              className="hidden md:inline-flex bg-[#1B365D] hover:bg-[#152b4d]"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -484,58 +488,58 @@ export function FanfletEditor({
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-slate-200">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+          <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500 shrink-0">
               Shortcuts
             </span>
-            <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 p-1 shadow-sm">
+            <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-gradient-to-r from-slate-100 to-slate-50 p-1 shadow-sm overflow-x-auto scrollbar-hide">
               <button
                 type="button"
                 onClick={() => scrollToSection("fanflet-details-section")}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
                   activeShortcutId === "fanflet-details-section"
                     ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
                     : "text-slate-600 hover:bg-white hover:text-slate-900"
                 }`}
               >
-                <FileText className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5 shrink-0" />
                 Details
               </button>
               <button
                 type="button"
                 onClick={() => scrollToSection("fanflet-theme-section")}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
                   activeShortcutId === "fanflet-theme-section"
                     ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
                     : "text-slate-600 hover:bg-white hover:text-slate-900"
                 }`}
               >
-                <Palette className="h-3.5 w-3.5" />
+                <Palette className="h-3.5 w-3.5 shrink-0" />
                 Theme
               </button>
               <button
                 type="button"
                 onClick={() => scrollToSection("fanflet-feedback-section")}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
                   activeShortcutId === "fanflet-feedback-section"
                     ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
                     : "text-slate-600 hover:bg-white hover:text-slate-900"
                 }`}
               >
-                <MessageSquare className="h-3.5 w-3.5" />
-                Feedback Question
+                <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+                Feedback
               </button>
               <button
                 type="button"
                 onClick={() => scrollToSection("fanflet-resource-blocks-section")}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all ${
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
                   activeShortcutId === "fanflet-resource-blocks-section"
                     ? "bg-[#1B365D] text-white shadow-sm ring-1 ring-[#1B365D]/20"
                     : "text-slate-600 hover:bg-white hover:text-slate-900"
                 }`}
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                Resource Blocks
+                <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+                Resources
               </button>
             </div>
           </div>
@@ -555,7 +559,7 @@ export function FanfletEditor({
         </div>
       )}
 
-      <div className="space-y-8 mt-6">
+      <div className="space-y-8 mt-6 pb-24 md:pb-0">
 
       {/* Details section */}
       <Card id="fanflet-details-section" className="border-slate-200">
@@ -617,7 +621,7 @@ export function FanfletEditor({
               </div>
               <div className="space-y-2">
                 <Label>URL Slug</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                   <span className="text-sm text-muted-foreground">
                     fanflet.com/{speakerSlug || "your-slug"}/
                   </span>
@@ -632,7 +636,7 @@ export function FanfletEditor({
                       )
                     }
                     placeholder="talk-slug"
-                    className="border-[#e2e8f0] font-mono flex-1"
+                    className="border-[#e2e8f0] font-mono sm:flex-1"
                   />
                 </div>
                 {slugChanged && fanflet.status === "published" && (
@@ -997,6 +1001,39 @@ export function FanfletEditor({
           />
         </div>
       </div>
+      </div>
+
+      {/* Mobile fixed bottom action bar */}
+      <div className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-white border-t border-slate-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center gap-2">
+          {fanflet.status === "draft" ? (
+            <Button
+              size="sm"
+              onClick={handlePublish}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              Publish
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={handleSaveClick}
+              disabled={saving}
+              className="flex-1 bg-[#1B365D] hover:bg-[#152b4d]"
+            >
+              {saving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          )}
+          <Button size="sm" variant="outline" asChild>
+            <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
+              <QrCode className="w-4 h-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

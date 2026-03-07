@@ -271,7 +271,7 @@ export default async function AccountDetailPage({
                   </span>
                   <FanfletStatusBadge status={fanflet.status} />
                 </div>
-                <div className="flex items-center gap-3 text-[12px] text-fg-muted shrink-0 ml-4">
+                <div className="flex items-center gap-3 text-[12px] text-fg-muted shrink-0 ml-4 max-sm:hidden">
                   <span>
                     {new Date(fanflet.created_at).toLocaleDateString()}
                   </span>

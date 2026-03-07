@@ -58,13 +58,13 @@ export default async function SubscribersPage() {
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Email
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted whitespace-nowrap">
                   Name
                 </th>
                 <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Speaker (account)
                 </th>
-                <th className="px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
+                <th className="hidden sm:table-cell px-5 py-3 text-left text-[12px] font-medium uppercase tracking-wider text-fg-muted">
                   Signed up
                 </th>
               </tr>
@@ -78,7 +78,7 @@ export default async function SubscribersPage() {
                   <td className="px-5 py-3.5 text-fg whitespace-nowrap align-middle">
                     {sub.email}
                   </td>
-                  <td className="px-5 py-3.5 text-fg-secondary align-middle">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-fg-secondary align-middle">
                     {sub.name ?? "—"}
                   </td>
                   <td className="px-5 py-3.5 align-middle">
@@ -89,7 +89,7 @@ export default async function SubscribersPage() {
                       {sub.speakers?.name || sub.speakers?.email || "—"}
                     </Link>
                   </td>
-                  <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
+                  <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                     {new Date(sub.created_at).toLocaleDateString()}
                   </td>
                 </tr>

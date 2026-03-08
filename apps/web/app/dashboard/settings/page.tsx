@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@fanflet/db/service";
 import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { SettingsForm } from "@/components/dashboard/settings-form";
+import { NotificationPreferences } from "@/components/dashboard/notification-preferences";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +26,18 @@ export default async function SettingsPage() {
   const allowMultipleThemes = entitlements?.features.has("multiple_theme_colors") ?? false;
   const currentPlanDisplayName = entitlements?.planDisplayName ?? "Free";
 
+  let platformAnnouncementsOptedIn = false;
+  if (speaker) {
+    const serviceSupabase = createServiceClient();
+    const { data: pref } = await serviceSupabase
+      .from("platform_communication_preferences")
+      .select("opted_in")
+      .eq("speaker_id", speaker.id)
+      .eq("category", "platform_announcements")
+      .maybeSingle();
+    platformAnnouncementsOptedIn = pref?.opted_in ?? false;
+  }
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
         <div>
@@ -41,6 +55,8 @@ export default async function SettingsPage() {
           userEmail={user.email ?? ""}
           allowMultipleThemes={allowMultipleThemes}
         />
+
+        <NotificationPreferences initialOptedIn={platformAnnouncementsOptedIn} />
 
         <Card id="subscription" className="border-[#e2e8f0]">
           <CardHeader>

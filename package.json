@@ -22,6 +22,7 @@
     "test": "turbo test"
   },
   "devDependencies": {
+    "playwright": "^1.58.2",
     "supabase": "^2.76.9",
     "turbo": "^2"
   },

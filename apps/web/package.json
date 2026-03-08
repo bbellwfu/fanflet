@@ -11,6 +11,7 @@
   "dependencies": {
     "@fanflet/core": "*",
     "@fanflet/db": "*",
+    "@fanflet/mcp": "*",
     "@fanflet/types": "*",
     "@fanflet/ui": "*",
     "@hookform/resolvers": "^5.2.2",

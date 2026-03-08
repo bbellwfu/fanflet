@@ -34,8 +34,8 @@ Thumbs.db
 # Local files (not part of repo)
 _local/
 
-# Local MCP config
-mcp/
+# Local MCP config (root level only)
+/mcp/
 
 # Debug logs
 npm-debug.log*

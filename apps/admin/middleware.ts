@@ -39,7 +39,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/auth/callback") ||
     pathname.startsWith("/api/auth");
 
-  if (isLoginOrCallback) {
+  const isMcpRoute =
+    pathname.startsWith("/api/mcp") ||
+    pathname.startsWith("/.well-known/");
+
+  if (isLoginOrCallback || isMcpRoute) {
     return supabaseResponse;
   }
 

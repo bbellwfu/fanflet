@@ -1,5 +1,5 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
-import { type NextRequest, NextResponse } from 'next/server'
+import { type NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/admin-notifications'
 
@@ -31,11 +31,13 @@ export async function GET(request: NextRequest) {
             .eq('auth_user_id', user.id)
             .maybeSingle()
           if (speaker) {
-            notifyAdmins('speaker_signup', {
-              speakerId: speaker.id,
-              email: speaker.email ?? user.email ?? '',
-              name: speaker.name ?? '',
-            }).catch(() => {})
+            after(async () => {
+              await notifyAdmins('speaker_signup', {
+                speakerId: speaker.id,
+                email: speaker.email ?? user.email ?? '',
+                name: speaker.name ?? '',
+              })
+            })
           }
         }
       }

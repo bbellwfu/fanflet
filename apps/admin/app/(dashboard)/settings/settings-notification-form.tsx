@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { updateNotificationPreferences } from "./actions";
+import { updateNotificationPreferences, sendTestNotification } from "./actions";
 
 interface NotificationPreferences {
   speaker_signup: boolean;
@@ -67,6 +67,7 @@ function NotificationToggle({
 export function SettingsNotificationForm({ initial }: SettingsNotificationFormProps) {
   const [prefs, setPrefs] = useState<NotificationPreferences>(initial);
   const [saving, setSaving] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
 
   const handleToggle = async (key: keyof NotificationPreferences, value: boolean) => {
     const next = { ...prefs, [key]: value };
@@ -82,39 +83,71 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
     }
   };
 
+  const handleSendTest = async () => {
+    setSendingTest(true);
+    const result = await sendTestNotification();
+    setSendingTest(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.success) {
+      toast.success(result.success);
+    }
+  };
+
   return (
-    <div className="rounded-lg border border-border-subtle bg-surface overflow-hidden max-w-xl">
-      <div className="px-5 py-4 border-b border-border-subtle">
-        <h2 className="text-sm font-semibold text-fg">Notification preferences</h2>
-        <p className="text-[12px] text-fg-muted mt-1">
-          Choose which platform events trigger an email to you. Email is sent via Resend when configured.
-        </p>
-      </div>
-      <div className="divide-y divide-border-subtle">
-        {(Object.keys(LABELS) as (keyof NotificationPreferences)[]).map((key) => (
-          <div
-            key={key}
-            className="px-5 py-4 flex items-center justify-between"
-          >
-            <label
-              htmlFor={key}
-              className="min-w-0 flex-1 mr-6 text-[13px] font-semibold text-fg cursor-pointer"
+    <div className="space-y-6 max-w-xl">
+      <div className="rounded-lg border border-border-subtle bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle">
+          <h2 className="text-sm font-semibold text-fg">Notification preferences</h2>
+          <p className="text-[12px] text-fg-muted mt-1">
+            Choose which platform events trigger an email to you. Email is sent via Resend when configured.
+          </p>
+        </div>
+        <div className="divide-y divide-border-subtle">
+          {(Object.keys(LABELS) as (keyof NotificationPreferences)[]).map((key) => (
+            <div
+              key={key}
+              className="px-5 py-4 flex items-center justify-between"
             >
-              {LABELS[key]}
-            </label>
-            <NotificationToggle
-              id={key}
-              checked={prefs[key]}
-              disabled={saving}
-              onChange={() => handleToggle(key, !prefs[key])}
-              ariaLabel={`${LABELS[key]}: ${prefs[key] ? "on" : "off"}`}
-            />
-          </div>
-        ))}
+              <label
+                htmlFor={key}
+                className="min-w-0 flex-1 mr-6 text-[13px] font-semibold text-fg cursor-pointer"
+              >
+                {LABELS[key]}
+              </label>
+              <NotificationToggle
+                id={key}
+                checked={prefs[key]}
+                disabled={saving}
+                onChange={() => handleToggle(key, !prefs[key])}
+                ariaLabel={`${LABELS[key]}: ${prefs[key] ? "on" : "off"}`}
+              />
+            </div>
+          ))}
+        </div>
+        {saving && (
+          <p className="px-5 pb-4 text-xs text-fg-muted">Saving…</p>
+        )}
       </div>
-      {saving && (
-        <p className="px-5 pb-4 text-xs text-fg-muted">Saving…</p>
-      )}
+
+      <div className="rounded-lg border border-border-subtle bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle">
+          <h2 className="text-sm font-semibold text-fg">Test delivery</h2>
+          <p className="text-[12px] text-fg-muted mt-1">
+            Send a test email to verify notifications are working end-to-end.
+          </p>
+        </div>
+        <div className="px-5 py-4">
+          <button
+            type="button"
+            onClick={handleSendTest}
+            disabled={sendingTest}
+            className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-lg bg-primary text-primary-fg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {sendingTest ? "Sending…" : "Send test email"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

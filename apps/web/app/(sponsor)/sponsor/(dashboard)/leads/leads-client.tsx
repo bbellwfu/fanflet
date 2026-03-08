@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Download, Loader2 } from "lucide-react";
 import { exportSponsorLeadsCsv } from "./actions";
 import { toast } from "sonner";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 type Lead = {
   id: string;
@@ -23,6 +25,7 @@ interface SponsorLeadsClientProps {
 }
 
 export function SponsorLeadsClient({ leads }: SponsorLeadsClientProps) {
+  const timezone = useTimezone();
   const [exporting, setExporting] = useState(false);
   const [filter, setFilter] = useState("");
 
@@ -104,7 +107,7 @@ export function SponsorLeadsClient({ leads }: SponsorLeadsClientProps) {
                   <td className="p-3">{lead.resourceTitle ?? "—"}</td>
                   <td className="p-3">{lead.engagementType}</td>
                   <td className="p-3 text-muted-foreground">
-                    {new Date(lead.createdAt).toLocaleDateString()}
+                    {formatDate(lead.createdAt, timezone)}
                   </td>
                 </tr>
               ))

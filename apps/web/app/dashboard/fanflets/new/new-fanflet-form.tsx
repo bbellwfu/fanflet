@@ -15,6 +15,8 @@ import {
   FREE_TIER_EXPIRATION_PRESETS,
   computeExpirationDate,
 } from "@/lib/expiration";
+import { formatDateLong } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 function slugify(text: string): string {
   return text
@@ -33,6 +35,7 @@ interface NewFanfletFormProps {
 }
 
 export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: NewFanfletFormProps) {
+  const timezone = useTimezone();
   const searchParams = useSearchParams();
   const [title, setTitle] = useState("");
   const [eventName, setEventName] = useState("");
@@ -252,11 +255,7 @@ export function NewFanfletForm({ speakerSlug, allowCustomExpiration = true }: Ne
             {(expirationPreset !== "none" && computedExpirationDate) && (
               <p className="text-sm text-muted-foreground">
                 This Fanflet will expire on{" "}
-                {new Date(computedExpirationDate + "T12:00:00Z").toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
+                {formatDateLong(computedExpirationDate + "T12:00:00Z", timezone)}
                 .
               </p>
             )}

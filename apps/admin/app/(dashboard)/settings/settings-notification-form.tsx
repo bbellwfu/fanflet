@@ -2,16 +2,22 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { updateNotificationPreferences, sendTestNotification } from "./actions";
+import { updateNotificationPreferences, updateAdminTimezone, sendTestNotification } from "./actions";
+import { TimezonePicker } from "@fanflet/ui/timezone-picker";
+import { TIMEZONE_OPTIONS, getBrowserTimezone } from "@fanflet/db/timezone";
 
-interface NotificationPreferences {
+interface NotificationToggles {
   speaker_signup: boolean;
   sponsor_signup: boolean;
   fanflet_created: boolean;
   onboarding_completed: boolean;
 }
 
-const LABELS: Record<keyof NotificationPreferences, string> = {
+interface AdminPreferences extends NotificationToggles {
+  timezone: string | null;
+}
+
+const LABELS: Record<keyof NotificationToggles, string> = {
   speaker_signup: "New speaker signup",
   sponsor_signup: "New sponsor signup",
   fanflet_created: "Speaker creates a Fanflet",
@@ -19,10 +25,9 @@ const LABELS: Record<keyof NotificationPreferences, string> = {
 };
 
 interface SettingsNotificationFormProps {
-  initial: NotificationPreferences;
+  initial: AdminPreferences;
 }
 
-/** Same toggle control as Features & Plans (feature-toggle.tsx): h-6 w-11, bg-primary | bg-surface-hover, thumb h-4 w-4. */
 function NotificationToggle({
   checked,
   disabled,
@@ -65,11 +70,18 @@ function NotificationToggle({
 }
 
 export function SettingsNotificationForm({ initial }: SettingsNotificationFormProps) {
-  const [prefs, setPrefs] = useState<NotificationPreferences>(initial);
+  const [prefs, setPrefs] = useState<NotificationToggles>({
+    speaker_signup: initial.speaker_signup,
+    sponsor_signup: initial.sponsor_signup,
+    fanflet_created: initial.fanflet_created,
+    onboarding_completed: initial.onboarding_completed,
+  });
   const [saving, setSaving] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [timezone, setTimezone] = useState(initial.timezone ?? getBrowserTimezone());
+  const [savingTimezone, setSavingTimezone] = useState(false);
 
-  const handleToggle = async (key: keyof NotificationPreferences, value: boolean) => {
+  const handleToggle = async (key: keyof NotificationToggles, value: boolean) => {
     const next = { ...prefs, [key]: value };
     setPrefs(next);
     setSaving(true);
@@ -94,8 +106,42 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
     }
   };
 
+  const handleTimezoneChange = async (value: string) => {
+    setTimezone(value);
+    setSavingTimezone(true);
+    const result = await updateAdminTimezone(value);
+    setSavingTimezone(false);
+    if (result.error) {
+      toast.error(result.error);
+      setTimezone(timezone);
+    } else {
+      toast.success("Timezone saved");
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-xl">
+      <div className="rounded-lg border border-border-subtle bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle">
+          <h2 className="text-sm font-semibold text-fg">Timezone</h2>
+          <p className="text-[12px] text-fg-muted mt-1">
+            Dates and times across the admin dashboard are displayed in this timezone.
+          </p>
+        </div>
+        <div className="px-5 py-4">
+          <TimezonePicker
+            value={timezone}
+            onValueChange={handleTimezoneChange}
+            options={TIMEZONE_OPTIONS}
+            disabled={savingTimezone}
+            className="w-full max-w-sm"
+          />
+          {savingTimezone && (
+            <p className="text-xs text-fg-muted mt-2">Saving...</p>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-lg border border-border-subtle bg-surface overflow-hidden">
         <div className="px-5 py-4 border-b border-border-subtle">
           <h2 className="text-sm font-semibold text-fg">Notification preferences</h2>
@@ -104,7 +150,7 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
           </p>
         </div>
         <div className="divide-y divide-border-subtle">
-          {(Object.keys(LABELS) as (keyof NotificationPreferences)[]).map((key) => (
+          {(Object.keys(LABELS) as (keyof NotificationToggles)[]).map((key) => (
             <div
               key={key}
               className="px-5 py-4 flex items-center justify-between"
@@ -126,7 +172,7 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
           ))}
         </div>
         {saving && (
-          <p className="px-5 pb-4 text-xs text-fg-muted">Saving…</p>
+          <p className="px-5 pb-4 text-xs text-fg-muted">Saving...</p>
         )}
       </div>
 
@@ -144,7 +190,7 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
             disabled={sendingTest}
             className="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-medium rounded-lg bg-primary text-primary-fg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {sendingTest ? "Sending…" : "Send test email"}
+            {sendingTest ? "Sending..." : "Send test email"}
           </button>
         </div>
       </div>

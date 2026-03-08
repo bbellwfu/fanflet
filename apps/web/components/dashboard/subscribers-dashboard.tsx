@@ -32,6 +32,8 @@ import {
 } from "lucide-react";
 import { deleteSubscriber, deleteSubscribers } from "@/app/dashboard/subscribers/actions";
 import type { SubscriberRow } from "@/app/dashboard/subscribers/actions";
+import { formatDate, formatDateShort } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 interface SubscribersDashboardProps {
   subscribers: SubscriberRow[];
@@ -43,27 +45,13 @@ interface SubscribersDashboardProps {
 type SortField = "created_at" | "email" | "source";
 type SortDirection = "asc" | "desc";
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
 export function SubscribersDashboard({
   subscribers: initialSubscribers,
   speakerName,
   speakerEmail,
   initialSourceFilter,
 }: SubscribersDashboardProps) {
+  const timezone = useTimezone();
   const [subscribers, setSubscribers] = useState(initialSubscribers);
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter ?? "all");
@@ -151,7 +139,7 @@ export function SubscribersDashboard({
     const rows = target.map((s) => [
       s.email,
       s.name ?? "",
-      formatDate(s.created_at),
+      formatDate(s.created_at, timezone),
       s.source_fanflet_title ?? "Direct",
     ]);
 
@@ -166,7 +154,7 @@ export function SubscribersDashboard({
     link.download = `subscribers-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [filteredSubscribers, selectedIds]);
+  }, [filteredSubscribers, selectedIds, timezone]);
 
   // Delete
   const handleDelete = useCallback(async () => {
@@ -460,7 +448,7 @@ export function SubscribersDashboard({
                         )}
                         <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
                           {subscriber.source_fanflet_title ?? "Direct"} &middot;{" "}
-                          {formatDateShort(subscriber.created_at)}
+                          {formatDateShort(subscriber.created_at, timezone)}
                         </p>
                       </div>
                     </td>
@@ -475,7 +463,7 @@ export function SubscribersDashboard({
                       )}
                     </td>
                     <td className="py-3 px-4 text-slate-500 hidden md:table-cell">
-                      {formatDate(subscriber.created_at)}
+                      {formatDate(subscriber.created_at, timezone)}
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button

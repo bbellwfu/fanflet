@@ -56,6 +56,8 @@ import {
   computeExpirationDate,
   todayUtcDateOnly,
 } from "@/lib/expiration";
+import { formatDateLong } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 type ConfirmationEmailConfig = {
   enabled?: boolean;
@@ -204,6 +206,7 @@ export function FanfletEditor({
   endedSponsors = [],
 }: FanfletEditorProps) {
   const router = useRouter();
+  const timezone = useTimezone();
   const [saving, setSaving] = useState(false);
   const [showSlugWarning, setShowSlugWarning] = useState(false);
   const surveySelectMounted = useSyncExternalStore(
@@ -698,11 +701,7 @@ export function FanfletEditor({
                 {computedExpirationDate && (
                   <p className="text-sm text-muted-foreground">
                     Expires on{" "}
-                    {new Date(computedExpirationDate + "T12:00:00Z").toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
+                    {formatDateLong(computedExpirationDate + "T12:00:00Z", timezone)}
                     .
                   </p>
                 )}

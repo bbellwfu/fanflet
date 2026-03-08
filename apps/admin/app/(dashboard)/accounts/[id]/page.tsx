@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate, formatDateTime } from "@fanflet/db/timezone";
 import { FREE_PLAN_NAME } from "@fanflet/db";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, UserIcon, AlertTriangleIcon } from "lucide-react";
@@ -16,6 +18,15 @@ export default async function AccountDetailPage({
   const { id } = await params;
   const supabase = createServiceClient();
   const webUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   const { data: speaker, error } = await supabase
     .from("speakers")
@@ -214,7 +225,7 @@ export default async function AccountDetailPage({
             <div>
               <dt className="text-fg-muted mb-0.5">Joined</dt>
               <dd className="text-fg">
-                {new Date(speaker.created_at).toLocaleDateString()}
+                {formatDate(speaker.created_at, adminTimezone)}
               </dd>
             </div>
             <div className="md:col-span-2">
@@ -238,7 +249,7 @@ export default async function AccountDetailPage({
             <p>
               <span className="font-medium text-fg">Suspended at:</span>{" "}
               {speaker.suspended_at
-                ? new Date(speaker.suspended_at).toLocaleString()
+                ? formatDateTime(speaker.suspended_at, adminTimezone)
                 : "Unknown"}
             </p>
             {speaker.suspension_reason && (
@@ -273,7 +284,7 @@ export default async function AccountDetailPage({
                 </div>
                 <div className="flex items-center gap-3 text-[12px] text-fg-muted shrink-0 ml-4 max-sm:hidden">
                   <span>
-                    {new Date(fanflet.created_at).toLocaleDateString()}
+                    {formatDate(fanflet.created_at, adminTimezone)}
                   </span>
                   {fanflet.status === "published" && speaker.slug && (
                     <a

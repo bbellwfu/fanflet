@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { ArrowLeft, BuildingIcon, GlobeIcon, MailIcon } from "lucide-react";
 import { VerifyButton } from "./verify-button";
@@ -12,6 +14,15 @@ export default async function SponsorDetailPage({
 }) {
   const { id } = await params;
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   const { data: sponsor, error } = await supabase
     .from("sponsor_accounts")
@@ -165,7 +176,7 @@ export default async function SponsorDetailPage({
             <div>
               <dt className="text-fg-muted mb-0.5">Joined</dt>
               <dd className="text-fg">
-                {new Date(sponsor.created_at).toLocaleDateString()}
+                {formatDate(sponsor.created_at, adminTimezone)}
               </dd>
             </div>
             <div className="md:col-span-2">

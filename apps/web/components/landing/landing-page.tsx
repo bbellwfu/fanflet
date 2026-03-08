@@ -161,11 +161,12 @@ export function LandingPage({
           {fanflet.show_expiration_notice !== false && fanflet.expiration_date && (
             <p className="text-center text-xs text-[var(--theme-hero-text)]/80 mb-4">
               This content available until{" "}
-              {new Date(fanflet.expiration_date + "T12:00:00Z").toLocaleDateString("en-US", {
+              {new Intl.DateTimeFormat("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
-              })}
+                timeZone: "UTC",
+              }).format(new Date(fanflet.expiration_date + "T12:00:00Z"))}
             </p>
           )}
 

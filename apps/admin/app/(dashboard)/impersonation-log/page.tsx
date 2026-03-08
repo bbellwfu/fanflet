@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDateTime } from "@fanflet/db/timezone";
 import {
   EyeIcon,
   ClockIcon,
@@ -9,6 +11,15 @@ import {
 
 export default async function ImpersonationLogPage() {
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   const { data: sessions } = await supabase
     .from("impersonation_sessions")
@@ -97,6 +108,7 @@ export default async function ImpersonationLogPage() {
                 key={session.id}
                 session={session}
                 userMap={userMap}
+                adminTimezone={adminTimezone}
                 isActive
               />
             ))}
@@ -116,6 +128,7 @@ export default async function ImpersonationLogPage() {
                 key={session.id}
                 session={session}
                 userMap={userMap}
+                adminTimezone={adminTimezone}
               />
             ))
           ) : (
@@ -135,10 +148,11 @@ export default async function ImpersonationLogPage() {
 interface SessionRowProps {
   session: Record<string, unknown>;
   userMap: Map<string, { email: string; name: string }>;
+  adminTimezone: string | null;
   isActive?: boolean;
 }
 
-function SessionRow({ session, userMap, isActive }: SessionRowProps) {
+function SessionRow({ session, userMap, adminTimezone, isActive }: SessionRowProps) {
   const adminInfo = userMap.get(session.admin_id as string);
   const targetInfo = userMap.get(session.target_user_id as string);
   const endedAt = session.ended_at as string | null;
@@ -193,7 +207,7 @@ function SessionRow({ session, userMap, isActive }: SessionRowProps) {
             )}
           </div>
           <div className="flex items-center gap-3 text-[12px] text-fg-muted">
-            <span>{new Date(createdAt).toLocaleString()}</span>
+            <span>{formatDateTime(createdAt, adminTimezone)}</span>
             <span className="flex items-center gap-1">
               <ClockIcon className="w-3 h-3" />
               {duration}

@@ -3,6 +3,7 @@
 import { createClient } from "@fanflet/db/server";
 import { Resend } from "resend";
 import { revalidatePath } from "next/cache";
+import { isValidTimezone } from "@fanflet/db/timezone";
 
 export type NotificationPreferenceKey =
   | "speaker_signup"
@@ -59,6 +60,38 @@ export async function updateNotificationPreferences(updates: {
   if (error) {
     console.error("[admin settings] updateNotificationPreferences failed:", error.message, error.code);
     return { error: "Failed to update preferences" };
+  }
+
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function updateAdminTimezone(tz: string): Promise<{ error?: string }> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  if (!isValidTimezone(tz)) {
+    return { error: "Invalid timezone identifier" };
+  }
+
+  const { error } = await admin.supabase
+    .from("admin_notification_preferences")
+    .upsert(
+      {
+        admin_user_id: admin.user.id,
+        timezone: tz,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "admin_user_id" }
+    );
+
+  if (error) {
+    console.error("[admin settings] updateAdminTimezone failed:", error.message, error.code);
+    return { error: "Failed to update timezone" };
   }
 
   revalidatePath("/settings");

@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { UsersIcon } from "lucide-react";
 import { AccountsFilterForm } from "./accounts-filter-form";
@@ -22,6 +24,15 @@ export default async function AccountsPage({
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   // Fetch sponsor auth_user_ids so we can exclude sponsor-only accounts
   const { data: sponsorRows } = await supabase
@@ -187,7 +198,7 @@ export default async function AccountsPage({
                     <StatusBadge status={speaker.status} />
                   </td>
                   <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                    {new Date(speaker.created_at).toLocaleDateString()}
+                    {formatDate(speaker.created_at, adminTimezone)}
                   </td>
                 </tr>
               ))}

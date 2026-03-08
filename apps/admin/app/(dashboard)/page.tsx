@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import {
   UsersIcon,
   FileTextIcon,
@@ -126,6 +128,15 @@ function PublishedRow({ title, date }: { title: string; date: string }) {
 
 export default async function AdminOverviewPage() {
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   const [
     speakersResult,
@@ -260,7 +271,7 @@ export default async function AdminOverviewPage() {
                   key={speaker.id}
                   name={speaker.name || "Unnamed"}
                   email={speaker.email}
-                  date={new Date(speaker.created_at).toLocaleDateString()}
+                  date={formatDate(speaker.created_at, adminTimezone)}
                 />
               ))
             ) : (
@@ -293,7 +304,7 @@ export default async function AdminOverviewPage() {
                   title={fanflet.title}
                   date={
                     fanflet.published_at
-                      ? new Date(fanflet.published_at).toLocaleDateString()
+                      ? formatDate(fanflet.published_at, adminTimezone)
                       : "N/A"
                   }
                 />

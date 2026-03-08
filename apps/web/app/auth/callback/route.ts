@@ -9,6 +9,13 @@ const ROLE_HOME: Record<string, string> = {
   audience: '/my',
 }
 
+/** Allow relative path only; reject protocol-relative or absolute URLs (open redirect safety). */
+function isSafeNext(next: string | null): next is string {
+  if (!next || typeof next !== 'string') return false
+  const trimmed = next.trim()
+  return trimmed.startsWith('/') && !trimmed.startsWith('//')
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
@@ -35,7 +42,7 @@ export async function GET(request: Request) {
         await handleAudiencePostSignup(supabase, user.id, ref)
       }
 
-      if (next) {
+      if (isSafeNext(next)) {
         return NextResponse.redirect(`${origin}${next}`)
       }
 

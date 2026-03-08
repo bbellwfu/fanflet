@@ -11,6 +11,7 @@ export default async function AdminLoginPage({
   const code = typeof params.code === "string" ? params.code : null;
   const next = typeof params.next === "string" ? params.next : "/";
   const errorParam = typeof params.error === "string" ? params.error : null;
+  const mcpState = typeof params.mcp_state === "string" ? params.mcp_state : null;
 
   // If Supabase redirected here with a code (shouldn't normally happen, but handle it),
   // send it to the Route Handler which CAN set cookies.
@@ -51,5 +52,5 @@ export default async function AdminLoginPage({
     }
   }
 
-  return <LoginForm error={errorParam} />;
+  return <LoginForm error={errorParam} mcpState={mcpState} />;
 }

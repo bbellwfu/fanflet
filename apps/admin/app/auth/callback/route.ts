@@ -3,10 +3,18 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/** Allow relative path only; reject protocol-relative or absolute URLs (open redirect safety). */
+function isSafeNext(next: string | null): next is string {
+  if (!next || typeof next !== "string") return false;
+  const trimmed = next.trim();
+  return trimmed.startsWith("/") && !trimmed.startsWith("//");
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/";
+  const nextParam = searchParams.get("next");
+  const next = isSafeNext(nextParam) ? nextParam : "/";
   const errorParam = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
 

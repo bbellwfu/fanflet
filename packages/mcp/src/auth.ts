@@ -2,6 +2,7 @@ import { createServiceClient } from "@fanflet/db/service";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
 import type { ToolContext } from "./types";
+import { verifyAccessToken as verifyOAuthToken } from "./oauth";
 
 const ADMIN_KEY_PREFIX = "fan_admin_";
 const SPEAKER_KEY_PREFIX = "fan_";
@@ -106,6 +107,24 @@ export async function authenticateFromHeaders(
   }
 
   const serviceClient = createServiceClient();
+
+  // Try MCP OAuth token first
+  const oauthResult = await verifyOAuthToken(token);
+  if (oauthResult) {
+    const isAdmin = await resolveAdminRole(serviceClient, oauthResult.userId);
+    const role: "speaker" | "sponsor" | "platform_admin" = isAdmin
+      ? "platform_admin"
+      : "speaker";
+
+    return {
+      userId: oauthResult.userId,
+      role,
+      supabase: serviceClient,
+      serviceClient,
+    };
+  }
+
+  // Fallback: try as a raw Supabase JWT (for dev/direct access)
   const { data: userData, error: userError } =
     await serviceClient.auth.getUser(token);
 

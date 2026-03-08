@@ -74,3 +74,77 @@ DROP POLICY IF EXISTS "Service role manages MCP audit logs" ON public.mcp_audit_
 CREATE POLICY "Service role manages MCP audit logs"
   ON public.mcp_audit_log FOR ALL TO service_role
   USING (true) WITH CHECK (true);
+
+-- ── OAuth 2.1 support tables ──
+
+-- Dynamically registered OAuth clients (MCP clients like Claude, Cursor, etc.)
+CREATE TABLE IF NOT EXISTS public.mcp_oauth_clients (
+  client_id TEXT PRIMARY KEY DEFAULT 'mcp_' || replace(gen_random_uuid()::text, '-', ''),
+  client_secret TEXT,
+  client_secret_expires_at BIGINT,
+  client_id_issued_at BIGINT DEFAULT extract(epoch from now())::bigint,
+  redirect_uris TEXT[] NOT NULL DEFAULT '{}',
+  client_name TEXT,
+  client_uri TEXT,
+  logo_uri TEXT,
+  scope TEXT,
+  grant_types TEXT[] DEFAULT '{authorization_code, refresh_token}',
+  response_types TEXT[] DEFAULT '{code}',
+  token_endpoint_auth_method TEXT DEFAULT 'none',
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.mcp_oauth_clients ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service role manages OAuth clients" ON public.mcp_oauth_clients;
+CREATE POLICY "Service role manages OAuth clients"
+  ON public.mcp_oauth_clients FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+-- Authorization codes (short-lived, single-use)
+CREATE TABLE IF NOT EXISTS public.mcp_oauth_codes (
+  code TEXT PRIMARY KEY DEFAULT replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
+  client_id TEXT NOT NULL REFERENCES public.mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  auth_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scope TEXT,
+  state TEXT,
+  used BOOLEAN DEFAULT false,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '10 minutes'),
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_oauth_codes_expires ON public.mcp_oauth_codes(expires_at);
+
+ALTER TABLE public.mcp_oauth_codes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service role manages OAuth codes" ON public.mcp_oauth_codes;
+CREATE POLICY "Service role manages OAuth codes"
+  ON public.mcp_oauth_codes FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+
+-- Issued OAuth tokens
+CREATE TABLE IF NOT EXISTS public.mcp_oauth_tokens (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  access_token_hash TEXT NOT NULL UNIQUE,
+  refresh_token_hash TEXT UNIQUE,
+  client_id TEXT NOT NULL REFERENCES public.mcp_oauth_clients(client_id) ON DELETE CASCADE,
+  auth_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  scope TEXT,
+  access_token_expires_at TIMESTAMPTZ NOT NULL,
+  refresh_token_expires_at TIMESTAMPTZ,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_access ON public.mcp_oauth_tokens(access_token_hash);
+CREATE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_refresh ON public.mcp_oauth_tokens(refresh_token_hash);
+CREATE INDEX IF NOT EXISTS idx_mcp_oauth_tokens_user ON public.mcp_oauth_tokens(auth_user_id);
+
+ALTER TABLE public.mcp_oauth_tokens ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service role manages OAuth tokens" ON public.mcp_oauth_tokens;
+CREATE POLICY "Service role manages OAuth tokens"
+  ON public.mcp_oauth_tokens FOR ALL TO service_role
+  USING (true) WITH CHECK (true);

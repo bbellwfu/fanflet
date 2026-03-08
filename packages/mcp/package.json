@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./server": "./src/server.ts",
     "./auth": "./src/auth.ts",
+    "./oauth": "./src/oauth.ts",
     "./types": "./src/types.ts"
   },
   "dependencies": {

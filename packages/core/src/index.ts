@@ -40,8 +40,26 @@ export {
   getDashboardOverview,
   getFanfletAnalytics,
   getResourceRankings,
+  getSpeakerKPIs,
+  getSpeakerDeviceBreakdown,
+  getSpeakerReferrerBreakdown,
+  getSpeakerResourceTypePerformance,
+  getSpeakerActivityHeatmap,
+  getSpeakerConversionFunnel,
+  exportSpeakerAnalyticsCSV,
 } from "./analytics";
-export type { FanfletAnalytics, ResourceRanking, DashboardOverview } from "./analytics";
+export type {
+  FanfletAnalytics,
+  ResourceRanking,
+  DashboardOverview,
+  DateRange,
+  SpeakerKPIs,
+  DeviceBreakdown,
+  ReferrerBreakdown,
+  ResourceTypePerformance,
+  HeatmapCell,
+  ConversionFunnelStep,
+} from "./analytics";
 
 export {
   requestSponsorConnection,

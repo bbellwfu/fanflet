@@ -2,21 +2,97 @@ import { createClient } from "@/lib/supabase/server";
 import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Eye, MousePointerClick, Users, Percent } from "lucide-react";
+import {
+  BarChart3, Eye, MousePointerClick, Users, Percent,
+  TrendingUp, TrendingDown, Minus, Smartphone, Globe, Filter,
+  Link2, FileDown, Building2, Type,
+} from "lucide-react";
+import {
+  getSpeakerKPIs,
+  getSpeakerDeviceBreakdown,
+  getSpeakerReferrerBreakdown,
+  getSpeakerResourceTypePerformance,
+  getSpeakerActivityHeatmap,
+  getSpeakerConversionFunnel,
+} from "@fanflet/core";
+import type { DateRange } from "@fanflet/core";
 import { ResourceClickBreakdown } from "@/components/analytics/resource-click-breakdown";
 import { SurveyResults, type SurveyResultData } from "@/components/analytics/survey-results";
+import { LockedFeatureCard } from "@/components/analytics/locked-feature-card";
+import { DateRangeSelector } from "@/components/analytics/date-range-selector";
+import { DeviceChart } from "@/components/analytics/device-chart";
+import { ReferrerChart } from "@/components/analytics/referrer-chart";
+import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
+import { FunnelChart } from "@/components/analytics/funnel-chart";
+import { CSVExportButton } from "@/components/analytics/csv-export-button";
 
 export const metadata = {
   title: "Analytics",
 };
 
-export default async function AnalyticsPage() {
+function buildDateRange(rangeParam: string | undefined): { range: DateRange | undefined; days: number | null } {
+  if (!rangeParam || rangeParam === "30") {
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return { range: { from: from.toISOString(), to: to.toISOString() }, days: 30 };
+  }
+  if (rangeParam === "all") return { range: undefined, days: null };
+  const days = parseInt(rangeParam, 10);
+  if (isNaN(days) || days <= 0) return { range: undefined, days: null };
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+  return { range: { from: from.toISOString(), to: to.toISOString() }, days };
+}
+
+function ChangeIndicator({ current, previous }: { current: number; previous: number }) {
+  if (previous === 0 && current === 0) return null;
+  if (previous === 0) {
+    return (
+      <span className="inline-flex items-center text-xs font-medium text-emerald-600">
+        <TrendingUp className="w-3 h-3 mr-0.5" /> New
+      </span>
+    );
+  }
+  const change = ((current - previous) / previous) * 100;
+  if (Math.abs(change) < 0.5) {
+    return (
+      <span className="inline-flex items-center text-xs font-medium text-slate-500">
+        <Minus className="w-3 h-3 mr-0.5" /> 0%
+      </span>
+    );
+  }
+  if (change > 0) {
+    return (
+      <span className="inline-flex items-center text-xs font-medium text-emerald-600">
+        <TrendingUp className="w-3 h-3 mr-0.5" /> +{change.toFixed(1)}%
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center text-xs font-medium text-red-500">
+      <TrendingDown className="w-3 h-3 mr-0.5" /> {change.toFixed(1)}%
+    </span>
+  );
+}
+
+const TYPE_ICONS: Record<string, typeof Link2> = {
+  link: Link2,
+  file: FileDown,
+  sponsor: Building2,
+  text: Type,
+};
+
+interface AnalyticsPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
+  const resolvedParams = await searchParams;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
   const { data: speaker } = await supabase
@@ -30,6 +106,7 @@ export default async function AnalyticsPage() {
   const entitlements = await getSpeakerEntitlements(speaker.id);
   const hasBasicStats = entitlements.features.has("basic_engagement_stats");
   const hasClickAnalytics = entitlements.features.has("click_through_analytics");
+  const hasAdvancedReporting = entitlements.features.has("advanced_reporting");
   const canSeeAnalytics = hasBasicStats || hasClickAnalytics;
 
   if (!canSeeAnalytics) {
@@ -55,7 +132,10 @@ export default async function AnalyticsPage() {
     );
   }
 
-  // Get all fanflets for this speaker
+  const rangeParam = typeof resolvedParams.range === "string" ? resolvedParams.range : undefined;
+  const { range, days: rangeDays } = buildDateRange(rangeParam);
+
+  // Fetch all fanflets for this speaker
   const { data: fanflets } = await supabase
     .from("fanflets")
     .select("id, title, event_name, slug, status")
@@ -64,41 +144,27 @@ export default async function AnalyticsPage() {
 
   const fanfletIds = (fanflets || []).map((f) => f.id);
 
-  // Get aggregate stats
+  // Always fetch basic aggregate stats (free tier)
   let totalUniqueViews = 0;
   let totalClicks = 0;
   let totalSubscribers = 0;
-
-  // Per-fanflet unique-view and click counts (built from batch queries)
   const viewsByFanflet: Record<string, number> = {};
   const clicksByFanflet: Record<string, number> = {};
   const subsByFanflet: Record<string, number> = {};
 
   if (fanfletIds.length > 0) {
-    // Batch-fetch page_view events with visitor_hash for unique counting
     const [pageViewResult, clickResult, subsResult, perFanfletSubsResult] =
       await Promise.all([
-        supabase
-          .from("analytics_events")
-          .select("fanflet_id, visitor_hash")
-          .in("fanflet_id", fanfletIds)
-          .eq("event_type", "page_view"),
-        supabase
-          .from("analytics_events")
-          .select("fanflet_id")
-          .in("fanflet_id", fanfletIds)
-          .eq("event_type", "resource_click"),
-        supabase
-          .from("subscribers")
-          .select("*", { count: "exact", head: true })
+        supabase.from("analytics_events").select("fanflet_id, visitor_hash")
+          .in("fanflet_id", fanfletIds).eq("event_type", "page_view"),
+        supabase.from("analytics_events").select("fanflet_id")
+          .in("fanflet_id", fanfletIds).eq("event_type", "resource_click"),
+        supabase.from("subscribers").select("*", { count: "exact", head: true })
           .eq("speaker_id", speaker.id),
-        supabase
-          .from("subscribers")
-          .select("source_fanflet_id")
+        supabase.from("subscribers").select("source_fanflet_id")
           .eq("speaker_id", speaker.id),
       ]);
 
-    // Unique views: deduplicate by visitor_hash per fanflet
     const globalUniqueHashes = new Set<string>();
     const perFanfletHashes: Record<string, Set<string>> = {};
     for (const evt of pageViewResult.data || []) {
@@ -111,31 +177,51 @@ export default async function AnalyticsPage() {
     for (const [fid, hashes] of Object.entries(perFanfletHashes)) {
       viewsByFanflet[fid] = hashes.size;
     }
-
-    // Clicks per fanflet (total, not unique)
     for (const evt of clickResult.data || []) {
       const fid = evt.fanflet_id as string;
       clicksByFanflet[fid] = (clicksByFanflet[fid] || 0) + 1;
     }
     totalClicks = (clickResult.data || []).length;
-
     totalSubscribers = subsResult.count || 0;
-
-    // Subscribers per fanflet
     for (const sub of perFanfletSubsResult.data || []) {
       const fid = sub.source_fanflet_id as string;
       if (fid) subsByFanflet[fid] = (subsByFanflet[fid] || 0) + 1;
     }
   }
 
-  const fanfletStats = (fanflets || []).map((f) => ({
-    ...f,
-    views: viewsByFanflet[f.id] || 0,
-    clicks: clicksByFanflet[f.id] || 0,
-    subscribers: subsByFanflet[f.id] || 0,
-  }));
+  // Pro-tier data (only fetch if entitled)
+  const kpisResult = hasClickAnalytics
+    ? await getSpeakerKPIs(supabase, speaker.id, entitlements, range)
+    : null;
+  const kpis = kpisResult?.data;
 
-  // Per-resource click breakdown (only for fanflets with clicks)
+  const deviceResult = hasClickAnalytics
+    ? await getSpeakerDeviceBreakdown(supabase, speaker.id, entitlements, range)
+    : null;
+  const deviceData = deviceResult?.data ?? [];
+
+  const referrerResult = hasClickAnalytics
+    ? await getSpeakerReferrerBreakdown(supabase, speaker.id, entitlements, range)
+    : null;
+  const referrerData = referrerResult?.data ?? [];
+
+  const resourceTypeResult = hasClickAnalytics
+    ? await getSpeakerResourceTypePerformance(supabase, speaker.id, entitlements, range)
+    : null;
+  const resourceTypeData = resourceTypeResult?.data ?? [];
+
+  // Enterprise-tier data
+  const heatmapResult = hasAdvancedReporting
+    ? await getSpeakerActivityHeatmap(supabase, speaker.id, entitlements, range)
+    : null;
+  const heatmapData = heatmapResult?.data ?? [];
+
+  const funnelResult = hasAdvancedReporting
+    ? await getSpeakerConversionFunnel(supabase, speaker.id, entitlements, range)
+    : null;
+  const funnelData = funnelResult?.data ?? [];
+
+  // Resource click breakdown (Pro)
   type ResourceClickStat = {
     fanflet_id: string;
     fanflet_title: string;
@@ -144,39 +230,27 @@ export default async function AnalyticsPage() {
     resource_type: string;
     clicks: number;
   };
-
   let resourceClickStats: ResourceClickStat[] = [];
 
-  if (fanfletIds.length > 0) {
-    // Get all resource blocks for the speaker's fanflets
+  if (hasClickAnalytics && fanfletIds.length > 0) {
     const { data: resourceBlocks } = await supabase
       .from("resource_blocks")
       .select("id, fanflet_id, title, type")
       .in("fanflet_id", fanfletIds);
-
     if (resourceBlocks && resourceBlocks.length > 0) {
-      // Get all resource_click events with resource_block_id
       const { data: clickEvents } = await supabase
         .from("analytics_events")
         .select("resource_block_id")
         .in("fanflet_id", fanfletIds)
         .eq("event_type", "resource_click")
         .not("resource_block_id", "is", null);
-
-      // Count clicks per resource_block_id
       const clickCounts: Record<string, number> = {};
       (clickEvents || []).forEach((evt) => {
         const rbId = evt.resource_block_id as string;
         clickCounts[rbId] = (clickCounts[rbId] || 0) + 1;
       });
-
-      // Map fanflet IDs to titles
       const fanfletTitleMap: Record<string, string> = {};
-      (fanflets || []).forEach((f) => {
-        fanfletTitleMap[f.id] = f.title;
-      });
-
-      // Build stats for resources that have at least 1 click
+      (fanflets || []).forEach((f) => { fanfletTitleMap[f.id] = f.title; });
       resourceClickStats = resourceBlocks
         .filter((rb) => clickCounts[rb.id] > 0)
         .map((rb) => ({
@@ -191,61 +265,55 @@ export default async function AnalyticsPage() {
     }
   }
 
-  // Fetch survey responses grouped by fanflet+question
+  // Survey results
   let surveyResultsData: SurveyResultData[] = [];
   if (fanfletIds.length > 0) {
-    // Get fanflets that have a survey_question_id set
     const { data: fanfletsWithSurvey } = await supabase
       .from("fanflets")
       .select("id, title, survey_question_id")
       .in("id", fanfletIds)
       .not("survey_question_id", "is", null);
-
     if (fanfletsWithSurvey && fanfletsWithSurvey.length > 0) {
-      const questionIds = [
-        ...new Set(fanfletsWithSurvey.map((f) => f.survey_question_id as string)),
-      ];
+      const questionIds = [...new Set(fanfletsWithSurvey.map((f) => f.survey_question_id as string))];
       const { data: questions } = await supabase
         .from("survey_questions")
         .select("id, question_text, question_type")
         .in("id", questionIds);
-
       const questionMap: Record<string, { question_text: string; question_type: string }> = {};
-      (questions || []).forEach((q) => {
-        questionMap[q.id] = { question_text: q.question_text, question_type: q.question_type };
-      });
-
-      // Get all survey responses for these fanflets
+      (questions || []).forEach((q) => { questionMap[q.id] = { question_text: q.question_text, question_type: q.question_type }; });
       const surveyFanfletIds = fanfletsWithSurvey.map((f) => f.id);
       const { data: responses } = await supabase
         .from("survey_responses")
         .select("fanflet_id, question_id, response_value")
         .in("fanflet_id", surveyFanfletIds);
-
-      // Group responses by fanflet_id + question_id
       const grouped: Record<string, string[]> = {};
       (responses || []).forEach((r) => {
         const key = `${r.fanflet_id}|${r.question_id}`;
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push(r.response_value);
       });
-
       surveyResultsData = fanfletsWithSurvey
         .filter((f) => f.survey_question_id && questionMap[f.survey_question_id])
         .map((f) => {
           const qId = f.survey_question_id as string;
-          const key = `${f.id}|${qId}`;
           return {
             fanflet_id: f.id,
             fanflet_title: f.title,
             question_id: qId,
             question_text: questionMap[qId].question_text,
             question_type: questionMap[qId].question_type,
-            responses: grouped[key] || [],
+            responses: grouped[`${f.id}|${qId}`] || [],
           };
         });
     }
   }
+
+  const fanfletStats = (fanflets || []).map((f) => ({
+    ...f,
+    views: viewsByFanflet[f.id] || 0,
+    clicks: clicksByFanflet[f.id] || 0,
+    subscribers: subsByFanflet[f.id] || 0,
+  }));
 
   if (!fanflets || fanflets.length === 0) {
     return (
@@ -267,14 +335,31 @@ export default async function AnalyticsPage() {
     );
   }
 
+  const rangeLabel = rangeDays === null ? "All Time" : `Last ${rangeDays} days`;
+
   return (
     <div className="max-w-5xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Analytics</h1>
-        <p className="text-muted-foreground">Track engagement across all your Fanflets.</p>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Analytics</h1>
+          <p className="text-muted-foreground">Track engagement across all your Fanflets.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {hasAdvancedReporting && (
+            <CSVExportButton speakerId={speaker.id} rangeDays={rangeDays} />
+          )}
+          {hasClickAnalytics && (
+            <Suspense>
+              <DateRangeSelector />
+            </Suspense>
+          )}
+        </div>
       </div>
 
-      {/* Aggregate Stats */}
+      {/* ================================================================ */}
+      {/* KPI Cards                                                        */}
+      {/* ================================================================ */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="h-full">
           <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
@@ -282,7 +367,8 @@ export default async function AnalyticsPage() {
             <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUniqueViews.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(kpis?.uniqueVisitors ?? totalUniqueViews).toLocaleString()}</div>
+            {kpis && <ChangeIndicator current={kpis.uniqueVisitors} previous={kpis.prevUniqueVisitors} />}
           </CardContent>
         </Card>
         <Card className="h-full">
@@ -291,7 +377,8 @@ export default async function AnalyticsPage() {
             <MousePointerClick className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalClicks.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(kpis?.totalResourceClicks ?? totalClicks).toLocaleString()}</div>
+            {kpis && <ChangeIndicator current={kpis.totalResourceClicks} previous={kpis.prevResourceClicks} />}
           </CardContent>
         </Card>
         <Card className="h-full">
@@ -301,9 +388,11 @@ export default async function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalUniqueViews > 0
-                ? `${((totalSubscribers / totalUniqueViews) * 100).toFixed(1)}%`
-                : "—"}
+              {kpis
+                ? `${kpis.conversionRate.toFixed(1)}%`
+                : totalUniqueViews > 0
+                  ? `${((totalSubscribers / totalUniqueViews) * 100).toFixed(1)}%`
+                  : "—"}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Subscribers / Unique Views</p>
           </CardContent>
@@ -315,13 +404,16 @@ export default async function AnalyticsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalSubscribers.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{(kpis?.totalSubscribers ?? totalSubscribers).toLocaleString()}</div>
+              {kpis && <ChangeIndicator current={kpis.totalSubscribers} previous={kpis.prevSubscribers} />}
             </CardContent>
           </Card>
         </Link>
       </div>
 
-      {/* Per-Fanflet Breakdown */}
+      {/* ================================================================ */}
+      {/* Per-Fanflet Breakdown (Free tier)                                */}
+      {/* ================================================================ */}
       <Card>
         <CardHeader>
           <CardTitle>Fanflet Performance</CardTitle>
@@ -375,17 +467,189 @@ export default async function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Per-Resource Click Breakdown */}
-      <ResourceClickBreakdown
-        stats={resourceClickStats}
-        fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
-      />
+      {/* ================================================================ */}
+      {/* Pro-Tier: Device & Traffic Sources                               */}
+      {/* ================================================================ */}
+      {hasClickAnalytics ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Smartphone className="w-4 h-4" />
+                Device Breakdown
+              </CardTitle>
+              <CardDescription>{rangeLabel}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeviceChart data={deviceData} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Globe className="w-4 h-4" />
+                Traffic Sources
+              </CardTitle>
+              <CardDescription>{rangeLabel}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ReferrerChart data={referrerData} />
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          <LockedFeatureCard
+            title="Device Breakdown"
+            description="See which devices your audience uses — mobile, desktop, or tablet."
+            planRequired="Pro"
+          >
+            <div className="px-6 py-4">
+              <DeviceChart data={[
+                { device: "mobile", count: 60 },
+                { device: "desktop", count: 30 },
+                { device: "tablet", count: 10 },
+              ]} />
+            </div>
+          </LockedFeatureCard>
+          <LockedFeatureCard
+            title="Traffic Sources"
+            description="Understand where your visitors come from — QR codes, search, social, or direct."
+            planRequired="Pro"
+          >
+            <div className="px-6 py-4">
+              <ReferrerChart data={[
+                { category: "QR Code", count: 45 },
+                { category: "Direct", count: 30 },
+                { category: "Search", count: 15 },
+                { category: "Social", count: 10 },
+              ]} />
+            </div>
+          </LockedFeatureCard>
+        </div>
+      )}
 
-      {/* Survey / Feedback Results */}
-      <SurveyResults
-        results={surveyResultsData}
-        fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
-      />
+      {/* ================================================================ */}
+      {/* Pro-Tier: Resource Type Performance                              */}
+      {/* ================================================================ */}
+      {hasClickAnalytics ? (
+        resourceTypeData.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                Resource Type Performance
+              </CardTitle>
+              <CardDescription>Which resource types get the most engagement ({rangeLabel}).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {resourceTypeData.map((rt) => {
+                  const Icon = TYPE_ICONS[rt.type] ?? Link2;
+                  return (
+                    <div key={rt.type} className="rounded-lg border bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-8 h-8 rounded-md bg-[#1B365D]/10 flex items-center justify-center text-[#1B365D]">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-medium capitalize">{rt.type}</span>
+                      </div>
+                      <p className="text-xl font-bold text-slate-900">{rt.totalClicks}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {rt.avgClicksPerBlock.toFixed(1)} avg / block &middot; {rt.blockCount} blocks
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      ) : (
+        <LockedFeatureCard
+          title="Resource Type Performance"
+          description="See which types of resources — links, files, sponsor blocks — drive the most clicks."
+          planRequired="Pro"
+        />
+      )}
+
+      {/* Pro-Tier: Resource Click Breakdown */}
+      {hasClickAnalytics ? (
+        <ResourceClickBreakdown
+          stats={resourceClickStats}
+          fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
+        />
+      ) : (
+        <LockedFeatureCard
+          title="Resource Click Breakdown"
+          description="Drill into click counts for every individual resource across your fanflets."
+          planRequired="Pro"
+        />
+      )}
+
+      {/* Survey / Feedback Results (Pro) */}
+      {hasClickAnalytics && (
+        <SurveyResults
+          results={surveyResultsData}
+          fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
+        />
+      )}
+
+      {/* ================================================================ */}
+      {/* Enterprise-Tier: Activity Heatmap & Conversion Funnel            */}
+      {/* ================================================================ */}
+      {hasAdvancedReporting ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Activity Heatmap</CardTitle>
+              <CardDescription>When your audience is most active ({rangeLabel}).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ActivityHeatmap data={heatmapData} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Conversion Funnel</CardTitle>
+              <CardDescription>Drop-off from scan to signup ({rangeLabel}).</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FunnelChart data={funnelData} />
+            </CardContent>
+          </Card>
+        </div>
+      ) : hasClickAnalytics ? (
+        <div className="grid gap-6 md:grid-cols-2">
+          <LockedFeatureCard
+            title="Activity Heatmap"
+            description="Discover the best times to share your fanflets — see when your audience is most active."
+            planRequired="Enterprise"
+          >
+            <div className="px-6 py-4">
+              <ActivityHeatmap data={Array.from({ length: 7 * 24 }, (_, i) => ({
+                dayOfWeek: Math.floor(i / 24),
+                hour: i % 24,
+                count: ((i * 7 + 3) % 11),
+              }))} />
+            </div>
+          </LockedFeatureCard>
+          <LockedFeatureCard
+            title="Conversion Funnel"
+            description="Track your audience journey from QR scan to email signup and see where drop-offs happen."
+            planRequired="Enterprise"
+          >
+            <div className="px-6 py-4">
+              <FunnelChart data={[
+                { step: "QR Scans", count: 100, dropOffPercent: 0 },
+                { step: "Page Views", count: 85, dropOffPercent: 15 },
+                { step: "Resource Clicks", count: 40, dropOffPercent: 52.9 },
+                { step: "Email Signups", count: 12, dropOffPercent: 70 },
+              ]} />
+            </div>
+          </LockedFeatureCard>
+        </div>
+      ) : null}
     </div>
   );
 }

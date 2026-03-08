@@ -13,6 +13,8 @@ import {
 import { rescindSponsorConnection, endSponsorConnection, hideSponsorConnectionFromView } from "./actions";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 function displayStatus(status: string, endedAt: string | null): string {
   if (status === "revoked") return "Canceled by Speaker";
@@ -37,6 +39,7 @@ export function ConnectionRow({
   createdAt,
   endedAt,
 }: ConnectionRowProps) {
+  const timezone = useTimezone();
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
@@ -91,8 +94,8 @@ export function ConnectionRow({
 
   const statusLabel = displayStatus(status, endedAt);
   const subtitle = endedAt
-    ? `${statusLabel} · Ended ${new Date(endedAt).toLocaleDateString()}`
-    : `${statusLabel} · ${new Date(createdAt).toLocaleDateString()}`;
+    ? `${statusLabel} · Ended ${formatDate(endedAt, timezone)}`
+    : `${statusLabel} · ${formatDate(createdAt, timezone)}`;
 
   return (
     <>

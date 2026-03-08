@@ -12,7 +12,7 @@ export default async function SponsorSettingsPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id, company_name, slug, description, logo_url, website_url, contact_email, industry")
+    .select("id, company_name, slug, description, logo_url, website_url, contact_email, industry, timezone")
     .eq("auth_user_id", user.id)
     .single();
 

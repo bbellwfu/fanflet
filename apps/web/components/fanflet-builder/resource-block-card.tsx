@@ -14,6 +14,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { STORAGE_BUCKET, extractFilename, formatFileSize } from "@fanflet/db/storage";
 import { toast } from "sonner";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 import { ChevronUp, ChevronDown, Pencil, Trash2, Loader2, Link as LinkIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,6 +133,7 @@ export function ResourceBlockCard({
   endedSponsors = [],
 }: ResourceBlockCardProps) {
   const router = useRouter();
+  const timezone = useTimezone();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -385,7 +388,7 @@ export function ResourceBlockCard({
                 <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
                   <p className="text-sm text-slate-700">
                     Linked to {ended.company_name}. Connection ended on{" "}
-                    {new Date(ended.ended_at).toLocaleDateString()}; no new data is sent to them.
+                    {formatDate(ended.ended_at, timezone)}; no new data is sent to them.
                   </p>
                   <Button
                     type="button"

@@ -59,6 +59,8 @@ import { createClient } from "@/lib/supabase/client";
 import { STORAGE_BUCKET, isAllowedFileType, ALLOWED_EXTENSIONS, formatFileSize, extractFilename } from "@fanflet/db/storage";
 import { StorageQuotaBar } from "./storage-quota-bar";
 import { toast } from "sonner";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 type LinkedFanflet = { id: string; title: string };
 
@@ -197,6 +199,7 @@ export function ResourceLibrary({
   endedSponsors = [],
 }: ResourceLibraryProps) {
   const resourceTypes = allowSponsorVisibility ? blockTypes : blockTypes.filter((t) => t.type !== "sponsor");
+  const timezone = useTimezone();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -1025,7 +1028,7 @@ export function ResourceLibrary({
                     {editDefaultSponsorId && endedSponsors.some((s) => s.id === editDefaultSponsorId) && (
                       <p className="text-sm text-slate-600 rounded-md border border-slate-200 bg-slate-50 p-2">
                         Connection ended on{" "}
-                        {new Date(endedSponsors.find((s) => s.id === editDefaultSponsorId)!.ended_at).toLocaleDateString()};
+                        {formatDate(endedSponsors.find((s) => s.id === editDefaultSponsorId)!.ended_at, timezone)};
                         no new data is sent to them. Choose None below to clear.
                       </p>
                     )}
@@ -1177,7 +1180,7 @@ export function ResourceLibrary({
                   )}
                   {r.created_at && (
                     <span className="text-[10px] text-slate-400" title="Upload date">
-                      &bull; {new Date(r.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                      &bull; {formatDate(r.created_at, timezone)}
                     </span>
                   )}
                 </div>

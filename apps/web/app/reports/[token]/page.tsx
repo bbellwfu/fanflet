@@ -2,6 +2,7 @@ import { createServiceClient } from "@fanflet/db/service";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, MousePointerClick, Users } from "lucide-react";
+import { formatDate } from "@fanflet/db/timezone";
 
 export default async function PublicSponsorReportPage({
   params,
@@ -43,7 +44,8 @@ export default async function PublicSponsorReportPage({
       .from("analytics_events")
       .select("*", { count: "exact", head: true })
       .eq("fanflet_id", fanfletId)
-      .eq("event_type", "page_view"),
+      .eq("event_type", "page_view")
+      .or("source.is.null,source.neq.portfolio"),
     blockIds.length > 0
       ? supabase
           .from("analytics_events")
@@ -146,7 +148,7 @@ export default async function PublicSponsorReportPage({
                           <td className="p-3">{lead.resource_title ?? "—"}</td>
                           <td className="p-3">{lead.engagement_type}</td>
                           <td className="p-3 text-muted-foreground">
-                            {new Date(lead.created_at).toLocaleDateString()}
+                            {formatDate(lead.created_at, null)}
                           </td>
                         </tr>
                       ))}

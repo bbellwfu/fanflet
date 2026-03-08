@@ -6,21 +6,33 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getSiteUrl } from '@/lib/config'
 
+/** Allow relative path redirects only (e.g. /brianbell/test-message). Reject protocol-relative or absolute URLs. */
+function isSafeNext(next: string | null): next is string {
+  if (!next || typeof next !== 'string') return false
+  const trimmed = next.trim()
+  return trimmed.startsWith('/') && !trimmed.startsWith('//')
+}
+
 function resolveLoginDestination(
   roles: string[],
   activeRoleCookie: string | undefined,
+  next: string | null,
 ): string {
+  if (isSafeNext(next)) return next
   if (roles.length === 0) return '/dashboard'
 
   const activeRole = activeRoleCookie && roles.includes(activeRoleCookie)
     ? activeRoleCookie
     : roles[0]
 
-  return activeRole === 'sponsor' ? '/sponsor/dashboard' : '/dashboard'
+  if (activeRole === 'sponsor') return '/sponsor/dashboard'
+  if (activeRole === 'audience') return '/my'
+  return '/dashboard'
 }
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
+  const next = formData.get('next') as string | null
   const data = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
@@ -40,7 +52,7 @@ export async function login(formData: FormData) {
       const cookieStore = await cookies()
       const activeRoleCookie = cookieStore.get('active_role')?.value
       revalidatePath('/', 'layout')
-      redirect(resolveLoginDestination(appRoles, activeRoleCookie))
+      redirect(resolveLoginDestination(appRoles, activeRoleCookie, next))
     }
 
     const signupRole = user.user_metadata?.signup_role
@@ -52,21 +64,25 @@ export async function login(formData: FormData) {
         .maybeSingle()
 
       revalidatePath('/', 'layout')
-      redirect(sponsor ? '/sponsor/dashboard' : '/sponsor/onboarding')
+      redirect(isSafeNext(next) ? next : (sponsor ? '/sponsor/dashboard' : '/sponsor/onboarding'))
     }
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect(isSafeNext(next) ? next : '/dashboard')
 }
 
-export async function signInWithGoogle() {
+export async function signInWithGoogle(opts?: { next?: string }) {
   const supabase = await createClient()
   const siteUrl = getSiteUrl()
+  const params = new URLSearchParams()
+  if (opts?.next && isSafeNext(opts.next)) params.set('next', opts.next)
+  const qs = params.toString()
+  const callbackUrl = qs ? `${siteUrl}/auth/callback?${qs}` : `${siteUrl}/auth/callback`
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${siteUrl}/auth/callback`,
+      redirectTo: callbackUrl,
     },
   })
   if (error) {

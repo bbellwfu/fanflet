@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { SubscribeForm } from "./subscribe-form";
 import { SmsBookmarkForm } from "./sms-bookmark-form";
+import { AudienceCTA } from "./audience-cta";
 import { trackResourceClick, trackReferralClick } from "./analytics-script";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 import { readPhotoFrame } from "@/lib/photo-frame";
@@ -75,6 +76,8 @@ type LandingPageProps = {
   fanflet: Fanflet;
   subscriberCount: number;
   showSmsBookmark?: boolean;
+  speakerSlug: string;
+  fanfletSlug: string;
 };
 
 function getDownloadUrl(block: ResourceBlock, fanfletId: string): string {
@@ -104,6 +107,8 @@ export function LandingPage({
   fanflet,
   subscriberCount,
   showSmsBookmark = false,
+  speakerSlug,
+  fanfletSlug,
 }: LandingPageProps) {
   const themeId = resolveThemeId(fanflet.theme_config);
   const themeVars = getThemeCSSVariables(themeId);
@@ -161,11 +166,12 @@ export function LandingPage({
           {fanflet.show_expiration_notice !== false && fanflet.expiration_date && (
             <p className="text-center text-xs text-[var(--theme-hero-text)]/80 mb-4">
               This content available until{" "}
-              {new Date(fanflet.expiration_date + "T12:00:00Z").toLocaleDateString("en-US", {
+              {new Intl.DateTimeFormat("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
-              })}
+                timeZone: "UTC",
+              }).format(new Date(fanflet.expiration_date + "T12:00:00Z"))}
             </p>
           )}
 
@@ -442,6 +448,14 @@ export function LandingPage({
             })}
           </div>
         ))}
+
+        {/* Audience Account CTA — platform-wide invitation to create a portfolio */}
+        <AudienceCTA
+          fanfletId={fanflet.id}
+          speakerSlug={speakerSlug}
+          fanfletSlug={fanfletSlug}
+          speakerName={speaker.name}
+        />
 
         {/* Sponsors Section */}
         {sponsorBlocks.length > 0 && (

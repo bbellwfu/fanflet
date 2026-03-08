@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { BuildingIcon } from "lucide-react";
 import { SponsorsFilterForm } from "./sponsors-filter-form";
@@ -23,6 +25,15 @@ export default async function SponsorsPage({
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   let query = supabase
     .from("sponsor_accounts")
@@ -176,7 +187,7 @@ export default async function SponsorsPage({
                     <VerificationBadge verified={sponsor.is_verified} />
                   </td>
                   <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                    {new Date(sponsor.created_at).toLocaleDateString()}
+                    {formatDate(sponsor.created_at, adminTimezone)}
                   </td>
                 </tr>
               ))}

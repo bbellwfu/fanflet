@@ -8,6 +8,7 @@ import { Plus, FileText, Pencil, ExternalLink } from "lucide-react";
 import { CloneFanfletButton } from "./clone-fanflet-button";
 import { CopyFanfletUrlButton } from "./copy-fanflet-url-button";
 import { getExpirationStatus } from "@/lib/expiration";
+import { formatDate } from "@fanflet/db/timezone";
 
 export default async function FanfletsPage() {
   const supabase = await createClient();
@@ -19,13 +20,15 @@ export default async function FanfletsPage() {
 
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("id, slug")
+    .select("id, slug, timezone")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!speaker) {
     redirect("/dashboard/settings");
   }
+
+  const speakerTimezone: string | null = (speaker as Record<string, unknown>).timezone as string | null ?? null;
 
   type FanfletRow = { id: string; title: string; event_name: string; event_date: string | null; slug: string; status: string; created_at: string; expiration_date?: string | null };
 
@@ -121,15 +124,6 @@ export default async function FanfletsPage() {
     );
   };
 
-  const formatDate = (d: string | null) => {
-    if (!d) return null;
-    return new Date(d).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
-
   const publicUrl = speaker.slug
     ? `${baseUrl}/${speaker.slug}`
     : null;
@@ -195,7 +189,7 @@ export default async function FanfletsPage() {
                       <p className="text-sm text-muted-foreground">
                         {fanflet.event_name}
                         {fanflet.event_date &&
-                          ` • ${formatDate(fanflet.event_date)}`}
+                          ` • ${formatDate(fanflet.event_date, speakerTimezone)}`}
                       </p>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-xs text-slate-600 font-mono truncate min-w-0">

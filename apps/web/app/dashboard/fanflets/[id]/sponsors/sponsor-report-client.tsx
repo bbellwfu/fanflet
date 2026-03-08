@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Eye, MousePointerClick, Users, Download, Loader2, ChevronDown, ChevronUp, Link2 } from "lucide-react";
 import { exportSponsorReportCsv, createSponsorReportToken } from "./actions";
 import { toast } from "sonner";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 type Lead = {
   id: string;
@@ -37,6 +39,7 @@ export function SponsorReportClient({
   fanfletTitle,
   sponsors,
 }: SponsorReportClientProps) {
+  const timezone = useTimezone();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exportingAll, setExportingAll] = useState(false);
   const [exportingId, setExportingId] = useState<string | null>(null);
@@ -214,7 +217,7 @@ export function SponsorReportClient({
                             <td className="hidden md:table-cell p-3">{lead.resource_title ?? "—"}</td>
                             <td className="hidden md:table-cell p-3">{lead.engagement_type}</td>
                             <td className="p-3 text-muted-foreground">
-                              {new Date(lead.created_at).toLocaleDateString()}
+                              {formatDate(lead.created_at, timezone)}
                             </td>
                           </tr>
                         ))}

@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { ExternalLink, FileTextIcon } from "lucide-react";
 
@@ -31,6 +33,15 @@ export default async function FanfletsPage({
   const params = await searchParams;
   const webUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   let query = supabase
     .from("fanflets")
@@ -192,11 +203,11 @@ export default async function FanfletsPage({
                     </td>
                     <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
                       {fanflet.published_at
-                        ? new Date(fanflet.published_at).toLocaleDateString()
+                        ? formatDate(fanflet.published_at, adminTimezone)
                         : "—"}
                     </td>
                     <td className="px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                      {new Date(fanflet.created_at).toLocaleDateString()}
+                      {formatDate(fanflet.created_at, adminTimezone)}
                     </td>
                   </tr>
                 );

@@ -25,13 +25,15 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [referralId, setReferralId] = useState<string | null>(null)
+  const [signupRole, setSignupRole] = useState<string | null>(null)
+  const [nextUrl, setNextUrl] = useState<string | null>(null)
 
-  // Capture referral param from URL and persist in localStorage
-  // (localStorage survives the OAuth redirect round-trip)
-  // Uses window.location instead of useSearchParams to avoid Suspense boundary requirement
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
+    const role = params.get('role')
+    const next = params.get('next')
+
     if (ref) {
       localStorage.setItem(REFERRAL_STORAGE_KEY, ref)
       setReferralId(ref)
@@ -39,6 +41,9 @@ export default function SignupPage() {
       const stored = localStorage.getItem(REFERRAL_STORAGE_KEY)
       if (stored) setReferralId(stored)
     }
+
+    if (role) setSignupRole(role)
+    if (next) setNextUrl(next)
   }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -67,9 +72,11 @@ export default function SignupPage() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      // referralId is already persisted in localStorage and will be
-      // available when the user returns from OAuth redirect
-      const result = await signInWithGoogle(referralId ?? undefined)
+      const result = await signInWithGoogle({
+        referredByFanfletId: referralId ?? undefined,
+        role: signupRole ?? undefined,
+        next: nextUrl ?? undefined,
+      })
       if (result?.error) {
         setError(result.error)
       }
@@ -166,10 +173,12 @@ export default function SignupPage() {
         </Link>
         <div className="space-y-1">
           <CardTitle className="text-2xl font-bold text-[#1B365D]">
-            Create your account
+            {signupRole === 'audience' ? 'Create your free account' : 'Create your account'}
           </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Start building lasting audience connections
+            {signupRole === 'audience'
+              ? 'Save this fanflet and build your personal portfolio'
+              : 'Start building lasting audience connections'}
           </CardDescription>
         </div>
       </CardHeader>
@@ -185,6 +194,12 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {referralId && (
             <input type="hidden" name="ref" value={referralId} />
+          )}
+          {signupRole && (
+            <input type="hidden" name="role" value={signupRole} />
+          )}
+          {nextUrl && (
+            <input type="hidden" name="next" value={nextUrl} />
           )}
           <div className="space-y-2">
             <Label htmlFor="name">Full name</Label>

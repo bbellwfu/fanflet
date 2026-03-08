@@ -8,12 +8,15 @@ const VALID_EVENT_TYPES = [
   'qr_scan', 'referral_click', 'resource_download', 'sms_bookmark',
 ] as const
 
+const SOURCE_VALUES = ['direct', 'qr', 'portfolio', 'share'] as const
+
 const TrackEventSchema = z.object({
   fanflet_id: z.string().uuid(),
   event_type: z.enum(VALID_EVENT_TYPES),
   resource_block_id: z.string().uuid().optional().nullable(),
   subscriber_id: z.string().uuid().optional().nullable(),
   referrer: z.string().max(2048).optional().nullable(),
+  source: z.enum(SOURCE_VALUES).optional().default('direct'),
 })
 
 export async function POST(request: NextRequest) {
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
     }
 
-    const { fanflet_id, event_type, resource_block_id, subscriber_id: rawSubscriberId, referrer: bodyReferrer } = parsed.data
+    const { fanflet_id, event_type, resource_block_id, subscriber_id: rawSubscriberId, referrer: bodyReferrer, source } = parsed.data
 
     // Generate visitor hash from IP + User-Agent + date (daily uniqueness)
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
       visitor_hash,
       device_type,
       referrer,
+      source: source ?? 'direct',
     })
 
     const subscriberId = rawSubscriberId ?? null

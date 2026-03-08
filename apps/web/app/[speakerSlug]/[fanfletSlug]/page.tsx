@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   const eventContext = resolvedFanflet.event_name
-    ? `${resolvedFanflet.event_name}${resolvedFanflet.event_date ? ` · ${new Date(resolvedFanflet.event_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : ""}`
+    ? `${resolvedFanflet.event_name}${resolvedFanflet.event_date ? ` · ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(resolvedFanflet.event_date + "T12:00:00Z"))}` : ""}`
     : "Presentation resources";
 
   return {
@@ -193,6 +193,8 @@ export default async function AudienceLandingPage({ params }: Props) {
         fanflet={fanfletWithBlocks}
         subscriberCount={subscriberCount ?? 0}
         showSmsBookmark={showSmsBookmark}
+        speakerSlug={speakerSlug}
+        fanfletSlug={fanfletSlug}
       />
     </div>
   );

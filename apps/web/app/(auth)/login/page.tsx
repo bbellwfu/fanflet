@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Loader2 } from 'lucide-react'
@@ -18,9 +19,16 @@ import { Label } from '@/components/ui/label'
 import { login, signInWithGoogle } from './actions'
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [nextUrl, setNextUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const next = searchParams.get('next')
+    if (next?.startsWith('/') && !next.startsWith('//')) setNextUrl(next)
+  }, [searchParams])
 
   async function handleSubmit(formData: FormData) {
     setError(null)
@@ -39,7 +47,7 @@ export default function LoginPage() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const result = await signInWithGoogle()
+      const result = await signInWithGoogle({ next: nextUrl ?? undefined })
       if (result?.error) {
         setError(result.error)
       }
@@ -85,6 +93,7 @@ export default function LoginPage() {
           </div>
         )}
         <form action={handleSubmit} className="space-y-4">
+          {nextUrl && <input type="hidden" name="next" value={nextUrl} />}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input

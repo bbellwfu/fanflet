@@ -3,10 +3,10 @@ export { createClient as createBrowserClient } from "./client";
 export { createServiceClient } from "./service";
 export { updateSession } from "./middleware";
 export { getSiteUrl } from "./config";
-export { getSpeakerEntitlements, hasFeature, getSpeakerLimits } from "./features";
+export { getSpeakerEntitlements, loadSpeakerEntitlements, hasFeature, getSpeakerLimits } from "./features";
 export { FREE_PLAN_NAME } from "./constants";
 export type { SpeakerEntitlements } from "./features";
-export { getSponsorEntitlements } from "./sponsor-features";
+export { getSponsorEntitlements, loadSponsorEntitlements } from "./sponsor-features";
 export type { SponsorEntitlements } from "./sponsor-features";
 export {
   STORAGE_BUCKET,
@@ -23,3 +23,17 @@ export {
   extractFilename,
 } from "./storage";
 export type { StorageQuota } from "./storage";
+export { createUserScopedClient } from "./user-client";
+export {
+  formatDate,
+  formatDateShort,
+  formatDateLong,
+  formatDateTime,
+  formatInTimezone,
+  toDateKeyInTimezone,
+  getTimezoneAbbreviation,
+  getTimezoneLabel,
+  getBrowserTimezone,
+  isValidTimezone,
+  TIMEZONE_OPTIONS,
+} from "./timezone";

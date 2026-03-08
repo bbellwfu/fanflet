@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireFanfletOwner } from '@/lib/auth-context'
 import { getSpeakerEntitlements } from '@fanflet/db'
+import { unpublishFanflet as coreUnpublishFanflet } from '@fanflet/core'
 import { DEFAULT_THEME_ID } from '@/lib/themes'
 import { ensureUrl } from '@/lib/utils'
 import {
@@ -178,15 +179,9 @@ export async function unpublishFanflet(id: string): Promise<{ error?: string; su
   }
   const { speakerId, supabase } = ctx
 
-  const { error } = await supabase
-    .from('fanflets')
-    .update({
-      status: 'draft',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
+  const result = await coreUnpublishFanflet(supabase, id)
 
-  if (error) return { error: error.message }
+  if (result.error) return { error: result.error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'unpublishFanflet', fanflet_id: id, speaker_id: speakerId })
   revalidatePath(`/dashboard/fanflets/${id}`)

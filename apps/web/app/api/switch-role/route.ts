@@ -3,12 +3,13 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 
 const SwitchRoleSchema = z.object({
-  role: z.enum(['speaker', 'sponsor']),
+  role: z.enum(['speaker', 'sponsor', 'audience']),
 })
 
 const ROLE_HOME: Record<string, string> = {
   speaker: '/dashboard',
   sponsor: '/sponsor/dashboard',
+  audience: '/my',
 }
 
 export async function POST(request: NextRequest) {

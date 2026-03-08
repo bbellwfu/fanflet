@@ -17,6 +17,8 @@ import { LogoCropModal } from "@/components/sponsor/logo-crop-modal";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Check, X, Loader2, Upload, Crop, Trash2, Building2, Users } from "lucide-react";
+import { TimezonePicker } from "@fanflet/ui/timezone-picker";
+import { TIMEZONE_OPTIONS, getBrowserTimezone } from "@fanflet/db/timezone";
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
 const MAX_LOGO_SIZE = 2 * 1024 * 1024;
@@ -41,6 +43,7 @@ interface SponsorSettingsFormProps {
     website_url: string | null;
     contact_email: string;
     industry: string | null;
+    timezone: string | null;
   };
   authUserId: string;
   userEmail: string;
@@ -54,6 +57,7 @@ export function SponsorSettingsForm({ sponsor, authUserId, userEmail }: SponsorS
   const [websiteUrl, setWebsiteUrl] = useState(sponsor.website_url ?? "");
   const [industry, setIndustry] = useState(sponsor.industry ?? "");
   const [logoUrl, setLogoUrl] = useState(sponsor.logo_url ?? "");
+  const [timezone, setTimezone] = useState(sponsor.timezone ?? getBrowserTimezone());
 
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -204,6 +208,7 @@ export function SponsorSettingsForm({ sponsor, authUserId, userEmail }: SponsorS
     formData.set("contact_email", contactEmail.trim());
     formData.set("website_url", websiteUrl.trim());
     formData.set("industry", industry.trim());
+    formData.set("timezone", timezone);
 
     const result = await updateSponsorProfile(formData);
 
@@ -433,6 +438,24 @@ export function SponsorSettingsForm({ sponsor, authUserId, userEmail }: SponsorS
               className="border-[#e2e8f0] focus:border-teal-500 focus:ring-teal-500/30"
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Timezone */}
+      <Card className="border-[#e2e8f0]">
+        <CardHeader>
+          <CardTitle className="text-zinc-900">Timezone</CardTitle>
+          <CardDescription>
+            Dates and times in your dashboard are displayed in this timezone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TimezonePicker
+            value={timezone}
+            onValueChange={setTimezone}
+            options={TIMEZONE_OPTIONS}
+            className="w-full max-w-sm border-[#e2e8f0] focus:border-teal-500 focus:ring-teal-500/30"
+          />
         </CardContent>
       </Card>
 

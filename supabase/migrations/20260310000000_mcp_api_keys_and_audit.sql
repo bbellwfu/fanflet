@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.mcp_api_keys (
   name TEXT NOT NULL DEFAULT 'Default',
   scopes TEXT[] DEFAULT '{}',
   role TEXT NOT NULL DEFAULT 'speaker'
-    CHECK (role IN ('speaker', 'sponsor', 'admin')),
+    CHECK (role IN ('speaker', 'sponsor', 'admin', 'audience')),
   last_used_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,

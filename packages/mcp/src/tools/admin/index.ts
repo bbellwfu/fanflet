@@ -1,9 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../types";
-import { McpToolError } from "../../types";
-import { writeAuditLog } from "../../middleware/audit";
-import { checkRateLimit } from "../../middleware/rate-limit";
+import { wrapTool } from "../shared";
 
 import {
   adminPlatformOverview,
@@ -48,31 +46,14 @@ import {
 } from "./waiting-list";
 import { adminGetSettings, adminUpdateSettings } from "./settings";
 
-type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
-
-function wrapTool(
-  ctx: ToolContext,
-  toolName: string,
-  handler: ToolHandler
-) {
-  return async (input: Record<string, unknown>) => {
-    checkRateLimit(ctx);
-    const start = Date.now();
-    try {
-      const result = await handler(input);
-      await writeAuditLog(ctx, toolName, input, "success", Date.now() - start);
-      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unknown error";
-      await writeAuditLog(ctx, toolName, input, "error", Date.now() - start, message);
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify({ error: message }) }],
-        isError: true,
-      };
-    }
-  };
-}
-
+/**
+ * Registers all admin tools.
+ *
+ * Admin tools use ctx.serviceClient (bypasses RLS) for cross-tenant queries.
+ * All tool names are prefixed with `admin_` by convention.
+ *
+ * @see packages/mcp/README.md for the full pattern guide.
+ */
 export function registerAdminTools(server: McpServer, ctx: ToolContext) {
   if (ctx.role !== "platform_admin") return;
 

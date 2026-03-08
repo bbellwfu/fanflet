@@ -1,7 +1,7 @@
 import { createServiceClient } from "@fanflet/db/service";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
-import type { ToolContext } from "./types";
+import type { ToolContext, McpRole } from "./types";
 import { verifyAccessToken as verifyOAuthToken } from "./oauth";
 
 const ADMIN_KEY_PREFIX = "fan_admin_";
@@ -32,12 +32,46 @@ async function resolveAdminRole(
   return !!roleRow;
 }
 
-function resolveRole(
+/**
+ * Resolves the MCP role for a user. Checks in priority order:
+ * 1. platform_admin (app_metadata or user_roles)
+ * 2. sponsor (has a sponsor_accounts row)
+ * 3. speaker (has a speakers row — default for authenticated users)
+ * 4. audience (fallback — has subscriber entries but no speaker/sponsor account)
+ */
+async function resolveUserRole(
+  serviceClient: SupabaseClient,
+  userId: string,
+  appMetadataRole?: string
+): Promise<McpRole> {
+  if (await resolveAdminRole(serviceClient, userId, appMetadataRole)) {
+    return "platform_admin";
+  }
+
+  const { data: sponsorRow } = await serviceClient
+    .from("sponsor_accounts")
+    .select("id")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  if (sponsorRow) return "sponsor";
+
+  const { data: speakerRow } = await serviceClient
+    .from("speakers")
+    .select("id")
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  if (speakerRow) return "speaker";
+
+  return "audience";
+}
+
+function resolveApiKeyRole(
   keyRole: string,
   isAdmin: boolean
-): "speaker" | "sponsor" | "platform_admin" {
+): McpRole {
   if (keyRole === "admin" && isAdmin) return "platform_admin";
   if (keyRole === "sponsor") return "sponsor";
+  if (keyRole === "audience") return "audience";
   return "speaker";
 }
 
@@ -75,7 +109,7 @@ export async function authenticateFromApiKey(
     keyRow.auth_user_id,
     undefined
   );
-  const role = resolveRole(keyRow.role, isAdmin);
+  const role = resolveApiKeyRole(keyRow.role, isAdmin);
 
   if (keyRow.role === "admin" && role !== "platform_admin") {
     throw new McpAuthError(
@@ -111,10 +145,7 @@ export async function authenticateFromHeaders(
   // Try MCP OAuth token first
   const oauthResult = await verifyOAuthToken(token);
   if (oauthResult) {
-    const isAdmin = await resolveAdminRole(serviceClient, oauthResult.userId);
-    const role: "speaker" | "sponsor" | "platform_admin" = isAdmin
-      ? "platform_admin"
-      : "speaker";
+    const role = await resolveUserRole(serviceClient, oauthResult.userId);
 
     return {
       userId: oauthResult.userId,
@@ -136,15 +167,7 @@ export async function authenticateFromHeaders(
   const appMetadataRole = (user.app_metadata as Record<string, unknown>)
     ?.role as string | undefined;
 
-  const isAdmin = await resolveAdminRole(
-    serviceClient,
-    user.id,
-    appMetadataRole
-  );
-
-  const role: "speaker" | "sponsor" | "platform_admin" = isAdmin
-    ? "platform_admin"
-    : "speaker";
+  const role = await resolveUserRole(serviceClient, user.id, appMetadataRole);
 
   return {
     userId: user.id,

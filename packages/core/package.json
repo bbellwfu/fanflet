@@ -13,7 +13,8 @@
     "./sponsor-connections": "./src/sponsor-connections.ts",
     "./sponsor-profile": "./src/sponsor-profile.ts",
     "./events": "./src/events.ts",
-    "./integrations": "./src/integrations/index.ts"
+    "./integrations": "./src/integrations/index.ts",
+    "./email-provider": "./src/email-provider.ts"
   },
   "scripts": {
     "test": "vitest run",

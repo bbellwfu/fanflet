@@ -13,6 +13,12 @@ function isSafeNext(next: string | null): next is string {
   return trimmed.startsWith('/') && !trimmed.startsWith('//')
 }
 
+/** Redirect to our MCP callback with state only; never use client-provided callback URL. */
+function getMcpCallbackRedirect(mcpState: string): string {
+  const siteUrl = getSiteUrl().replace(/\/$/, '')
+  return `${siteUrl}/api/mcp/callback?state=${encodeURIComponent(mcpState)}`
+}
+
 function resolveLoginDestination(
   roles: string[],
   activeRoleCookie: string | undefined,
@@ -33,6 +39,7 @@ function resolveLoginDestination(
 export async function login(formData: FormData) {
   const supabase = await createClient()
   const next = formData.get('next') as string | null
+  const mcpState = formData.get('mcp_state') as string | null
   const data = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
@@ -40,6 +47,11 @@ export async function login(formData: FormData) {
   const { data: authData, error } = await supabase.auth.signInWithPassword(data)
   if (error) {
     return { error: error.message }
+  }
+
+  if (mcpState && typeof mcpState === 'string' && mcpState.trim()) {
+    revalidatePath('/', 'layout')
+    redirect(getMcpCallbackRedirect(mcpState.trim()))
   }
 
   const user = authData.user
@@ -72,11 +84,15 @@ export async function login(formData: FormData) {
   redirect(isSafeNext(next) ? next : '/dashboard')
 }
 
-export async function signInWithGoogle(opts?: { next?: string }) {
+export async function signInWithGoogle(opts?: { next?: string; mcp_state?: string }) {
   const supabase = await createClient()
-  const siteUrl = getSiteUrl()
+  const siteUrl = getSiteUrl().replace(/\/$/, '')
   const params = new URLSearchParams()
-  if (opts?.next && isSafeNext(opts.next)) params.set('next', opts.next)
+  if (opts?.mcp_state && typeof opts.mcp_state === 'string' && opts.mcp_state.trim()) {
+    params.set('next', `/api/mcp/callback?state=${encodeURIComponent(opts.mcp_state.trim())}`)
+  } else if (opts?.next && isSafeNext(opts.next)) {
+    params.set('next', opts.next)
+  }
   const qs = params.toString()
   const callbackUrl = qs ? `${siteUrl}/auth/callback?${qs}` : `${siteUrl}/auth/callback`
   const { data, error } = await supabase.auth.signInWithOAuth({

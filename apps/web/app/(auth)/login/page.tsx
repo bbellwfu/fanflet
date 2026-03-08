@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
+  const mcpState = searchParams.get('mcp_state')
 
   useEffect(() => {
     const next = searchParams.get('next')
@@ -47,7 +48,10 @@ export default function LoginPage() {
     setError(null)
     setIsGoogleLoading(true)
     try {
-      const result = await signInWithGoogle({ next: nextUrl ?? undefined })
+      const result = await signInWithGoogle({
+        next: nextUrl ?? undefined,
+        mcp_state: mcpState ?? undefined,
+      })
       if (result?.error) {
         setError(result.error)
       }
@@ -94,6 +98,7 @@ export default function LoginPage() {
         )}
         <form action={handleSubmit} className="space-y-4">
           {nextUrl && <input type="hidden" name="next" value={nextUrl} />}
+          {mcpState && <input type="hidden" name="mcp_state" value={mcpState} />}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input

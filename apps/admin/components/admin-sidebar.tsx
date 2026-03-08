@@ -10,6 +10,7 @@ import {
   BuildingIcon,
   FileTextIcon,
   MailIcon,
+  MegaphoneIcon,
   ToggleLeftIcon,
   CreditCardIcon,
   LogOutIcon,
@@ -66,6 +67,12 @@ const navItems: NavItem[] = [
     href: "/analytics",
     label: "Analytics",
     icon: <BarChart3Icon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "communications",
+    href: "/communications",
+    label: "Communications",
+    icon: <MegaphoneIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "features",

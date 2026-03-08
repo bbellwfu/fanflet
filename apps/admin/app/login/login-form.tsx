@@ -19,9 +19,10 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 interface LoginFormProps {
   error: string | null;
+  mcpState?: string | null;
 }
 
-export function LoginForm({ error: initialError }: LoginFormProps) {
+export function LoginForm({ error: initialError, mcpState }: LoginFormProps) {
   const [error, setError] = useState<string | null>(
     initialError ? ERROR_MESSAGES[initialError] ?? initialError : null
   );
@@ -45,7 +46,9 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
     setError(null);
     setIsGoogleLoading(true);
     try {
-      const result = await signInWithGoogle();
+      const result = await signInWithGoogle({
+        mcp_state: mcpState ?? undefined,
+      });
       if (result?.error) {
         setError(result.error);
       }
@@ -84,6 +87,9 @@ export function LoginForm({ error: initialError }: LoginFormProps) {
           )}
 
           <form action={handleSubmit} className="space-y-4">
+            {mcpState && (
+              <input type="hidden" name="mcp_state" value={mcpState} />
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="email" className="text-[13px] font-medium text-fg">
                 Email

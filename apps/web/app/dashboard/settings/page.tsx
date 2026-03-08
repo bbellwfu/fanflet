@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@fanflet/db/service";
 import { getSpeakerEntitlements } from "@fanflet/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { SettingsForm } from "@/components/dashboard/settings-form";
+import { NotificationPreferences } from "@/components/dashboard/notification-preferences";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getSiteUrl } from "@/lib/config";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -23,6 +26,19 @@ export default async function SettingsPage() {
   const entitlements = speaker ? await getSpeakerEntitlements(speaker.id) : null;
   const allowMultipleThemes = entitlements?.features.has("multiple_theme_colors") ?? false;
   const currentPlanDisplayName = entitlements?.planDisplayName ?? "Free";
+  const mcpServerUrl = `${getSiteUrl().replace(/\/$/, "")}/api/mcp`;
+
+  let platformAnnouncementsOptedIn = false;
+  if (speaker) {
+    const serviceSupabase = createServiceClient();
+    const { data: pref } = await serviceSupabase
+      .from("platform_communication_preferences")
+      .select("opted_in")
+      .eq("speaker_id", speaker.id)
+      .eq("category", "platform_announcements")
+      .maybeSingle();
+    platformAnnouncementsOptedIn = pref?.opted_in ?? false;
+  }
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -42,6 +58,8 @@ export default async function SettingsPage() {
           allowMultipleThemes={allowMultipleThemes}
         />
 
+        <NotificationPreferences initialOptedIn={platformAnnouncementsOptedIn} />
+
         <Card id="subscription" className="border-[#e2e8f0]">
           <CardHeader>
             <CardTitle className="text-[#1B365D]">Subscription</CardTitle>
@@ -56,6 +74,39 @@ export default async function SettingsPage() {
             <Button asChild variant="outline" className="border-[#1B365D] text-[#1B365D] hover:bg-[#1B365D]/5">
               <Link href="/pricing">View plans and upgrade</Link>
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card id="ai-assistant" className="border-[#e2e8f0]">
+          <CardHeader>
+            <CardTitle className="text-[#1B365D]">Use Fanflet in AI assistants</CardTitle>
+            <CardDescription>
+              Create and manage fanflets, check analytics, and draft subscriber emails directly
+              from Claude Desktop, Cursor, or any MCP-compatible AI assistant.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-[#1B365D]">How to connect</p>
+                <ol className="mt-2 space-y-1.5 text-sm text-muted-foreground list-decimal list-inside">
+                  <li>In your AI assistant, add a new remote MCP server.</li>
+                  <li>Enter the server URL below.</li>
+                  <li>Sign in with your Fanflet account when prompted.</li>
+                </ol>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Server URL</p>
+                <code className="block rounded-md border border-[#e2e8f0] bg-slate-50 px-3 py-2 text-sm font-mono text-[#1B365D] select-all">
+                  {mcpServerUrl}
+                </code>
+              </div>
+            </div>
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
+              Once connected, ask your AI assistant things like &ldquo;show my fanflets,&rdquo;
+              &ldquo;create a fanflet for my next talk,&rdquo; or &ldquo;how many subscribers did I
+              get this week?&rdquo;
+            </div>
           </CardContent>
         </Card>
     </div>

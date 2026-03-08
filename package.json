@@ -18,7 +18,8 @@
     "db:migration:new": "npx supabase migration new",
     "db:push": "npx supabase db push",
     "db:status": "npx supabase migration list",
-    "db:types": "npx supabase gen types typescript --linked > packages/types/src/database.ts"
+    "db:types": "npx supabase gen types typescript --linked > packages/types/src/database.ts",
+    "test": "turbo test"
   },
   "devDependencies": {
     "supabase": "^2.76.9",

@@ -1,0 +1,29 @@
+{
+  "name": "@fanflet/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fanflets": "./src/fanflets.ts",
+    "./resource-blocks": "./src/resource-blocks.ts",
+    "./subscribers": "./src/subscribers.ts",
+    "./analytics": "./src/analytics.ts",
+    "./sponsor-connections": "./src/sponsor-connections.ts",
+    "./sponsor-profile": "./src/sponsor-profile.ts",
+    "./events": "./src/events.ts",
+    "./integrations": "./src/integrations/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^4.0.18"
+  }
+}

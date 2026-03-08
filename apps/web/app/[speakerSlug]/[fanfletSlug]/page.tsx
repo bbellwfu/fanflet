@@ -193,6 +193,8 @@ export default async function AudienceLandingPage({ params }: Props) {
         fanflet={fanfletWithBlocks}
         subscriberCount={subscriberCount ?? 0}
         showSmsBookmark={showSmsBookmark}
+        speakerSlug={speakerSlug}
+        fanfletSlug={fanfletSlug}
       />
     </div>
   );

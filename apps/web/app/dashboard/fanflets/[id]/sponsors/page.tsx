@@ -91,12 +91,13 @@ export default async function FanfletSponsorsReportPage({
     }
   }
 
-  // Page views for this fanflet (impressions)
+  // Page views for this fanflet (impressions; exclude portfolio revisits for sponsor accuracy)
   const { count: impressions } = await supabase
     .from("analytics_events")
     .select("*", { count: "exact", head: true })
     .eq("fanflet_id", fanfletId)
-    .eq("event_type", "page_view");
+    .eq("event_type", "page_view")
+    .or("source.is.null,source.neq.portfolio");
 
   // Clicks per sponsor (resource_click where resource_block_id in sponsor's blocks)
   const allBlockIds = Object.values(blockIdsBySponsor).flat();

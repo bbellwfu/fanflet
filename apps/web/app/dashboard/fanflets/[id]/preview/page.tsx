@@ -124,6 +124,8 @@ export default async function FanfletPreviewPage({
         speaker={speaker}
         fanflet={fanfletWithBlocks}
         subscriberCount={subscriberCount ?? 0}
+        speakerSlug={speaker.slug ?? ""}
+        fanfletSlug={fanflet.slug ?? ""}
       />
     </div>
   );

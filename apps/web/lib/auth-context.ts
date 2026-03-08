@@ -22,6 +22,12 @@ export interface SponsorContext {
   supabase: SupabaseClient;
 }
 
+export interface AudienceContext {
+  user: AuthUser;
+  audienceId: string;
+  supabase: SupabaseClient;
+}
+
 export interface FanfletOwnerContext extends SpeakerContext {
   fanfletId: string;
 }
@@ -76,6 +82,32 @@ export const requireSponsor = cache(async (): Promise<SponsorContext> => {
   }
 
   return { user, sponsorId: sponsor.id, supabase };
+});
+
+/**
+ * Require an authenticated audience member. Redirects to login if not
+ * authenticated or if no audience_accounts row exists for this user.
+ * Cached per request via React cache().
+ */
+export const requireAudience = cache(async (): Promise<AudienceContext> => {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const { data: audience } = await supabase
+    .from("audience_accounts")
+    .select("id")
+    .eq("auth_user_id", user.id)
+    .single();
+
+  if (!audience) {
+    redirect("/login");
+  }
+
+  return { user, audienceId: audience.id, supabase };
 });
 
 /**

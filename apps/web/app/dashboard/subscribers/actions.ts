@@ -3,6 +3,11 @@
 import { revalidatePath } from 'next/cache'
 import { requireSpeaker } from '@/lib/auth-context'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
+import {
+  listSubscribers as coreListSubscribers,
+  deleteSubscriber as coreDeleteSubscriber,
+  deleteSubscribers as coreDeleteSubscribers,
+} from '@fanflet/core'
 
 export type SubscriberRow = {
   id: string
@@ -18,42 +23,10 @@ export async function listSubscribers(): Promise<{
   error?: string
 }> {
   const { supabase, speakerId } = await requireSpeaker()
+  const result = await coreListSubscribers(supabase, speakerId)
 
-  const { data: subscribers, error } = await supabase
-    .from('subscribers')
-    .select('id, email, name, created_at, source_fanflet_id')
-    .eq('speaker_id', speakerId)
-    .order('created_at', { ascending: false })
-
-  if (error) return { error: error.message }
-
-  // Gather unique fanflet IDs to fetch titles in one query
-  const fanfletIds = [...new Set(
-    (subscribers ?? []).map((s) => s.source_fanflet_id).filter(Boolean) as string[]
-  )]
-
-  let fanfletTitles: Record<string, string> = {}
-  if (fanfletIds.length > 0) {
-    const { data: fanflets } = await supabase
-      .from('fanflets')
-      .select('id, title')
-      .in('id', fanfletIds)
-
-    if (fanflets) {
-      fanfletTitles = Object.fromEntries(fanflets.map((f) => [f.id, f.title]))
-    }
-  }
-
-  const rows: SubscriberRow[] = (subscribers ?? []).map((s) => ({
-    id: s.id,
-    email: s.email,
-    name: s.name,
-    created_at: s.created_at,
-    source_fanflet_id: s.source_fanflet_id,
-    source_fanflet_title: s.source_fanflet_id ? (fanfletTitles[s.source_fanflet_id] ?? null) : null,
-  }))
-
-  return { data: rows }
+  if (result.error) return { error: result.error.message }
+  return { data: result.data }
 }
 
 export async function deleteSubscriber(
@@ -62,15 +35,15 @@ export async function deleteSubscriber(
   await blockImpersonationWrites()
   const { supabase, speakerId } = await requireSpeaker()
 
-  const { error } = await supabase
-    .from('subscribers')
-    .delete()
-    .eq('id', subscriberId)
-    .eq('speaker_id', speakerId)
+  const result = await coreDeleteSubscriber(supabase, speakerId, subscriberId)
 
-  if (error) return { error: error.message }
+  if (result.error) return { error: result.error.message }
 
-  await logImpersonationAction('mutation', '/dashboard/subscribers', { action: 'deleteSubscriber', speaker_id: speakerId, subscriber_id: subscriberId })
+  await logImpersonationAction('mutation', '/dashboard/subscribers', {
+    action: 'deleteSubscriber',
+    speaker_id: speakerId,
+    subscriber_id: subscriberId,
+  })
   revalidatePath('/dashboard/subscribers')
   return { success: true }
 }
@@ -81,17 +54,16 @@ export async function deleteSubscribers(
   await blockImpersonationWrites()
   const { supabase, speakerId } = await requireSpeaker()
 
-  if (subscriberIds.length === 0) return { error: 'No subscribers selected' }
+  const result = await coreDeleteSubscribers(supabase, speakerId, subscriberIds)
 
-  const { error, count } = await supabase
-    .from('subscribers')
-    .delete({ count: 'exact' })
-    .in('id', subscriberIds)
-    .eq('speaker_id', speakerId)
+  if (result.error) return { error: result.error.message }
 
-  if (error) return { error: error.message }
-
-  await logImpersonationAction('mutation', '/dashboard/subscribers', { action: 'deleteSubscribers', speaker_id: speakerId, subscriber_ids: subscriberIds, deleted_count: count ?? 0 })
+  await logImpersonationAction('mutation', '/dashboard/subscribers', {
+    action: 'deleteSubscribers',
+    speaker_id: speakerId,
+    subscriber_ids: subscriberIds,
+    deleted_count: result.data?.deletedCount ?? 0,
+  })
   revalidatePath('/dashboard/subscribers')
-  return { success: true, deletedCount: count ?? 0 }
+  return { success: true, deletedCount: result.data?.deletedCount ?? 0 }
 }

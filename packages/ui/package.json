@@ -19,7 +19,8 @@
     "./alert-dialog": "./src/alert-dialog.tsx",
     "./dialog": "./src/dialog.tsx",
     "./slider": "./src/slider.tsx",
-    "./utils": "./src/utils.ts"
+    "./utils": "./src/utils.ts",
+    "./timezone-picker": "./src/timezone-picker.tsx"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

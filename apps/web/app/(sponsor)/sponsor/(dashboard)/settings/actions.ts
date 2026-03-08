@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireSponsor } from "@/lib/auth-context";
 import { blockImpersonationWrites, logImpersonationAction } from "@/lib/impersonation";
+import { isValidTimezone } from "@fanflet/db/timezone";
 
 export async function updateSponsorProfile(formData: FormData) {
   await blockImpersonationWrites();
@@ -14,6 +15,8 @@ export async function updateSponsorProfile(formData: FormData) {
   const contactEmail = (formData.get("contact_email") as string)?.trim();
   const websiteUrl = (formData.get("website_url") as string)?.trim() || null;
   const industry = (formData.get("industry") as string)?.trim() || null;
+  const timezoneRaw = formData.get("timezone") as string | null;
+  const timezone = timezoneRaw && isValidTimezone(timezoneRaw) ? timezoneRaw : null;
 
   if (!companyName) {
     return { error: "Company name is required." };
@@ -44,6 +47,7 @@ export async function updateSponsorProfile(formData: FormData) {
       contact_email: contactEmail,
       website_url: websiteUrl,
       industry,
+      timezone,
     })
     .eq("id", sponsorId);
 

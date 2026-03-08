@@ -1,4 +1,6 @@
+import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { MailIcon } from "lucide-react";
 
@@ -14,6 +16,15 @@ type SubscriberRow = {
 
 export default async function SubscribersPage() {
   const supabase = createServiceClient();
+
+  const authSupabase = await createClient();
+  const { data: { user } } = await authSupabase.auth.getUser();
+  const { data: adminPrefs } = await supabase
+    .from("admin_notification_preferences")
+    .select("timezone")
+    .eq("admin_user_id", user!.id)
+    .maybeSingle();
+  const adminTimezone = adminPrefs?.timezone ?? null;
 
   const { data: subscribers, error } = await supabase
     .from("subscribers")
@@ -90,7 +101,7 @@ export default async function SubscribersPage() {
                     </Link>
                   </td>
                   <td className="hidden sm:table-cell px-5 py-3.5 text-[12px] text-fg-muted align-middle">
-                    {new Date(sub.created_at).toLocaleDateString()}
+                    {formatDate(sub.created_at, adminTimezone)}
                   </td>
                 </tr>
               ))}

@@ -14,7 +14,8 @@
     "./features": "./src/features.ts",
     "./constants": "./src/constants.ts",
     "./storage": "./src/storage.ts",
-    "./impersonation": "./src/impersonation.ts"
+    "./impersonation": "./src/impersonation.ts",
+    "./timezone": "./src/timezone.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

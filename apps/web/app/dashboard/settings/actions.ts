@@ -8,6 +8,7 @@ import { DEFAULT_THEME_ID, THEME_PRESETS } from '@/lib/themes'
 import { toSocialLinksRecord } from '@/lib/speaker-preferences'
 import { ensureUrl } from '@/lib/utils'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
+import { isValidTimezone } from '@fanflet/db/timezone'
 
 export async function updateSpeakerProfile(formData: FormData) {
   await blockImpersonationWrites()
@@ -22,6 +23,8 @@ export async function updateSpeakerProfile(formData: FormData) {
   const twitter = formData.get('twitter') as string
   const website = formData.get('website') as string
   const defaultThemePreset = formData.get('default_theme_preset') as string
+  const timezoneRaw = formData.get('timezone') as string | null
+  const timezone = timezoneRaw && isValidTimezone(timezoneRaw) ? timezoneRaw : null
   const confirmationEmailEnabled = formData.get('confirmation_email_enabled') === 'true'
   const confirmationEmailBody = (formData.get('confirmation_email_body') as string) ?? ''
 
@@ -77,6 +80,7 @@ export async function updateSpeakerProfile(formData: FormData) {
     bio,
     slug,
     social_links: socialLinks,
+    timezone,
   }
 
   if (removePhoto) {
@@ -101,6 +105,29 @@ export async function updateSpeakerProfile(formData: FormData) {
   await logImpersonationAction('mutation', '/dashboard/settings', { action: 'updateSpeakerProfile', speaker_id: speakerId })
   revalidatePath('/dashboard/settings')
   return { success: true }
+}
+
+/**
+ * Auto-detect backfill: sets timezone only if the speaker doesn't have one yet.
+ * Called by TimezoneSync on first authenticated page load.
+ */
+export async function syncTimezone(tz: string) {
+  const { speakerId, supabase } = await requireSpeaker()
+
+  if (!isValidTimezone(tz)) return
+
+  const { data: current } = await supabase
+    .from('speakers')
+    .select('timezone')
+    .eq('id', speakerId)
+    .single()
+
+  if (current?.timezone) return
+
+  await supabase
+    .from('speakers')
+    .update({ timezone: tz })
+    .eq('id', speakerId)
 }
 
 export async function checkSlugAvailability(slug: string) {

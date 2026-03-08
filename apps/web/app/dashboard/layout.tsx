@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib/speaker-preferences";
 import { notifyAdmins } from "@/lib/admin-notifications";
+import { TimezoneProvider } from "@/lib/timezone-context";
+import { TimezoneSync } from "@/lib/timezone-sync";
 
 export default async function DashboardLayout({
   children,
@@ -104,17 +106,22 @@ export default async function DashboardLayout({
   const cookieStore = await cookies();
   const activeRole = cookieStore.get("active_role")?.value ?? "speaker";
 
+  const speakerTimezone: string | null = (speaker as Record<string, unknown>).timezone as string | null ?? null;
+
   return (
-    <Sidebar
-      user={user}
-      speaker={speaker}
-      fanfletCount={fanfletCount}
-      publishedFanfletCount={publishedFanfletCount}
-      surveyQuestionCount={surveyQuestionCount}
-      resourceLibraryCount={resourceLibraryCount}
-      activeRole={activeRole}
-    >
-      {children}
-    </Sidebar>
+    <TimezoneProvider timezone={speakerTimezone}>
+      <TimezoneSync currentTimezone={speakerTimezone} />
+      <Sidebar
+        user={user}
+        speaker={speaker}
+        fanfletCount={fanfletCount}
+        publishedFanfletCount={publishedFanfletCount}
+        surveyQuestionCount={surveyQuestionCount}
+        resourceLibraryCount={resourceLibraryCount}
+        activeRole={activeRole}
+      >
+        {children}
+      </Sidebar>
+    </TimezoneProvider>
   );
 }

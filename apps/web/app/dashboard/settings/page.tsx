@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("id, name, bio, photo_url, slug, social_links")
+    .select("id, name, bio, photo_url, slug, social_links, timezone")
     .eq("auth_user_id", user.id)
     .single();
 

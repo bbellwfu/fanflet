@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plus, Users, ArrowUpRight, MousePointerClick } from "lucide-react";
 import DashboardChart from "@/components/dashboard-chart";
+import { formatDate, formatDateShort, toDateKeyInTimezone } from "@fanflet/db/timezone";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -14,12 +15,13 @@ export default async function DashboardPage() {
 
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("id, name")
+    .select("id, name, timezone")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!speaker) redirect("/dashboard/settings");
 
+  const speakerTimezone: string | null = (speaker as Record<string, unknown>).timezone as string | null ?? null;
   const displayName = speaker.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "there";
 
   // Fetch speaker's fanflets
@@ -67,7 +69,7 @@ export default async function DashboardPage() {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     chartData.push({
-      date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: formatDateShort(d, speakerTimezone),
       subscribers: 0,
       pageViews: 0,
       resourceClicks: 0,
@@ -93,17 +95,17 @@ export default async function DashboardPage() {
     chartData.forEach((row, idx) => {
       const d = new Date(now);
       d.setDate(d.getDate() - (59 - idx));
-      const key = d.toISOString().split("T")[0];
+      const key = toDateKeyInTimezone(d.toISOString(), speakerTimezone);
       dateCounts[key] = { subscribers: 0, pageViews: 0, resourceClicks: 0 };
     });
 
     subsByDate?.forEach((s) => {
-      const key = (s.created_at as string).split("T")[0];
+      const key = toDateKeyInTimezone(s.created_at as string, speakerTimezone);
       if (dateCounts[key]) dateCounts[key].subscribers++;
     });
 
     events?.forEach((e) => {
-      const key = (e.created_at as string).split("T")[0];
+      const key = toDateKeyInTimezone(e.created_at as string, speakerTimezone);
       if (dateCounts[key]) {
         if (e.event_type === "page_view") dateCounts[key].pageViews++;
         else if (e.event_type === "resource_click") dateCounts[key].resourceClicks++;
@@ -113,7 +115,7 @@ export default async function DashboardPage() {
     chartData.forEach((row, idx) => {
       const d = new Date(now);
       d.setDate(d.getDate() - (59 - idx));
-      const key = d.toISOString().split("T")[0];
+      const key = toDateKeyInTimezone(d.toISOString(), speakerTimezone);
       const counts = dateCounts[key];
       if (counts) {
         row.subscribers = counts.subscribers;
@@ -233,16 +235,8 @@ export default async function DashboardPage() {
                           ? "bg-slate-200 text-slate-600"
                           : "bg-slate-200 text-slate-600";
                     const dateStr = fanflet.event_date
-                      ? new Date(fanflet.event_date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : new Date(fanflet.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        });
+                      ? formatDate(fanflet.event_date, speakerTimezone)
+                      : formatDate(fanflet.created_at, speakerTimezone);
                     return (
                       <Link
                         key={fanflet.id}

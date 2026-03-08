@@ -13,6 +13,8 @@ import {
 import { respondToConnection, endSponsorConnection, hideSpeakerConnectionFromView } from "./actions";
 import { toast } from "sonner";
 import { Loader2, Check, X } from "lucide-react";
+import { formatDate } from "@fanflet/db/timezone";
+import { useTimezone } from "@/lib/timezone-context";
 
 type Connection = {
   id: string;
@@ -37,6 +39,7 @@ interface ConnectionsListProps {
 }
 
 export function ConnectionsList({ connections }: ConnectionsListProps) {
+  const timezone = useTimezone();
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [endingId, setEndingId] = useState<string | null>(null);
   const [hideId, setHideId] = useState<string | null>(null);
@@ -108,8 +111,8 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
       {connections.map((conn) => {
         const statusLabel = displayStatus(conn.status, conn.endedAt);
         const subtitle = conn.endedAt
-          ? `${statusLabel} · Ended ${new Date(conn.endedAt).toLocaleDateString()}`
-          : `Requested ${conn.initiatedBy === "speaker" ? "by speaker" : "by you"} · ${new Date(conn.createdAt).toLocaleDateString()}`;
+          ? `${statusLabel} · Ended ${formatDate(conn.endedAt, timezone)}`
+          : `Requested ${conn.initiatedBy === "speaker" ? "by speaker" : "by you"} · ${formatDate(conn.createdAt, timezone)}`;
         const canEndConnection = conn.status === "active" && !conn.endedAt;
         const canHideFromView =
           conn.status === "revoked" ||

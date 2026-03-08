@@ -20,6 +20,8 @@ import { FramedAvatar } from "@/components/dashboard/framed-avatar";
 import { getDefaultThemePreset } from "@/lib/speaker-preferences";
 import { toast } from "sonner";
 import { Check, X, Loader2, Upload, Trash2 } from "lucide-react";
+import { TimezonePicker } from "@fanflet/ui/timezone-picker";
+import { TIMEZONE_OPTIONS, getBrowserTimezone } from "@fanflet/db/timezone";
 
 type ConfirmationEmailSettings = {
   enabled?: boolean;
@@ -33,6 +35,7 @@ type SpeakerProfile = {
   bio: string | null;
   photo_url: string | null;
   slug: string | null;
+  timezone: string | null;
   social_links: {
     linkedin?: string;
     twitter?: string;
@@ -87,6 +90,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
   const [twitter, setTwitter] = useState(speaker?.social_links?.twitter ?? "");
   const [website, setWebsite] = useState(speaker?.social_links?.website ?? "");
   const [defaultThemePreset, setDefaultThemePreset] = useState(getDefaultThemePreset(speaker?.social_links ?? null));
+  const [timezone, setTimezone] = useState(speaker?.timezone ?? getBrowserTimezone());
 
   // Confirmation email settings
   const [confirmationEmailEnabled, setConfirmationEmailEnabled] = useState(
@@ -286,6 +290,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
     formData.set("twitter", twitter.trim());
     formData.set("website", website.trim());
     formData.set("default_theme_preset", defaultThemePreset);
+    formData.set("timezone", timezone);
     formData.set("confirmation_email_enabled", confirmationEmailEnabled.toString());
     formData.set("confirmation_email_body", confirmationEmailBody);
 
@@ -469,6 +474,23 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
               fanflet.com/{slug || "your-slug"}.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card id="timezone-section" className="border-[#e2e8f0]">
+        <CardHeader>
+          <CardTitle className="text-[#1B365D]">Timezone</CardTitle>
+          <CardDescription>
+            Dates and times in your dashboard are displayed in this timezone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TimezonePicker
+            value={timezone}
+            onValueChange={setTimezone}
+            options={TIMEZONE_OPTIONS}
+            className="w-full max-w-sm border-[#e2e8f0] focus:border-[#3BA5D9] focus:ring-[#3BA5D9]/30"
+          />
         </CardContent>
       </Card>
 

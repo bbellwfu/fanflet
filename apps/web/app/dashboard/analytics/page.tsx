@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  BarChart3, Eye, MousePointerClick, Users, Percent, QrCode,
+  BarChart3, Eye, MousePointerClick, Users, Percent,
   TrendingUp, TrendingDown, Minus, Smartphone, Globe, Filter,
   Link2, FileDown, Building2, Type,
 } from "lucide-react";
@@ -630,7 +630,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
               <ActivityHeatmap data={Array.from({ length: 7 * 24 }, (_, i) => ({
                 dayOfWeek: Math.floor(i / 24),
                 hour: i % 24,
-                count: Math.floor(Math.random() * 10),
+                count: ((i * 7 + 3) % 11),
               }))} />
             </div>
           </LockedFeatureCard>

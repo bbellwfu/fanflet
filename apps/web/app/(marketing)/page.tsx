@@ -1,6 +1,18 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, QrCode, Zap, CheckCircle2 } from "lucide-react";
+import { ArrowRight, QrCode, Zap, CheckCircle2, Mic, Building2, Heart } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Fanflet — Turn Event Talks into Lasting Engagement",
+  description:
+    "The professional way to share resources, capture leads, and dazzle sponsors. One QR code. Zero friction. Lifelong fans.",
+  openGraph: {
+    title: "Fanflet — Turn Event Talks into Lasting Engagement",
+    description:
+      "The professional way to share resources, capture leads, and dazzle sponsors. One QR code. Zero friction. Lifelong fans.",
+  },
+};
 
 export default function MarketingHome() {
   return (
@@ -93,6 +105,150 @@ export default function MarketingHome() {
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-3">Sponsor ROI</h3>
               <p className="text-slate-600">Give sponsors measurable visibility. Track clicks and engagement on their assets, proving your value.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* For Speakers */}
+      <div className="py-24 bg-slate-50" id="speakers">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-primary mb-6">
+                <Mic className="w-6 h-6" />
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl mb-4">For Speakers</h2>
+              <p className="text-lg text-slate-600 mb-6">
+                Your stage, your audience, your platform. Share resources instantly via QR code,
+                capture leads, and build lasting relationships that extend far beyond the event.
+              </p>
+              <ul className="space-y-3 text-slate-600">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Branded resource pages with your slides, links, files, and downloads</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Build your subscriber list independently from event organizers</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Analytics dashboard to track engagement across every talk</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Centralized resource library — update once, propagate everywhere</span>
+                </li>
+              </ul>
+              <Link href="/signup" className="inline-flex items-center gap-2 mt-8 text-primary font-semibold hover:text-primary/80 transition-colors">
+                Start sharing your resources <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden bg-white">
+              <Image
+                src="/marketing/speaker-dashboard.png"
+                alt="Fanflet speaker dashboard showing subscriber count, resource downloads, engagement analytics, and fanflet management"
+                width={1024}
+                height={576}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* For Sponsors */}
+      <div className="py-24 bg-white" id="sponsors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div className="order-2 md:order-1 rounded-2xl border border-slate-200 shadow-lg overflow-hidden bg-white">
+              <Image
+                src="/marketing/sponsor-analytics.png"
+                alt="Sponsor analytics dashboard showing content clicks, impressions, and audience breakdown"
+                width={1024}
+                height={576}
+                className="w-full h-auto"
+              />
+            </div>
+            <div className="order-1 md:order-2">
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center text-purple-600 mb-6">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl mb-4">For Sponsors</h2>
+              <p className="text-lg text-slate-600 mb-6">
+                Stop guessing whether your sponsorship dollars are working. Get measurable visibility
+                with the professional audiences that matter most to your business.
+              </p>
+              <ul className="space-y-3 text-slate-600">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Track clicks and engagement on your sponsored content</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Connect directly with top educators and Key Opinion Leaders</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Branded placement alongside trusted speaker content</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Real ROI data to justify and optimize your sponsorship spend</span>
+                </li>
+              </ul>
+              <Link href="/signup" className="inline-flex items-center gap-2 mt-8 text-primary font-semibold hover:text-primary/80 transition-colors">
+                Learn about sponsoring <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* For Fans */}
+      <div className="py-24 bg-slate-50" id="fans">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6">
+                <Heart className="w-6 h-6" />
+              </div>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl mb-4">For Fans</h2>
+              <p className="text-lg text-slate-600 mb-6">
+                Instant access to everything from your favorite speakers. No app to install,
+                no account to create, no friction. Just scan and go.
+              </p>
+              <ul className="space-y-3 text-slate-600">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Scan a QR code and get slides, links, and resources on your phone instantly</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Bookmark via SMS so you never lose a great resource again</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Subscribe to speakers you love and stay connected</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Access everything on any device — mobile, tablet, or desktop</span>
+                </li>
+              </ul>
+              <Link href="/demo" className="inline-flex items-center gap-2 mt-8 text-primary font-semibold hover:text-primary/80 transition-colors">
+                See a live demo <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-slate-200 shadow-lg overflow-hidden bg-white">
+              <Image
+                src="/marketing/fan-landing-page.png"
+                alt="Fanflet public landing page showing speaker profile, presentation details, email subscribe, and resource cards"
+                width={1280}
+                height={720}
+                className="w-full h-auto"
+              />
             </div>
           </div>
         </div>

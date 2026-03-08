@@ -2,7 +2,7 @@
 
 **Author:** Brian Bell
 **Date:** 2026-03-08
-**Status:** Draft
+**Status:** In Progress (Phase 1 implemented)
 **Companion docs:** `docs/ADR_MCP_ARCHITECTURE.md` (general MCP architecture), `PRDs/MCP_INTEGRATION_VISION.md` (speaker/sponsor vision)
 
 ---

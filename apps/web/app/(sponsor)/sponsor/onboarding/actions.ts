@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { notifyAdmins } from '@/lib/admin-notifications'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
@@ -58,11 +59,14 @@ export async function createSponsorProfile(formData: FormData) {
   })
 
   if (inserted?.id) {
-    notifyAdmins('sponsor_signup', {
-      sponsorId: inserted.id,
-      companyName,
-      contactEmail,
-    }).catch(() => {})
+    const sponsorId = inserted.id
+    after(async () => {
+      await notifyAdmins('sponsor_signup', {
+        sponsorId,
+        companyName,
+        contactEmail,
+      })
+    })
   }
 
   redirect('/sponsor/dashboard')

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@fanflet/db/server";
+import { Resend } from "resend";
 import { revalidatePath } from "next/cache";
 import { isValidTimezone } from "@fanflet/db/timezone";
 
@@ -115,7 +116,6 @@ export async function sendTestNotification(): Promise<{ error?: string; success?
     return { error: "No email address found for your account." };
   }
 
-  const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
   const from = process.env.RESEND_FROM ?? "Fanflet <onboarding@resend.dev>";
   const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL ?? "https://admin.fanflet.com";

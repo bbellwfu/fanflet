@@ -1,13 +1,24 @@
 import { createServiceClient } from "@fanflet/db/service";
 
+/**
+ * Resolves the base URL for the current app. Each Next.js app should
+ * set the appropriate env var:
+ *
+ * - apps/web:   NEXT_PUBLIC_SITE_URL  (fanflet.com / localhost:3000)
+ * - apps/admin: NEXT_PUBLIC_ADMIN_URL (admin.fanflet.com / localhost:3001)
+ *
+ * Route handlers should pass their app's base URL explicitly to avoid ambiguity.
+ */
 export function getMcpBaseUrl(): string {
+  const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (siteUrl) return siteUrl.replace(/\/$/, "");
+  const url = adminUrl ?? siteUrl;
+  if (url) return url.replace(/\/$/, "");
   return "http://localhost:3000";
 }
 
-export function getMcpEndpoint(): string {
-  return `${getMcpBaseUrl()}/api/mcp`;
+export function getMcpEndpoint(baseUrl?: string): string {
+  return `${baseUrl ?? getMcpBaseUrl()}/api/mcp`;
 }
 
 async function sha256(input: string): Promise<string> {
@@ -45,30 +56,38 @@ export async function verifyPkceChallenge(
   return computed === codeChallenge;
 }
 
-export function getOAuthMetadata() {
-  const baseUrl = getMcpBaseUrl();
+/**
+ * OAuth 2.1 Authorization Server Metadata.
+ * Pass the app's base URL (e.g., from NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_ADMIN_URL).
+ */
+export function getOAuthMetadata(baseUrl?: string) {
+  const base = baseUrl ?? getMcpBaseUrl();
   return {
-    issuer: baseUrl,
-    authorization_endpoint: `${baseUrl}/api/mcp/authorize`,
-    token_endpoint: `${baseUrl}/api/mcp/token`,
-    registration_endpoint: `${baseUrl}/api/mcp/register`,
+    issuer: base,
+    authorization_endpoint: `${base}/api/mcp/authorize`,
+    token_endpoint: `${base}/api/mcp/token`,
+    registration_endpoint: `${base}/api/mcp/register`,
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     token_endpoint_auth_methods_supported: ["none"],
     code_challenge_methods_supported: ["S256"],
-    scopes_supported: ["admin", "speaker", "sponsor"],
+    scopes_supported: ["admin", "speaker", "sponsor", "audience"],
   };
 }
 
-export function getProtectedResourceMetadata() {
-  const baseUrl = getMcpBaseUrl();
+/**
+ * OAuth 2.0 Protected Resource Metadata.
+ * Pass the app's base URL.
+ */
+export function getProtectedResourceMetadata(baseUrl?: string) {
+  const base = baseUrl ?? getMcpBaseUrl();
   return {
-    resource: `${baseUrl}/api/mcp`,
-    authorization_servers: [baseUrl],
-    scopes_supported: ["admin", "speaker", "sponsor"],
+    resource: `${base}/api/mcp`,
+    authorization_servers: [base],
+    scopes_supported: ["admin", "speaker", "sponsor", "audience"],
     bearer_methods_supported: ["header"],
     resource_name: "Fanflet MCP Server",
-    resource_documentation: `${baseUrl}/docs`,
+    resource_documentation: `${base}/docs`,
   };
 }
 

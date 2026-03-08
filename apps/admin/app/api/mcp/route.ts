@@ -7,17 +7,17 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function getWebBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SITE_URL;
+function getAdminBaseUrl(): string {
+  const url = process.env.NEXT_PUBLIC_ADMIN_URL;
   if (url) return url.replace(/\/$/, "");
-  return "http://localhost:3000";
+  return "http://localhost:3001";
 }
 
 async function handleMcpRequest(req: Request): Promise<Response> {
   const authHeader = req.headers.get("authorization");
 
   if (!authHeader) {
-    const resourceMetadataUrl = `${getWebBaseUrl()}/.well-known/oauth-protected-resource/api/mcp`;
+    const resourceMetadataUrl = `${getAdminBaseUrl()}/.well-known/oauth-protected-resource/api/mcp`;
     return new Response(
       JSON.stringify({
         error: "unauthorized",
@@ -38,7 +38,7 @@ async function handleMcpRequest(req: Request): Promise<Response> {
     const ctx = await authenticateFromHeaders(req.headers);
 
     const server = createMcpServer(ctx, {
-      allowedRoles: ["speaker", "sponsor", "audience"],
+      allowedRoles: ["platform_admin"],
     });
 
     const transport = new WebStandardStreamableHTTPServerTransport({
@@ -52,7 +52,7 @@ async function handleMcpRequest(req: Request): Promise<Response> {
     return response;
   } catch (err) {
     if (err instanceof McpAuthError) {
-      const resourceMetadataUrl = `${getWebBaseUrl()}/.well-known/oauth-protected-resource/api/mcp`;
+      const resourceMetadataUrl = `${getAdminBaseUrl()}/.well-known/oauth-protected-resource/api/mcp`;
       return new Response(JSON.stringify({ error: err.message }), {
         status: 401,
         headers: {

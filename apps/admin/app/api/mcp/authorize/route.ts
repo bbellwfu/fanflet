@@ -1,13 +1,13 @@
 import { getOAuthClient } from "@fanflet/mcp";
 import { NextResponse } from "next/server";
 
-function getWebBaseUrl(): string {
-  const url = process.env.NEXT_PUBLIC_SITE_URL;
-  if (url) return url.replace(/\/$/, "");
-  return "http://localhost:3000";
-}
-
 export const dynamic = "force-dynamic";
+
+function getAdminBaseUrl(): string {
+  const url = process.env.NEXT_PUBLIC_ADMIN_URL;
+  if (url) return url.replace(/\/$/, "");
+  return "http://localhost:3001";
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const baseUrl = getWebBaseUrl();
+  const baseUrl = getAdminBaseUrl();
   const callbackUrl = `${baseUrl}/api/mcp/callback`;
 
   const statePayload = JSON.stringify({

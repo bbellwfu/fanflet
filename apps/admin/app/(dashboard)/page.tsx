@@ -234,6 +234,7 @@ export default async function AdminOverviewPage() {
           value={totalPageViews.toLocaleString()}
           icon={<BarChart3Icon className="w-4 h-4" />}
           accentColor="amber"
+          href="/analytics"
         />
         <StatCard
           title="New Signups (30d)"

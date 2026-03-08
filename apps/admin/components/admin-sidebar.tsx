@@ -16,6 +16,7 @@ import {
   MenuIcon,
   CogIcon,
   EyeIcon,
+  BarChart3Icon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -59,6 +60,12 @@ const navItems: NavItem[] = [
     href: "/subscribers",
     label: "Subscribers",
     icon: <MailIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "analytics",
+    href: "/analytics",
+    label: "Analytics",
+    icon: <BarChart3Icon className="w-[18px] h-[18px]" />,
   },
   {
     id: "features",

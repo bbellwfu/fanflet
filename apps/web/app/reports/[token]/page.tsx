@@ -44,7 +44,8 @@ export default async function PublicSponsorReportPage({
       .from("analytics_events")
       .select("*", { count: "exact", head: true })
       .eq("fanflet_id", fanfletId)
-      .eq("event_type", "page_view"),
+      .eq("event_type", "page_view")
+      .or("source.is.null,source.neq.portfolio"),
     blockIds.length > 0
       ? supabase
           .from("analytics_events")

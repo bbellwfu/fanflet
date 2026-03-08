@@ -154,7 +154,7 @@ export function SubscribersDashboard({
     link.download = `subscribers-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-  }, [filteredSubscribers, selectedIds]);
+  }, [filteredSubscribers, selectedIds, timezone]);
 
   // Delete
   const handleDelete = useCallback(async () => {

@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, Users, Link2, Settings, LogOut, Clock } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
@@ -12,6 +12,7 @@ const sponsorNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/sponsor/dashboard" },
   { icon: Users, label: "Leads", href: "/sponsor/leads" },
   { icon: Link2, label: "Connections", href: "/sponsor/connections" },
+  { icon: Plug, label: "Integrations", href: "/sponsor/integrations" },
   { icon: Settings, label: "Settings", href: "/sponsor/settings" },
 ];
 

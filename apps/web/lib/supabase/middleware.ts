@@ -3,12 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const ROLE_ROUTE_MAP: Record<string, string[]> = {
   speaker: ["/dashboard"],
-  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/settings"],
+  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/integrations", "/sponsor/settings"],
+  audience: ["/my"],
 };
 
 const ROLE_HOME: Record<string, string> = {
   speaker: "/dashboard",
   sponsor: "/sponsor/dashboard",
+  audience: "/my",
 };
 
 export async function updateSession(request: NextRequest) {
@@ -71,7 +73,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/sponsor/onboarding") ||
     pathname.startsWith("/sponsor/leads") ||
     pathname.startsWith("/sponsor/connections") ||
+    pathname.startsWith("/sponsor/integrations") ||
     pathname.startsWith("/sponsor/settings") ||
+    pathname.startsWith("/my") ||
     pathname.startsWith("/become-speaker");
 
   if (!user && isProtected) {
@@ -160,7 +164,11 @@ function resolveRoles(user: { app_metadata?: Record<string, unknown>; user_metad
   }
   // Fallback for users created before the roles migration
   const signupRole = user.user_metadata?.signup_role;
-  return [typeof signupRole === "string" && signupRole === "sponsor" ? "sponsor" : "speaker"];
+  if (typeof signupRole === "string") {
+    if (signupRole === "sponsor") return ["sponsor"];
+    if (signupRole === "audience") return ["audience"];
+  }
+  return ["speaker"];
 }
 
 function resolveActiveRole(request: NextRequest, roles: string[]): string {

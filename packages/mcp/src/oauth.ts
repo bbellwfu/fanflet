@@ -91,6 +91,33 @@ export function getProtectedResourceMetadata(baseUrl?: string) {
   };
 }
 
+/** Claude's official MCP OAuth callback URL. */
+export const MCP_REDIRECT_URI_CLAUDE = "https://claude.ai/api/mcp/auth_callback";
+
+/**
+ * Allowed redirect_uri values for OAuth authorize/token.
+ * Only these URIs may be used when issuing authorization codes.
+ */
+export function isRedirectUriAllowed(redirectUri: string): boolean {
+  const trimmed = redirectUri.trim();
+  if (trimmed === MCP_REDIRECT_URI_CLAUDE) return true;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol === "http:" && u.hostname === "localhost") return true;
+  } catch {
+    // invalid URL
+  }
+  return false;
+}
+
+/**
+ * Returns true if at least one of the given URIs is allowed.
+ * Used by Dynamic Client Registration to validate redirect_uris.
+ */
+export function hasAllowedRedirectUri(redirectUris: string[]): boolean {
+  return redirectUris.some((uri) => isRedirectUriAllowed(uri));
+}
+
 export interface OAuthClient {
   client_id: string;
   client_secret: string | null;

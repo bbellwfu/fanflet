@@ -1,82 +1,76 @@
+import { NextResponse } from "next/server";
 import { exchangeCode, refreshAccessToken } from "@fanflet/mcp";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
-  let body: Record<string, string>;
+function oauthError(status: number, error: string, description?: string) {
+  return NextResponse.json(
+    { error, error_description: description ?? error },
+    { status, headers: { "Cache-Control": "no-store" } }
+  );
+}
 
-  const contentType = req.headers.get("content-type") ?? "";
-  if (contentType.includes("application/x-www-form-urlencoded")) {
-    const text = await req.text();
-    body = Object.fromEntries(new URLSearchParams(text));
-  } else {
-    body = await req.json();
+export async function POST(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/x-www-form-urlencoded")) {
+    return oauthError(400, "invalid_request", "Content-Type must be application/x-www-form-urlencoded");
   }
 
-  const grantType = body.grant_type;
+  const body = await request.text();
+  const params = new URLSearchParams(body);
+  const grantType = params.get("grant_type");
 
   if (grantType === "authorization_code") {
-    const code = body.code;
-    const clientId = body.client_id;
-    const codeVerifier = body.code_verifier;
-    const redirectUri = body.redirect_uri;
+    const code = params.get("code");
+    const redirectUri = params.get("redirect_uri");
+    const clientId = params.get("client_id");
+    const codeVerifier = params.get("code_verifier");
 
-    if (!code || !clientId || !codeVerifier || !redirectUri) {
-      return Response.json(
-        { error: "invalid_request", error_description: "Missing required parameters" },
-        { status: 400 }
-      );
+    if (!code || !redirectUri || !clientId || !codeVerifier) {
+      return oauthError(400, "invalid_request", "code, redirect_uri, client_id, and code_verifier required");
     }
 
     try {
       const result = await exchangeCode(code, clientId, codeVerifier, redirectUri);
-      return Response.json({
-        access_token: result.accessToken,
-        token_type: "Bearer",
-        expires_in: result.expiresIn,
-        refresh_token: result.refreshToken,
-        scope: "admin",
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "server_error";
-      return Response.json(
-        { error: message, error_description: "Token exchange failed" },
-        { status: 400 }
+      return NextResponse.json(
+        {
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          expires_in: result.expiresIn,
+          token_type: "Bearer",
+        },
+        { headers: { "Cache-Control": "no-store" } }
       );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "invalid_grant";
+      return oauthError(400, "invalid_grant", message);
     }
   }
 
   if (grantType === "refresh_token") {
-    const refreshToken = body.refresh_token;
-    const clientId = body.client_id;
+    const refreshToken = params.get("refresh_token");
+    const clientId = params.get("client_id");
 
     if (!refreshToken || !clientId) {
-      return Response.json(
-        { error: "invalid_request", error_description: "Missing required parameters" },
-        { status: 400 }
-      );
+      return oauthError(400, "invalid_request", "refresh_token and client_id required");
     }
 
     try {
       const result = await refreshAccessToken(refreshToken, clientId);
-      return Response.json({
-        access_token: result.accessToken,
-        token_type: "Bearer",
-        expires_in: result.expiresIn,
-        refresh_token: result.refreshToken,
-        scope: "admin",
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "server_error";
-      return Response.json(
-        { error: message, error_description: "Token refresh failed" },
-        { status: 400 }
+      return NextResponse.json(
+        {
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+          expires_in: result.expiresIn,
+          token_type: "Bearer",
+        },
+        { headers: { "Cache-Control": "no-store" } }
       );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "invalid_grant";
+      return oauthError(400, "invalid_grant", message);
     }
   }
 
-  return Response.json(
-    { error: "unsupported_grant_type" },
-    { status: 400 }
-  );
+  return oauthError(400, "unsupported_grant_type", "grant_type must be authorization_code or refresh_token");
 }

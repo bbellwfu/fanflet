@@ -23,9 +23,17 @@ const mockEntitlements = {
   planDisplayName: "Pro",
 };
 
+const mockSponsorEntitlements = {
+  features: new Set<string>(),
+  limits: { max_connections: 3, max_resources: 5, storage_mb: 50 },
+  planName: "sponsor_free",
+  planDisplayName: "Sponsor Free",
+};
+
 vi.mock("@fanflet/db", () => ({
   createUserScopedClient: vi.fn(async () => mockUserScopedClient),
   loadSpeakerEntitlements: vi.fn(async () => mockEntitlements),
+  loadSponsorEntitlements: vi.fn(async () => mockSponsorEntitlements),
 }));
 
 vi.mock("../oauth", () => ({

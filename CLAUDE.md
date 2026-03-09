@@ -41,16 +41,16 @@ Digital resource platform for speakers — attendees scan a QR code and get inst
 - **Files**: `apps/web/app/api/sms/route.ts`, `apps/web/components/landing/sms-bookmark-form.tsx`
 - **Note**: Twilio trial accounts can only send to verified phone numbers. Add numbers under Twilio Console → Phone Numbers → Verified Caller IDs.
 
-### Sponsor portal (schema only — no UI yet)
+### Sponsor portal
 
-- **Architecture doc**: `docs/SPONSOR_PORTAL_ARCHITECTURE.md` — full design covering user roles, connection flow, resource sharing, content lifecycle, discovery model, RLS policies, and phased implementation plan.
-- **Database tables** (migration `20260227120000`):
-  - `sponsor_accounts` — company profile (name, logo, industry, website, verification status). One per auth user, parallel to `speakers`.
-  - `sponsor_connections` — manages sponsor↔speaker relationships with request flow (`pending → active/declined/revoked`). Either party can initiate. Unique constraint on `(sponsor_id, speaker_id)`.
-  - `sponsor_resources` — content curated by sponsors with lifecycle control (`active/paused/retired` + optional `expires_at`). Types: link, file, text, promo.
-  - `resource_blocks.sponsor_resource_id` — new nullable FK (`ON DELETE SET NULL`) linking fanflet blocks to sponsor-controlled resources. When the sponsor retires or deletes a resource, the block shows "This content is no longer available."
-- **RLS**: Full policies on all three tables. Sponsors manage their own data; speakers with active connections can read sponsor resources; public can read resources linked to published fanflets.
-- **No UI yet**: The sponsor-facing app, discovery/search, and connection management UI are planned for post-launch.
+- **Architecture doc**: `PRDs/SPONSOR_PORTAL_ARCHITECTURE.md` — full design covering user roles, connection flow, resource sharing, content lifecycle, discovery model, RLS policies, and phased implementation plan.
+- **Database tables**: `sponsor_accounts`, `sponsor_connections`, `sponsor_resources`, `sponsor_leads`, `sponsor_report_tokens` (migrations `20260227120000`, `20260305*`). Sponsor plans and subscriptions in `sponsor_plans`, `sponsor_subscriptions` (migration `20260307140000`). Sponsor plan features in `sponsor_plan_features` (migration `20260313100000`).
+- **Sponsor dashboard** (`/sponsor/`): Overview, leads (CSV export), connections, integrations, settings (profile, logo crop, slug). Layout at `apps/web/app/sponsor/`.
+- **Speaker connections**: `/dashboard/sponsor-connections` — browse verified sponsors, send/accept/decline requests.
+- **Sponsor blocks**: Speakers can link resource blocks to connected sponsors for lead attribution.
+- **Sponsor entitlements**: Three tiers — Sponsor Free (3 connections, 5 resources), Sponsor Pro (unlimited + analytics), Sponsor Enterprise (unlimited + bulk ops + reports). Feature flags loaded via `loadSponsorEntitlements()` from `@fanflet/db`.
+- **Admin**: Sponsor list, detail, verify, impersonate at `apps/admin/app/(dashboard)/sponsors/`.
+- **RLS**: Full policies on all sponsor tables. Sponsors manage their own data; speakers with active connections can read sponsor resources.
 
 ## Tech Stack
 
@@ -128,8 +128,8 @@ The MCP server (`packages/mcp/`) uses **branded Supabase client types** to enfor
 4. **The `buildToolContext()` function in `auth.ts` is the ONLY place** where the client type cast should appear. Do not cast `ServiceRoleClient` to `RlsScopedClient` anywhere else.
 5. **`SUPABASE_JWT_SECRET` must be set** in all environments. Without it, `createUserScopedClient()` throws (fail closed).
 6. **All changes to `packages/mcp/src/auth.ts` require security review.** The RLS isolation tests in `packages/mcp/src/__tests__/auth-rls-isolation.test.ts` must pass.
-7. **MCP access is gated by subscription tier.** The `mcp_access` feature flag (Pro+ plans) is checked in `createMcpServer()`. Free speakers receive a 403 with an upgrade URL. Per-tool gating uses `wrapTool(ctx, name, handler, { requiredFeature: "feature_key" })`.
-8. **Speaker entitlements are loaded during auth** via `loadSpeakerEntitlements()` and stored on `ctx.entitlements`. Future tools that require specific features (e.g., analytics) must pass `requiredFeature` to `wrapTool`.
+7. **MCP is a delivery channel, not a gated feature.** All authenticated users (Free, Pro, Enterprise) can connect to MCP. Individual tools enforce entitlements via `wrapTool(ctx, name, handler, { requiredFeature, checkLimits })`. Free users hit the same limits as on the dashboard. Analytics and advanced tools are gated behind feature flags (e.g., `click_through_analytics`).
+8. **Speaker and sponsor entitlements are loaded during auth.** `loadSpeakerEntitlements()` → `ctx.entitlements` for speakers; `loadSponsorEntitlements()` → `ctx.sponsorEntitlements` for sponsors. Tools that require specific features must pass `requiredFeature` to `wrapTool`; tools that enforce plan limits use `checkLimits`.
 
 **CI enforcement:**
 - `.github/scripts/check-mcp-client-isolation.sh` — static check that non-admin tool files don't reference `serviceClient`
@@ -207,10 +207,51 @@ Branch protection on `main` and `develop` is not configured (no required status 
 | `20260227100000` | Subscriber management (DELETE/UPDATE RLS policies) |
 | `20260227110000` | SMS bookmarks tracking table |
 | `20260227120000` | Sponsor portal schema (accounts, connections, resources) |
+| `20260305000000` | Sponsor engagement (consent, leads, report tokens) |
+| `20260305100000` | Resource library default sponsor |
+| `20260305120000` | Sponsor connections ended_at |
+| `20260305200000` | Fix new user trigger skip sponsors |
+| `20260307140000` | Sponsor plans and subscriptions |
+| `20260310000000` | Integration framework |
+| `20260311110000` | MCP OAuth pending requests |
+| `20260312100000` | MCP access feature flag (now unused — MCP is open to all tiers) |
+| `20260312110000` | Admin roles and audit log |
+| `20260312120000` | Admin invitations |
+| `20260313100000` | Sponsor plan features junction table |
+
+### MCP CRUD entitlement matrix
+
+MCP tools enforce the same entitlements as the web dashboard. The CRUD matrix below defines per-tool gating. See `PRDs/MCP_INTEGRATION_VISION.md` for the full tool inventory across all phases.
+
+**Speaker tools (Phase 1 — 10 tools implemented):**
+
+| Tool | Operation | Free | Pro / Early Access | Enterprise | Gate |
+|------|-----------|------|-------------------|------------|------|
+| `speaker_get_profile` | Read | Yes | Yes | Yes | None |
+| `speaker_list_fanflets` | Read | Yes | Yes | Yes | None |
+| `speaker_get_plan_info` | Read | Yes | Yes | Yes | None |
+| `speaker_get_fanflet` | Read | Yes | Yes | Yes | None |
+| `speaker_create_fanflet` | Create | Limit: 5 | Unlimited | Unlimited | `checkLimits: max_fanflets` |
+| `speaker_publish_fanflet` | Update | Yes | Yes | Yes | None |
+| `speaker_unpublish_fanflet` | Update | Yes | Yes | Yes | None |
+| `speaker_add_resource_block` | Create | Limit: 20 | Unlimited | Unlimited | `checkLimits: max_resources_per_fanflet` |
+| `speaker_delete_resource_block` | Delete | Yes | Yes | Yes | None |
+| `speaker_get_subscriber_count` | Read | Yes | Yes | Yes | None |
+
+**Sponsor tools (3 read-only, more planned):**
+
+| Tool | Operation | Sponsor Free | Sponsor Pro | Sponsor Enterprise | Gate |
+|------|-----------|-------------|------------|-------------------|------|
+| `sponsor_get_profile` | Read | Yes | Yes | Yes | None |
+| `sponsor_list_connections` | Read | Yes | Yes | Yes | None |
+| `sponsor_list_resources` | Read | Yes | Yes | Yes | None |
+
+**Audience tools (2, no gating):** `audience_list_subscriptions`, `audience_get_fanflet_resources`
 
 ### Next steps
 
-- **Sponsor portal UI**: Build the sponsor-facing app, connection discovery/search, and resource sharing interface. Schema is ready (see `docs/SPONSOR_PORTAL_ARCHITECTURE.md`).
+- **MCP Phase 2 tools**: Library CRUD, analytics (Pro-gated), subscriber list/export, fanflet update. See `PRDs/MCP_INTEGRATION_VISION.md`.
+- **MCP sponsor tools**: Implement mutation tools (create/update resource, connection requests) with sponsor entitlement gating.
 - **Email sending integration**: The subscriber email compose currently opens the user's email client via `mailto:`. Wire up a server-side email service (e.g., Resend) for in-app sending with templates and tracking.
 - **Twilio verification**: The toll-free number requires Twilio verification before it can send to unverified numbers. Trial accounts are limited to verified caller IDs.
 - Add `npm audit --audit-level=high` and gitleaks to `ci.yml` per engineering guidelines.

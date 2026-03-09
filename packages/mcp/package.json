@@ -16,6 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fanflet/core": "*",
     "@fanflet/db": "*",
     "@fanflet/types": "*",
     "@modelcontextprotocol/sdk": "^1.27.1",

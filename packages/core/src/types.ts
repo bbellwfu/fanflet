@@ -40,9 +40,11 @@ export interface SpeakerEntitlements {
 }
 
 /**
- * Entitlements resolved for a sponsor.
+ * Entitlements resolved for a sponsor. Mirrors the speaker model with
+ * both feature flags and plan limits.
  */
 export interface SponsorEntitlements {
+  features: Set<string>;
   limits: Record<string, number>;
   planName: string | null;
   planDisplayName: string | null;

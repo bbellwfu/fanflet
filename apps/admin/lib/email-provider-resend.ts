@@ -40,6 +40,7 @@ export class ResendEmailProvider implements EmailProvider {
             subject: msg.subject,
             html: msg.bodyHtml,
             ...(msg.bodyPlain ? { text: msg.bodyPlain } : {}),
+            ...(msg.replyTo ? { replyTo: [msg.replyTo] } : {}),
           });
 
           if (error) {

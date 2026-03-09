@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 next dev -p 3001",
     "dev:admin": "NODE_TLS_REJECT_UNAUTHORIZED=0 next dev -p 3001",
+    "prebuild": "tsx scripts/index-worklogs.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -39,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5"
   }
 }

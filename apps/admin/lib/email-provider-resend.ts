@@ -5,11 +5,20 @@ import type {
   EmailSendResult,
 } from "@fanflet/core/email-provider";
 
-const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 200;
+/** Resend batch API allows up to 100 emails per request. */
+const BATCH_SIZE = 100;
+/** Stay under 2 req/s: wait 1s between batch requests. */
+const DELAY_BETWEEN_BATCHES_MS = 1000;
+/** Max retries on 429 rate limit, with exponential backoff (1s, 2s, 4s). */
+const MAX_RETRIES = 3;
 
-function sleep(ms: number) {
+function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRateLimitError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("429") || msg.toLowerCase().includes("rate limit");
 }
 
 export class ResendEmailProvider implements EmailProvider {
@@ -30,49 +39,58 @@ export class ResendEmailProvider implements EmailProvider {
     const results: EmailSendResult[] = [];
 
     for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-      const batch = messages.slice(i, i + BATCH_SIZE);
-
-      const batchResults = await Promise.allSettled(
-        batch.map(async (msg) => {
-          const { data, error } = await this.resend.emails.send({
-            from: this.from,
-            to: [msg.to],
-            subject: msg.subject,
-            html: msg.bodyHtml,
-            ...(msg.bodyPlain ? { text: msg.bodyPlain } : {}),
-            ...(msg.replyTo ? { replyTo: [msg.replyTo] } : {}),
-          });
-
-          if (error) {
-            return {
-              email: msg.to,
-              success: false,
-              error: error.message,
-            } satisfies EmailSendResult;
-          }
-
-          return {
-            email: msg.to,
-            success: true,
-            externalId: data?.id,
-          } satisfies EmailSendResult;
-        })
-      );
-
-      for (const result of batchResults) {
-        if (result.status === "fulfilled") {
-          results.push(result.value);
-        } else {
-          results.push({
-            email: "unknown",
-            success: false,
-            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-          });
-        }
+      if (i > 0) {
+        await sleep(DELAY_BETWEEN_BATCHES_MS);
       }
 
-      if (i + BATCH_SIZE < messages.length) {
-        await sleep(BATCH_DELAY_MS);
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      const payloads = batch.map((msg) => ({
+        from: this.from,
+        to: [msg.to],
+        subject: msg.subject,
+        html: msg.bodyHtml,
+        ...(msg.bodyPlain ? { text: msg.bodyPlain } : {}),
+        ...(msg.replyTo ? { replyTo: [msg.replyTo] } : {}),
+      }));
+
+      let lastError: { message: string } | null = null;
+      let data: unknown = null;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const response = await this.resend.batch.send(payloads);
+        lastError = response.error ?? null;
+        data = response.data ?? null;
+
+        if (!response.error) break;
+        if (!isRateLimitError(response.error) || attempt === MAX_RETRIES) break;
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        await sleep(backoffMs);
+      }
+
+      const error = lastError;
+
+      if (error) {
+        for (const msg of batch) {
+          results.push({
+            email: msg.to,
+            success: false,
+            error: error.message,
+          });
+        }
+        continue;
+      }
+
+      const ids = Array.isArray(data) ? data : (data as { id?: string }[] | undefined) ?? [];
+      for (let j = 0; j < batch.length; j++) {
+        const msg = batch[j];
+        const item = ids[j];
+        const id = typeof item === "object" && item && "id" in item ? (item as { id: string }).id : undefined;
+        results.push({
+          email: msg.to,
+          success: !!id,
+          externalId: id ?? undefined,
+          error: id ? undefined : "No id returned for batch item",
+        });
       }
     }
 

@@ -11,6 +11,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
+import { ResendFailedButton } from "./resend-failed-button";
 
 export default async function CommunicationDetailPage({
   params,
@@ -142,6 +143,14 @@ export default async function CommunicationDetailPage({
             <XCircleIcon className="w-5 h-5" />
             {failCount}
           </p>
+          {comm.status === "sent" && failCount > 0 && (
+            <div className="mt-3">
+              <ResendFailedButton
+                communicationId={id}
+                failedCount={failCount}
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -119,7 +119,7 @@ async function handleAudiencePostSignup(
     .eq('auth_user_id', userId)
     .maybeSingle()
 
-  // Existing user without audience_accounts row — provision one
+  // Existing user without audience_accounts row - provision one
   if (!audience) {
     const service = createServiceClient()
     const { data: { user } } = await service.auth.admin.getUserById(userId)

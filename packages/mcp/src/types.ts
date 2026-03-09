@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SpeakerEntitlements } from "@fanflet/db";
+import type { SpeakerEntitlements, SponsorEntitlements } from "@fanflet/db";
 
 /**
  * All roles that can authenticate to the MCP server.
@@ -49,9 +49,14 @@ export interface ToolContext {
   sponsorId?: string;
   /**
    * Speaker entitlements (plan, features, limits). Loaded during auth
-   * for speaker role. Used for MCP access gating and per-tool feature checks.
+   * for speaker role. Used for per-tool feature and limit checks.
    */
   entitlements?: SpeakerEntitlements;
+  /**
+   * Sponsor entitlements (plan, features, limits). Loaded during auth
+   * for sponsor role. Used for per-tool feature and limit checks.
+   */
+  sponsorEntitlements?: SponsorEntitlements;
 }
 
 export interface AuditEntry {

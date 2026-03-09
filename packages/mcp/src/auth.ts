@@ -1,5 +1,5 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { createUserScopedClient, loadSpeakerEntitlements } from "@fanflet/db";
+import { createUserScopedClient, loadSpeakerEntitlements, loadSponsorEntitlements } from "@fanflet/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
 import type {
@@ -150,13 +150,20 @@ async function buildToolContext(
     sponsorId,
   };
 
-  // Load entitlements for speakers so MCP access and per-tool features can be gated.
-  // Uses the service client because entitlement tables (plans, plan_features, etc.)
-  // may not have SELECT policies for the authenticated role.
+  // Load entitlements so per-tool feature and limit checks work.
+  // Uses the service client because entitlement tables may not have
+  // SELECT policies for the authenticated role.
   if (role === "speaker" && speakerId) {
     ctx.entitlements = await loadSpeakerEntitlements(
       rawServiceClient,
       speakerId
+    );
+  }
+
+  if (role === "sponsor" && sponsorId) {
+    ctx.sponsorEntitlements = await loadSponsorEntitlements(
+      rawServiceClient,
+      sponsorId
     );
   }
 

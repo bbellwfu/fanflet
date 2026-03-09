@@ -28,14 +28,22 @@ export type RegisterToolsFn = (server: McpServer, ctx: ToolContext) => void;
 
 export interface WrapToolOptions {
   /**
-   * Feature flag key required to use this tool. If set and the speaker's
+   * Feature flag key required to use this tool. If set and the user's
    * entitlements don't include this feature, the tool returns a structured
    * upgrade prompt instead of executing.
    *
-   * Only applies to roles with entitlements (currently speaker).
-   * Admin tools are never gated.
+   * Checks speaker entitlements for speaker role and sponsor entitlements
+   * for sponsor role. Admin tools are never gated.
    */
   requiredFeature?: string;
+
+  /**
+   * Async callback to enforce plan limits before executing the tool.
+   * Return `null` if the limit is OK, or an error message string if
+   * the limit is exceeded. Called after the feature check and before
+   * the handler.
+   */
+  checkLimits?: (ctx: ToolContext, input: Record<string, unknown>) => Promise<string | null>;
 }
 
 /**
@@ -61,10 +69,17 @@ export function wrapTool(
   options?: WrapToolOptions
 ) {
   return async (input: Record<string, unknown>) => {
-    // Per-tool entitlement check
-    if (options?.requiredFeature && ctx.entitlements) {
-      if (!ctx.entitlements.features.has(options.requiredFeature)) {
-        const planName = ctx.entitlements.planDisplayName ?? "Free";
+    // Per-tool feature flag check (speakers and sponsors)
+    if (options?.requiredFeature) {
+      const speakerFeatures = ctx.entitlements?.features;
+      const sponsorFeatures = ctx.sponsorEntitlements?.features;
+      const features = speakerFeatures ?? sponsorFeatures;
+      const planName =
+        ctx.entitlements?.planDisplayName ??
+        ctx.sponsorEntitlements?.planDisplayName ??
+        "Free";
+
+      if (features && !features.has(options.requiredFeature)) {
         await writeAuditLog(ctx, toolName, input, "denied", 0);
         return {
           content: [
@@ -75,6 +90,30 @@ export function wrapTool(
                 message: `This tool requires the "${options.requiredFeature}" feature, which is not included in your ${planName} plan. Upgrade at https://fanflet.com/pricing`,
                 current_plan: planName,
                 required_feature: options.requiredFeature,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // Per-tool limit check (e.g. max_fanflets, max_resources_per_fanflet)
+    if (options?.checkLimits) {
+      const limitError = await options.checkLimits(ctx, input);
+      if (limitError) {
+        await writeAuditLog(ctx, toolName, input, "denied", 0);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                error: "limit_reached",
+                message: limitError,
+                current_plan:
+                  ctx.entitlements?.planDisplayName ??
+                  ctx.sponsorEntitlements?.planDisplayName ??
+                  "Free",
               }),
             },
           ],

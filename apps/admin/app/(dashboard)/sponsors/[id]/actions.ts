@@ -1,25 +1,32 @@
 "use server";
 
 import { createServiceClient } from "@fanflet/db/service";
-import { createClient } from "@fanflet/db/server";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/admin-auth";
+import { auditAdminAction } from "@/lib/audit";
+import { z } from "zod";
+
+const toggleSponsorVerificationSchema = z.object({
+  sponsorId: z.string().uuid(),
+  currentlyVerified: z.boolean(),
+});
 
 export async function toggleSponsorVerification(
   sponsorId: string,
   currentlyVerified: boolean
 ) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = toggleSponsorVerificationSchema.safeParse({
+    sponsorId,
+    currentlyVerified,
+  });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { sponsorId: validSponsorId, currentlyVerified: validCurrentlyVerified } = parsed.data;
 
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
-
-  const appMetadata = user.app_metadata ?? {};
-  if (appMetadata.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
@@ -27,16 +34,28 @@ export async function toggleSponsorVerification(
   const { error } = await supabase
     .from("sponsor_accounts")
     .update({
-      is_verified: !currentlyVerified,
+      is_verified: !validCurrentlyVerified,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", sponsorId);
+    .eq("id", validSponsorId);
 
   if (error) {
     return { error: "Failed to update verification status" };
   }
 
-  revalidatePath(`/sponsors/${sponsorId}`);
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: validCurrentlyVerified
+      ? "sponsor.unverify"
+      : "sponsor.verify",
+    category: "sponsor",
+    targetType: "sponsor",
+    targetId: validSponsorId,
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath(`/sponsors/${validSponsorId}`);
   revalidatePath("/sponsors");
   return { success: true };
 }

@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
   const isLoginOrCallback =
     pathname === "/login" ||
     pathname.startsWith("/auth/callback") ||
-    pathname.startsWith("/api/auth");
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/invite/accept");
 
   const isMcpRoute =
     pathname.startsWith("/api/mcp") ||
@@ -58,7 +59,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const appMetadataRole = (user.app_metadata as Record<string, unknown> | undefined)?.role;
-  if (appMetadataRole === "platform_admin") {
+  if (appMetadataRole === "platform_admin" || appMetadataRole === "super_admin") {
     return supabaseResponse;
   }
 
@@ -67,7 +68,8 @@ export async function middleware(request: NextRequest) {
     .from("user_roles")
     .select("role")
     .eq("auth_user_id", user.id)
-    .eq("role", "platform_admin")
+    .in("role", ["super_admin", "platform_admin"])
+    .filter("removed_at", "is", "null")
     .maybeSingle();
 
   if (roleRow) {

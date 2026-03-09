@@ -1,9 +1,19 @@
 "use server";
 
-import { createClient } from "@fanflet/db/server";
 import { Resend } from "resend";
 import { revalidatePath } from "next/cache";
 import { isValidTimezone } from "@fanflet/db/timezone";
+import { requireAdmin } from "@/lib/admin-auth";
+import { auditAdminAction } from "@/lib/audit";
+import { z } from "zod";
+
+const notificationPreferencesSchema = z.object({
+  speaker_signup: z.boolean().optional(),
+  sponsor_signup: z.boolean().optional(),
+  fanflet_created: z.boolean().optional(),
+  onboarding_completed: z.boolean().optional(),
+});
+const timezoneSchema = z.string().min(1).max(100);
 
 export type NotificationPreferenceKey =
   | "speaker_signup"
@@ -11,34 +21,16 @@ export type NotificationPreferenceKey =
   | "fanflet_created"
   | "onboarding_completed";
 
-async function requireAdmin() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) throw new Error("Not authenticated");
-
-  const appMetadata = user.app_metadata ?? {};
-  const { data: roleRow } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("auth_user_id", user.id)
-    .eq("role", "platform_admin")
-    .maybeSingle();
-
-  const isAdmin = roleRow != null || appMetadata.role === "platform_admin";
-  if (!isAdmin) throw new Error("Not authorized");
-
-  return { user, supabase };
-}
-
 export async function updateNotificationPreferences(updates: {
   speaker_signup?: boolean;
   sponsor_signup?: boolean;
   fanflet_created?: boolean;
   onboarding_completed?: boolean;
 }): Promise<{ error?: string }> {
+  const parsed = notificationPreferencesSchema.safeParse(updates);
+  if (!parsed.success) return { error: "Invalid input" };
+  const validUpdates = parsed.data;
+
   let admin: Awaited<ReturnType<typeof requireAdmin>>;
   try {
     admin = await requireAdmin();
@@ -51,7 +43,7 @@ export async function updateNotificationPreferences(updates: {
     .upsert(
       {
         admin_user_id: admin.user.id,
-        ...updates,
+        ...validUpdates,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "admin_user_id" }
@@ -62,11 +54,24 @@ export async function updateNotificationPreferences(updates: {
     return { error: "Failed to update preferences" };
   }
 
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "setting.update_notifications",
+    category: "setting",
+    details: validUpdates as Record<string, unknown>,
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
   revalidatePath("/settings");
   return {};
 }
 
 export async function updateAdminTimezone(tz: string): Promise<{ error?: string }> {
+  const parsed = timezoneSchema.safeParse(tz);
+  if (!parsed.success) return { error: "Invalid input" };
+  const validTz = parsed.data;
+
   let admin: Awaited<ReturnType<typeof requireAdmin>>;
   try {
     admin = await requireAdmin();
@@ -74,7 +79,7 @@ export async function updateAdminTimezone(tz: string): Promise<{ error?: string 
     return { error: (e as Error).message };
   }
 
-  if (!isValidTimezone(tz)) {
+  if (!isValidTimezone(validTz)) {
     return { error: "Invalid timezone identifier" };
   }
 
@@ -83,7 +88,7 @@ export async function updateAdminTimezone(tz: string): Promise<{ error?: string 
     .upsert(
       {
         admin_user_id: admin.user.id,
-        timezone: tz,
+        timezone: validTz,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "admin_user_id" }
@@ -93,6 +98,15 @@ export async function updateAdminTimezone(tz: string): Promise<{ error?: string 
     console.error("[admin settings] updateAdminTimezone failed:", error.message, error.code);
     return { error: "Failed to update timezone" };
   }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "setting.update_timezone",
+    category: "setting",
+    details: { timezone: validTz },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
 
   revalidatePath("/settings");
   return {};
@@ -131,7 +145,7 @@ export async function sendTestNotification(): Promise<{ error?: string; success?
 
   if (sendError) {
     console.error("[admin settings] sendTestNotification failed:", sendError);
-    return { error: `Resend API error: ${sendError.message}` };
+    return { error: "Failed to send test notification" };
   }
 
   return { success: `Test email sent to ${email}` };

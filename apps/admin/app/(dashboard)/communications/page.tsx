@@ -8,8 +8,18 @@ import {
   SendIcon,
   FileEditIcon,
   ClockIcon,
+  FileTextIcon,
+  ArrowRightIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
+import type { WorklogEntry } from "@/lib/worklog-types";
+
+let worklogIndex: WorklogEntry[] = [];
+try {
+  worklogIndex = (await import("@/generated/worklog-index.json")).default as WorklogEntry[];
+} catch {
+  // No worklog index available
+}
 
 interface CommunicationRow {
   id: string;
@@ -79,6 +89,23 @@ export default async function CommunicationsPage() {
   const drafts = rows.filter((r) => r.status === "draft");
   const sent = rows.filter((r) => r.status === "sent");
 
+  // Find worklogs that don't have a corresponding communication yet (split pipe-separated refs)
+  const existingRefs = new Set<string>();
+  for (const r of rows) {
+    if (r.source_reference) {
+      for (const ref of r.source_reference.split("|").map((s: string) => s.trim()).filter(Boolean)) {
+        existingRefs.add(ref);
+      }
+    }
+  }
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const pendingWorklogs = worklogIndex.filter((w) => {
+    const ref = `worklog/${w.filename}`;
+    if (existingRefs.has(ref)) return false;
+    return new Date(w.date) >= sevenDaysAgo;
+  });
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -98,6 +125,45 @@ export default async function CommunicationsPage() {
           </Link>
         </Button>
       </div>
+
+      {/* Pending worklog banner */}
+      {pendingWorklogs.length > 0 && (
+        <div className="space-y-3">
+          {pendingWorklogs.map((w) => (
+            <Link
+              key={w.filename}
+              href={`/communications/new?worklog=${encodeURIComponent(w.filename)}`}
+              className="flex items-center justify-between gap-4 bg-primary/5 rounded-lg border border-primary/15 px-5 py-4 hover:bg-primary/10 transition-colors group"
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <FileTextIcon className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-[13px] font-medium text-fg">
+                    New worklog ready: {w.dateLabel}
+                  </p>
+                  <p className="text-[12px] text-fg-muted mt-0.5 truncate">
+                    {w.titleSummary}
+                    {w.features.length > 0 && (
+                      <span className="ml-2">
+                        &middot; {w.features.length} feature{w.features.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {w.bugFixes.length > 0 && (
+                      <span className="ml-2">
+                        &middot; {w.bugFixes.length} fix{w.bugFixes.length !== 1 ? "es" : ""}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 text-[12px] font-medium text-primary shrink-0 group-hover:gap-2 transition-all">
+                Draft announcement
+                <ArrowRightIcon className="w-3.5 h-3.5" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">

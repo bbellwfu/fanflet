@@ -18,6 +18,8 @@ import {
   CogIcon,
   EyeIcon,
   BarChart3Icon,
+  ShieldIcon,
+  ScrollTextIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -29,6 +31,7 @@ interface NavItem {
   icon: React.ReactNode;
   disabled?: boolean;
   badge?: string;
+  superAdminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -101,6 +104,20 @@ const navItems: NavItem[] = [
     icon: <EyeIcon className="w-[18px] h-[18px]" />,
   },
   {
+    id: "admin-team",
+    href: "/admin-team",
+    label: "Admin Team",
+    icon: <ShieldIcon className="w-[18px] h-[18px]" />,
+    superAdminOnly: true,
+  },
+  {
+    id: "audit-log",
+    href: "/audit-log",
+    label: "Audit Log",
+    icon: <ScrollTextIcon className="w-[18px] h-[18px]" />,
+    superAdminOnly: true,
+  },
+  {
     id: "settings",
     href: "/settings",
     label: "Settings",
@@ -116,10 +133,14 @@ function isActive(pathname: string, item: NavItem): boolean {
 interface NavContentProps {
   pathname: string;
   email: string;
+  isSuperAdmin: boolean;
 }
 
-function NavContent({ pathname, email }: NavContentProps) {
+function NavContent({ pathname, email, isSuperAdmin }: NavContentProps) {
   const initial = email.charAt(0).toUpperCase();
+  const visibleItems = navItems.filter(
+    (item) => !item.superAdminOnly || isSuperAdmin
+  );
 
   return (
     <div className="h-full flex flex-col bg-sidebar border-r border-border-subtle">
@@ -139,7 +160,7 @@ function NavContent({ pathname, email }: NavContentProps) {
       {/* Navigation */}
       <nav className="flex-1 px-3">
         <div className="space-y-0.5">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const active = isActive(pathname, item);
             return (
               <Link
@@ -206,10 +227,11 @@ function NavContent({ pathname, email }: NavContentProps) {
 
 interface AdminSidebarProps {
   email: string;
+  isSuperAdmin: boolean;
   children: React.ReactNode;
 }
 
-export function AdminSidebar({ email, children }: AdminSidebarProps) {
+export function AdminSidebar({ email, isSuperAdmin, children }: AdminSidebarProps) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -221,7 +243,7 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
     <div className="flex min-h-screen bg-page">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block fixed top-0 left-0 bottom-0 w-60 z-30">
-        <NavContent pathname={pathname} email={email} />
+        <NavContent pathname={pathname} email={email} isSuperAdmin={isSuperAdmin} />
       </aside>
 
       {/* Main Content */}
@@ -245,7 +267,7 @@ export function AdminSidebar({ email, children }: AdminSidebarProps) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-60 border-r border-border-subtle bg-sidebar">
-                <NavContent pathname={pathname} email={email} />
+                <NavContent pathname={pathname} email={email} isSuperAdmin={isSuperAdmin} />
               </SheetContent>
             </Sheet>
           ) : (

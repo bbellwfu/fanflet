@@ -8,6 +8,7 @@ import {
   TOKEN_EXCHANGE_TTL_SECONDS,
 } from "@fanflet/db/impersonation";
 import { z } from "zod";
+import { auditAdminAction } from "@/lib/audit";
 
 const RequestSchema = z.object({
   targetUserId: z.string().uuid(),
@@ -28,8 +29,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    // Check user_roles table (source of truth) with app_metadata fallback
+    const { data: roleRow } = await userSupabase
+      .from("user_roles")
+      .select("role")
+      .eq("auth_user_id", user.id)
+      .in("role", ["super_admin", "platform_admin"])
+      .filter("removed_at", "is", "null")
+      .maybeSingle();
+
     const appMetadata = user.app_metadata ?? {};
-    if (appMetadata.role !== "platform_admin") {
+    const isAdmin =
+      roleRow != null ||
+      appMetadata.role === "platform_admin" ||
+      appMetadata.role === "super_admin";
+
+    if (!isAdmin) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 });
     }
 
@@ -160,6 +175,21 @@ export async function POST(request: NextRequest) {
       establishParams.set("returnPath", returnPath);
     }
     const establishUrl = `${webUrl}/api/impersonate/establish?${establishParams}`;
+
+    await auditAdminAction({
+      adminId: user.id,
+      action: "impersonation.start",
+      category: "impersonation",
+      targetType: targetRole,
+      targetId: targetUserId,
+      details: {
+        sessionId: session.id,
+        reason: reason || null,
+        writeEnabled,
+      },
+      ipAddress: ip ?? null,
+      userAgent: userAgent,
+    });
 
     return NextResponse.json({ redirectUrl: establishUrl });
   } catch (err) {

@@ -25,7 +25,7 @@ function messageForErrorCode(code: string | null): string | null {
     case 'auth_callback_failed':
       return "Sign-in didn't complete. Please try again."
     case 'link_required':
-      return 'Sign in with your email and password below. You can then link Google in Settings → Sign-in options so you can use either method next time.'
+      return 'Sign in with your email and password below. You can then link Google in Settings (Sign-in options) so you can use either method next time.'
     default:
       return 'Sign-in failed. Please try again.'
   }
@@ -86,7 +86,7 @@ export default function LoginPage() {
         <Link
           href="/"
           className="flex items-center justify-center gap-2.5 hover:opacity-90 transition-opacity"
-          aria-label="Fanflet – home"
+          aria-label="Fanflet - home"
         >
           <Image
             src="/logo.png"

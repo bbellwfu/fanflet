@@ -80,11 +80,19 @@ export class ResendEmailProvider implements EmailProvider {
         continue;
       }
 
-      const ids = Array.isArray(data) ? data : (data as { id?: string }[] | undefined) ?? [];
+      // Resend returns { data: [ { id: "..." }, ... ] }; some SDKs may nest as data.data
+      const raw =
+        Array.isArray(data) ? data : (data && typeof data === "object" && "data" in data)
+          ? (data as { data: unknown }).data
+          : null;
+      const ids = Array.isArray(raw) ? raw : [];
       for (let j = 0; j < batch.length; j++) {
         const msg = batch[j];
         const item = ids[j];
-        const id = typeof item === "object" && item && "id" in item ? (item as { id: string }).id : undefined;
+        const id =
+          typeof item === "object" && item !== null && "id" in item
+            ? String((item as { id: string }).id)
+            : undefined;
         results.push({
           email: msg.to,
           success: !!id,

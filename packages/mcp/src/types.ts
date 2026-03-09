@@ -11,6 +11,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  */
 export type McpRole = "platform_admin" | "speaker" | "sponsor" | "audience";
 
+// ── Branded Supabase client types ──────────────────────────────────────
+// These compile-time brands prevent accidentally swapping service-role and
+// RLS-scoped clients. Both extend SupabaseClient so they pass to functions
+// typed as SupabaseClient, but they are NOT assignable to each other.
+declare const __clientBrand: unique symbol;
+
+/** RLS-scoped Supabase client. auth.uid() = authenticated user. */
+export type RlsScopedClient = SupabaseClient & {
+  readonly [__clientBrand]: "rls";
+};
+
+/** Service-role Supabase client. Bypasses all RLS policies. */
+export type ServiceRoleClient = SupabaseClient & {
+  readonly [__clientBrand]: "service";
+};
+
 export interface ToolContext {
   userId: string;
   role: McpRole;
@@ -18,13 +34,14 @@ export interface ToolContext {
   /**
    * User-scoped Supabase client (RLS enforced).
    * Use for speaker, sponsor, and audience tools.
+   * NEVER assign a service-role client to this field.
    */
-  supabase: SupabaseClient;
+  supabase: RlsScopedClient;
   /**
    * Service-role Supabase client (bypasses RLS).
-   * Use ONLY for platform_admin tools.
+   * Use ONLY in platform_admin tools and audit middleware.
    */
-  serviceClient: SupabaseClient;
+  serviceClient: ServiceRoleClient;
   /** Speaker ID, resolved after auth. Available for speaker role. */
   speakerId?: string;
   /** Sponsor ID, resolved after auth. Available for sponsor role. */

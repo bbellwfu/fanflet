@@ -2,7 +2,12 @@ import { createServiceClient } from "@fanflet/db/service";
 import { createUserScopedClient } from "@fanflet/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
-import type { ToolContext, McpRole } from "./types";
+import type {
+  ToolContext,
+  McpRole,
+  RlsScopedClient,
+  ServiceRoleClient,
+} from "./types";
 import { verifyAccessToken as verifyOAuthToken } from "./oauth";
 
 const ADMIN_KEY_PREFIX = "fan_admin_";
@@ -86,12 +91,18 @@ function resolveApiKeyRole(
 async function buildToolContext(
   userId: string,
   role: McpRole,
-  serviceClient: SupabaseClient,
+  rawServiceClient: SupabaseClient,
   apiKeyId?: string
 ): Promise<ToolContext> {
-  const supabase = role === "platform_admin"
-    ? serviceClient
-    : await createUserScopedClient(userId);
+  const serviceClient = rawServiceClient as ServiceRoleClient;
+
+  // SECURITY: non-admin roles MUST get an RLS-scoped client.
+  // The branded types make it a compile error to assign ServiceRoleClient
+  // to the supabase field. The explicit cast here is intentional and the
+  // ONLY place where this cast should appear.
+  const supabase: RlsScopedClient = role === "platform_admin"
+    ? (rawServiceClient as RlsScopedClient)
+    : (await createUserScopedClient(userId)) as RlsScopedClient;
 
   return {
     userId,

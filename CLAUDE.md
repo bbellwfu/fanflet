@@ -116,6 +116,23 @@ supabase/migrations/   # Idempotent SQL migrations (see migrations/README.md)
 - Auth endpoints must return identical responses whether or not an email exists (prevent user enumeration).
 - Follow standards defined in `ENGINEERING_GUIDELINES_MEMO_v2.md`.
 
+### MCP Server Security (CRITICAL)
+
+The MCP server (`packages/mcp/`) uses **branded Supabase client types** to enforce data isolation at compile time. Violating these rules is a **security vulnerability** — it was exploited in PR #77 where all roles received the service-role client, bypassing RLS.
+
+**Rules for MCP tool development:**
+
+1. **Speaker, sponsor, and audience tools MUST use `ctx.supabase`** (typed as `RlsScopedClient`). This client has `auth.uid()` set to the authenticated user, so RLS policies enforce data isolation.
+2. **NEVER use `ctx.serviceClient` in non-admin tools.** It bypasses all RLS. CI will reject PRs that reference `serviceClient` or `createServiceClient` in `tools/speaker/`, `tools/sponsor/`, or `tools/audience/`.
+3. **Only `platform_admin` tools may use `ctx.serviceClient`** (typed as `ServiceRoleClient`) for cross-tenant queries.
+4. **The `buildToolContext()` function in `auth.ts` is the ONLY place** where the client type cast should appear. Do not cast `ServiceRoleClient` to `RlsScopedClient` anywhere else.
+5. **`SUPABASE_JWT_SECRET` must be set** in all environments. Without it, `createUserScopedClient()` throws (fail closed).
+6. **All changes to `packages/mcp/src/auth.ts` require security review.** The RLS isolation tests in `packages/mcp/src/__tests__/auth-rls-isolation.test.ts` must pass.
+
+**CI enforcement:**
+- `.github/scripts/check-mcp-client-isolation.sh` — static check that non-admin tool files don't reference `serviceClient`
+- `packages/mcp/src/__tests__/auth-rls-isolation.test.ts` — 7 tests verifying each role gets the correct client type
+
 ## Common Anti-Patterns to Flag
 
 - Using `any` type instead of proper typing
@@ -129,6 +146,8 @@ supabase/migrations/   # Idempotent SQL migrations (see migrations/README.md)
 - Direct DOM manipulation instead of React patterns
 - Hardcoding URLs instead of using centralized config
 - **Non-idempotent migrations** — `CREATE TABLE`/`CREATE POLICY`/`CREATE INDEX` without `IF NOT EXISTS` or a preceding `DROP ... IF EXISTS` (breaks CI when migrations are applied in more than one way or re-run)
+- **Using `serviceClient` in non-admin MCP tools** — Speaker/sponsor/audience tools must use `ctx.supabase` (RLS-scoped). Using `ctx.serviceClient` bypasses data isolation. CI enforces this via `.github/scripts/check-mcp-client-isolation.sh`.
+- **Casting `ServiceRoleClient` to `RlsScopedClient`** outside of `buildToolContext()` in `auth.ts` — this defeats the branded type safety net
 
 ## Review Focus Areas
 
@@ -161,7 +180,7 @@ For security audits, use Supabase and Vercel MCP tools directly (not via agents)
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, build, migration idempotency check |
+| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, MCP security tests, build, migration idempotency check, MCP client isolation check |
 | `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations with `--include-all` to linked Supabase project (dev on develop, prod on main) |
 | `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App (CLAUDE_CODE_OAUTH_TOKEN) |
 | `claude-code-review.yml` | Manual (`workflow_dispatch`) | Plugin-based code review using CLAUDE_CODE_OAUTH_TOKEN; invoke manually or via `@claude` |

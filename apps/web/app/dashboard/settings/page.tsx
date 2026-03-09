@@ -8,6 +8,7 @@ import { NotificationPreferences } from "@/components/dashboard/notification-pre
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getSiteUrl } from "@/lib/config";
+import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -97,9 +98,12 @@ export default async function SettingsPage() {
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground mb-1">Server URL</p>
-                <code className="block rounded-md border border-[#e2e8f0] bg-slate-50 px-3 py-2 text-sm font-mono text-[#1B365D] select-all">
-                  {mcpServerUrl}
-                </code>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded-md border border-[#e2e8f0] bg-slate-50 px-3 py-2 text-sm font-mono text-[#1B365D] select-all">
+                    {mcpServerUrl}
+                  </code>
+                  <CopyFanfletUrlButton url={mcpServerUrl} />
+                </div>
               </div>
             </div>
             <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">

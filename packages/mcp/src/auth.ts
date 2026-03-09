@@ -1,4 +1,5 @@
 import { createServiceClient } from "@fanflet/db/service";
+import { createUserScopedClient } from "@fanflet/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
 import type { ToolContext, McpRole } from "./types";
@@ -75,6 +76,32 @@ function resolveApiKeyRole(
   return "speaker";
 }
 
+/**
+ * Builds a ToolContext with the correct Supabase client for the role.
+ *
+ * - platform_admin: both clients are the service-role client (full cross-tenant access)
+ * - speaker/sponsor/audience: ctx.supabase is an RLS-scoped client where auth.uid()
+ *   matches the authenticated user, so RLS policies enforce data isolation.
+ */
+async function buildToolContext(
+  userId: string,
+  role: McpRole,
+  serviceClient: SupabaseClient,
+  apiKeyId?: string
+): Promise<ToolContext> {
+  const supabase = role === "platform_admin"
+    ? serviceClient
+    : await createUserScopedClient(userId);
+
+  return {
+    userId,
+    role,
+    apiKeyId,
+    supabase,
+    serviceClient,
+  };
+}
+
 export async function authenticateFromApiKey(
   bearerToken: string
 ): Promise<ToolContext> {
@@ -117,13 +144,7 @@ export async function authenticateFromApiKey(
     );
   }
 
-  return {
-    userId: keyRow.auth_user_id,
-    role,
-    apiKeyId: keyRow.id,
-    supabase: serviceClient,
-    serviceClient,
-  };
+  return buildToolContext(keyRow.auth_user_id, role, serviceClient, keyRow.id);
 }
 
 export async function authenticateFromHeaders(
@@ -146,13 +167,7 @@ export async function authenticateFromHeaders(
   const oauthResult = await verifyOAuthToken(token);
   if (oauthResult) {
     const role = await resolveUserRole(serviceClient, oauthResult.userId);
-
-    return {
-      userId: oauthResult.userId,
-      role,
-      supabase: serviceClient,
-      serviceClient,
-    };
+    return buildToolContext(oauthResult.userId, role, serviceClient);
   }
 
   // Fallback: try as a raw Supabase JWT (for dev/direct access)
@@ -169,10 +184,5 @@ export async function authenticateFromHeaders(
 
   const role = await resolveUserRole(serviceClient, user.id, appMetadataRole);
 
-  return {
-    userId: user.id,
-    role,
-    supabase: serviceClient,
-    serviceClient,
-  };
+  return buildToolContext(user.id, role, serviceClient);
 }

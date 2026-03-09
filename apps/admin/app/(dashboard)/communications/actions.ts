@@ -534,3 +534,119 @@ export async function deleteDraft(id: string): Promise<{ error?: string }> {
   revalidatePath("/communications");
   return {};
 }
+
+export async function resendFailedRecipients(
+  communicationId: string
+): Promise<{ sentCount?: number; error?: string }> {
+  const parsed = communicationIdSchema.safeParse(communicationId);
+  if (!parsed.success) return { error: "Invalid input" };
+  const validCommunicationId = parsed.data;
+
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  const supabase = createServiceClient();
+
+  const { data: comm } = await supabase
+    .from("platform_communications")
+    .select("id, status, title")
+    .eq("id", validCommunicationId)
+    .single();
+
+  if (!comm) return { error: "Communication not found" };
+  if (comm.status !== "sent") return { error: "Only sent communications can be resent to failed recipients" };
+
+  const { data: failedDeliveries } = await supabase
+    .from("communication_deliveries")
+    .select("id, recipient_id")
+    .eq("communication_id", validCommunicationId)
+    .eq("channel", "email")
+    .is("provider_message_id", null);
+
+  if (!failedDeliveries?.length) return { error: "No failed deliveries to resend" };
+
+  const recipientIds = failedDeliveries.map((d) => d.recipient_id).filter(Boolean) as string[];
+  const { data: speakers } = await supabase
+    .from("speakers")
+    .select("id, email")
+    .in("id", recipientIds)
+    .not("email", "is", null);
+
+  if (!speakers?.length) return { error: "No speaker emails found for failed recipients" };
+
+  const speakerById = new Map(speakers.map((s) => [s.id, s]));
+  const resendList: { deliveryId: string; email: string }[] = [];
+  for (const d of failedDeliveries) {
+    if (!d.recipient_id) continue;
+    const speaker = speakerById.get(d.recipient_id);
+    if (speaker?.email) resendList.push({ deliveryId: d.id, email: speaker.email });
+  }
+  if (resendList.length === 0) return { error: "No speaker emails found for failed recipients" };
+
+  const { data: variant } = await supabase
+    .from("platform_communication_variants")
+    .select("subject, body_html, body_plain")
+    .eq("communication_id", validCommunicationId)
+    .eq("audience_type", "speaker")
+    .single();
+
+  if (!variant) return { error: "No speaker variant found" };
+
+  const webUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const messages = resendList.map(({ email }) => {
+    const unsubscribeUrl = `${webUrl}/api/communications/unsubscribe?email=${encodeURIComponent(email)}&comm=${validCommunicationId}`;
+    const preferencesUrl = `${webUrl}/dashboard/settings#notifications`;
+    const fullHtml = renderAnnouncementEmail({
+      title: comm.title,
+      bodyHtml: variant.body_html,
+      unsubscribeUrl,
+      preferencesUrl,
+    });
+    return {
+      to: email,
+      subject: variant.subject,
+      bodyHtml: fullHtml,
+      bodyPlain: variant.body_plain ?? undefined,
+      replyTo: "support@fanflet.com",
+    };
+  });
+
+  const provider = getEmailProvider();
+  const results = await provider.send(messages);
+
+  const now = new Date().toISOString();
+  for (let i = 0; i < results.length && i < resendList.length; i++) {
+    const result = results[i];
+    const { deliveryId } = resendList[i];
+    if (result.success && result.externalId) {
+      await supabase
+        .from("communication_deliveries")
+        .update({
+          provider_message_id: result.externalId,
+          sent_at: now,
+          email_provider: provider.name,
+        })
+        .eq("id", deliveryId);
+    }
+  }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "communication.resend_failed",
+    category: "communication",
+    targetType: "communication",
+    targetId: validCommunicationId,
+    details: { attempted: resendList.length, sentCount: results.filter((r) => r.success).length },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath("/communications");
+  revalidatePath(`/communications/${validCommunicationId}`);
+  return { sentCount: results.filter((r) => r.success).length };
+}

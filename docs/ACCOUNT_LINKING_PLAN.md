@@ -29,7 +29,7 @@ flowchart TB
   subgraph ManualLink["Manual link path"]
     K --> M[Login page: show generic message]
     M --> N[User signs in with email/password]
-    N --> O[Dashboard → Settings]
+    N --> O[Dashboard -> Settings]
     O --> P[Sign-in options: Link Google]
     P --> Q[linkIdentity Google]
     Q --> A
@@ -50,12 +50,12 @@ flowchart TB
 
 | Item | Where | Action |
 |------|--------|--------|
-| **Automatic linking** | Dashboard → Auth → Providers (or GoTrue config) | Ensure automatic linking is enabled so same verified email can link. |
-| **Manual linking** | Dashboard → Auth → [config] or env `GOTRUE_SECURITY_MANUAL_LINKING_ENABLED` | Enable manual linking so logged-in users can call `linkIdentity({ provider: 'google' })`. |
-| **Google provider** | Auth → Providers → Google | Already configured (current OAuth works). No change required for linking. |
+| **Automatic linking** | Dashboard -> Auth -> Providers (or GoTrue config) | Ensure automatic linking is enabled so same verified email can link. |
+| **Manual linking** | Dashboard -> Auth -> [config] or env `GOTRUE_SECURITY_MANUAL_LINKING_ENABLED` | Enable manual linking so logged-in users can call `linkIdentity({ provider: 'google' })`. |
+| **Google provider** | Auth -> Providers -> Google | Already configured (current OAuth works). No change required for linking. |
 | **Email verification** | Auth settings | Keep email verification on for email/password so auto-linking only links to verified emails (security). |
 
-**Reference:** [Supabase Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking) — automatic linking (same verified email), manual linking (beta) via dashboard or `GOTRUE_SECURITY_MANUAL_LINKING_ENABLED`.
+**Reference:** [Supabase Identity Linking](https://supabase.com/docs/guides/auth/auth-identity-linking) - automatic linking (same verified email), manual linking (beta) via dashboard or `GOTRUE_SECURITY_MANUAL_LINKING_ENABLED`.
 
 ---
 
@@ -108,11 +108,11 @@ if (errorParam) {
 
 1. **Read `error` from URL on mount:** e.g. `const errorCode = searchParams.get('error')`. Map `errorCode` to a **user-facing message**; do not display raw query params or server messages.
 2. **Message map (safe, no enumeration):**
-   - `auth_callback_failed` → e.g. "Sign-in didn’t complete. Please try again."
-   - `link_required` → e.g. "Sign in with your email and password below. You can then link Google in Settings → Sign-in options so you can use either method next time."
-   - Other known codes (e.g. from impersonation) → keep existing or add to map. Default for unknown → generic "Sign-in failed. Please try again."
+   - `auth_callback_failed` -> e.g. "Sign-in didn't complete. Please try again."
+   - `link_required` -> e.g. "Sign in with your email and password below. You can then link Google in Settings -> Sign-in options so you can use either method next time."
+   - Other known codes (e.g. from impersonation) -> keep existing or add to map. Default for unknown -> generic "Sign-in failed. Please try again."
 3. **Optional:** For `link_required`, add a short hint or link: "After signing in, go to **Settings** and open **Sign-in options** to link Google."
-4. **Preserve `next` and `mcp_state`:** When redirecting from callback with `link_required`, pass `next` so after the user signs in (and optionally links in Settings), they can be redirected to the original destination. Login form already forwards `next` in hidden input; ensure the link-to-settings hint doesn’t drop `next`.
+4. **Preserve `next` and `mcp_state`:** When redirecting from callback with `link_required`, pass `next` so after the user signs in (and optionally links in Settings), they can be redirected to the original destination. Login form already forwards `next` in hidden input; ensure the link-to-settings hint doesn't drop `next`.
 
 **Implementation note:** Initialize `error` state from the mapped message for `errorCode` on first render (or when `searchParams` change), so the banner shows without requiring a form submit.
 
@@ -140,7 +140,7 @@ if (errorParam) {
 
 3. **Link Google button:** If Google is not already linked, show a button: "Link Google account". On click, call `linkIdentity({ provider: 'google' })` from a **client component** (needs browser Supabase client). The OAuth redirect_uri must point to the same auth callback; after success, redirect user back to `/dashboard/settings` (e.g. pass `next=/dashboard/settings` in the callback URL when initiating link). Ensure the callback treats this as a "link" flow (session already exists) and does not overwrite or conflict with existing session.
 
-4. **Unlink (optional):** If there are ≥2 identities, show an "Unlink" (or "Remove") action for non-primary methods (e.g. Google). On confirm, call `unlinkIdentity(identity)`. Show a short warning that they will no longer be able to sign in with that method. Do not allow unlinking the last method (Supabase will enforce this; disable the button when only one identity remains).
+4. **Unlink (optional):** If there are 2+ identities, show an "Unlink" (or "Remove") action for non-primary methods (e.g. Google). On confirm, call `unlinkIdentity(identity)`. Show a short warning that they will no longer be able to sign in with that method. Do not allow unlinking the last method (Supabase will enforce this; disable the button when only one identity remains).
 
 5. **Server vs client:** The settings **page** can stay a server component that fetches user and passes `identities` (or a minimal list of provider names) to a client component. The client component performs `linkIdentity` / `unlinkIdentity` and refreshes the list (or revalidates) after success.
 
@@ -148,8 +148,8 @@ if (errorParam) {
 
 **Files to add/touch:**
 
-- `apps/web/app/dashboard/settings/page.tsx` — Add Sign-in options section; fetch and pass identities (or provider list) to client component.
-- `apps/web/components/dashboard/sign-in-options-card.tsx` (or equivalent) — Client component: list providers, "Link Google" button, optional unlink with confirmation.
+- `apps/web/app/dashboard/settings/page.tsx` - Add Sign-in options section; fetch and pass identities (or provider list) to client component.
+- `apps/web/components/dashboard/sign-in-options-card.tsx` (or equivalent) - Client component: list providers, "Link Google" button, optional unlink with confirmation.
 
 **Server action (optional):** If you prefer server actions for consistency, you can have a server action that returns the redirect URL for linking (so the client only does `window.location.href = url`). Linking itself still requires the OAuth round-trip in the browser.
 
@@ -161,7 +161,7 @@ if (errorParam) {
 
 ```ts
 // In client: e.g. redirectTo = `${window.location.origin}/auth/callback?next=/dashboard/settings`
-const redirectTo = `…/auth/callback?next=/dashboard/settings`
+const redirectTo = `${window.location.origin}/auth/callback?next=/dashboard/settings`
 const { data, error } = await supabase.auth.linkIdentity({
   provider: 'google',
   options: { redirectTo },
@@ -169,7 +169,7 @@ const { data, error } = await supabase.auth.linkIdentity({
 if (data?.url) window.location.href = data.url
 ```
 
-Use `redirectTo` so the callback receives `next=/dashboard/settings` and redirects the user back to settings after linking. The redirect URL must be in Supabase Auth → URL Configuration → Redirect URLs.
+Use `redirectTo` so the callback receives `next=/dashboard/settings` and redirects the user back to settings after linking. The redirect URL must be in Supabase Auth -> URL Configuration -> Redirect URLs.
 
 **Option B:** If link is initiated from a server action, the action would generate the OAuth URL (e.g. by calling the same logic that builds the redirect URL) and return it; the client then does `window.location.href = url`. Either way, the actual OAuth flow is browser-based and ends at `/auth/callback`.
 
@@ -186,7 +186,7 @@ Use `redirectTo` so the callback receives `next=/dashboard/settings` and redirec
 | 3 | On login page, read `error` from URL and map to safe messages; add message for `link_required` with CTA to sign in then link in Settings | `apps/web/app/(auth)/login/page.tsx` |
 | 4 | Add Sign-in options section to dashboard settings; show linked providers and "Link Google" | `apps/web/app/dashboard/settings/page.tsx` + new client component |
 | 5 | Implement "Link Google" via `linkIdentity({ provider: 'google' })` with redirect back to settings | New client component (e.g. `sign-in-options-card.tsx`) |
-| 6 | (Optional) Unlink identity with confirmation when ≥2 identities | Same client component |
+| 6 | (Optional) Unlink identity with confirmation when 2+ identities | Same client component |
 
 ---
 
@@ -194,9 +194,9 @@ Use `redirectTo` so the callback receives `next=/dashboard/settings` and redirec
 
 - **No user enumeration:** Never show "this email is already registered" or similar. Use only generic codes (`link_required`, `auth_callback_failed`) and fixed messages.
 - **Same message for other OAuth errors:** If Supabase returns a different error (e.g. access_denied), still redirect with a generic code and message so an attacker cannot distinguish "email exists" from "user denied."
-- **Email verification:** Rely on Supabase to only auto-link when the existing account’s email is verified.
+- **Email verification:** Rely on Supabase to only auto-link when the existing account's email is verified.
 - **After linking:** User can sign in with either email/password or Google; both refer to the same user and `auth_user_id` in your app.
 
 ---
 
-*Document version: 1.0. No full code—only specifications and touchpoints.*
+*Document version: 1.0. No full code - only specifications and touchpoints.*

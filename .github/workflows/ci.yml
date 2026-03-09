@@ -21,6 +21,9 @@ jobs:
       - name: Check MCP client isolation
         run: bash .github/scripts/check-mcp-client-isolation.sh
 
+      - name: Check pricing page feature metadata
+        run: node .github/scripts/check-pricing-metadata.js
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

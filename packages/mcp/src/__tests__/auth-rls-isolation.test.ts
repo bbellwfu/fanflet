@@ -16,8 +16,16 @@ vi.mock("@fanflet/db/service", () => ({
   createServiceClient: vi.fn(() => mockServiceClient),
 }));
 
+const mockEntitlements = {
+  features: new Set(["mcp_access", "basic_engagement_stats"]),
+  limits: { max_fanflets: -1 },
+  planName: "pro",
+  planDisplayName: "Pro",
+};
+
 vi.mock("@fanflet/db", () => ({
   createUserScopedClient: vi.fn(async () => mockUserScopedClient),
+  loadSpeakerEntitlements: vi.fn(async () => mockEntitlements),
 }));
 
 vi.mock("../oauth", () => ({
@@ -118,6 +126,17 @@ describe("MCP auth RLS isolation", () => {
       );
 
       expect(ctx.supabase).not.toBe(ctx.serviceClient);
+    });
+
+    it("resolves speakerId and loads entitlements", async () => {
+      const ctx = await authenticateFromHeaders(
+        makeHeadersWithJwt("some-jwt-token")
+      );
+
+      expect(ctx.speakerId).toBe("spk-1");
+      expect(ctx.entitlements).toBeDefined();
+      expect(ctx.entitlements?.planName).toBe("pro");
+      expect(ctx.entitlements?.features.has("mcp_access")).toBe(true);
     });
   });
 
@@ -249,6 +268,14 @@ describe("MCP auth RLS isolation", () => {
       await authenticateFromHeaders(makeHeadersWithJwt("some-jwt-token"));
 
       expect(createUserScopedClient).not.toHaveBeenCalled();
+    });
+
+    it("does NOT load entitlements", async () => {
+      const ctx = await authenticateFromHeaders(
+        makeHeadersWithJwt("some-jwt-token")
+      );
+
+      expect(ctx.entitlements).toBeUndefined();
     });
   });
 });

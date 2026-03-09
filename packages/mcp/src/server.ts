@@ -1,6 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerToolsForRole } from "./tools/index";
 import type { ToolContext, McpRole } from "./types";
+import { McpEntitlementError } from "./types";
+
+const MCP_ACCESS_FEATURE = "mcp_access";
 
 export interface McpServerOptions {
   /**
@@ -30,6 +33,19 @@ export function createMcpServer(
       `Role "${ctx.role}" is not allowed on this MCP endpoint. ` +
       `Allowed roles: ${options.allowedRoles.join(", ")}`
     );
+  }
+
+  // Entitlement gate: speakers must have mcp_access (Pro plan or higher).
+  // Admin and sponsor roles are not gated here (admin always has access;
+  // sponsor entitlements will be added when the sponsor portal launches).
+  if (ctx.role === "speaker" && ctx.entitlements) {
+    if (!ctx.entitlements.features.has(MCP_ACCESS_FEATURE)) {
+      throw new McpEntitlementError(
+        `MCP access requires a Pro or Enterprise subscription. ` +
+        `Your current plan: ${ctx.entitlements.planDisplayName ?? "Free"}. ` +
+        `Upgrade at https://fanflet.com/pricing`
+      );
+    }
   }
 
   const server = new McpServer({

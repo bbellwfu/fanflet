@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SpeakerEntitlements } from "@fanflet/db";
 
 /**
  * All roles that can authenticate to the MCP server.
@@ -46,6 +47,11 @@ export interface ToolContext {
   speakerId?: string;
   /** Sponsor ID, resolved after auth. Available for sponsor role. */
   sponsorId?: string;
+  /**
+   * Speaker entitlements (plan, features, limits). Loaded during auth
+   * for speaker role. Used for MCP access gating and per-tool feature checks.
+   */
+  entitlements?: SpeakerEntitlements;
 }
 
 export interface AuditEntry {
@@ -83,5 +89,15 @@ export class McpAuthError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "McpAuthError";
+  }
+}
+
+export class McpEntitlementError extends Error {
+  constructor(
+    message: string,
+    public readonly planRequired: string = "Pro"
+  ) {
+    super(message);
+    this.name = "McpEntitlementError";
   }
 }

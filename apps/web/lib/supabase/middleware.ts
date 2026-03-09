@@ -47,6 +47,10 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  if (!user && request.cookies.get("active_role")) {
+    supabaseResponse.cookies.delete("active_role");
+  }
+
   // Allow impersonation API routes without additional checks
   if (pathname.startsWith("/api/impersonate/")) {
     return supabaseResponse;
@@ -79,9 +83,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/become-speaker");
 
   if (!user && isProtected) {
+    const hadSession = request.cookies.getAll().some(c => c.name.startsWith("sb-") && c.name.includes("auth-token"));
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
+    if (hadSession) {
+      url.searchParams.set("reason", "session_expired");
+    }
     return NextResponse.redirect(url);
   }
 

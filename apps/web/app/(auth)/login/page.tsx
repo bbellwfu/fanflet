@@ -25,6 +25,7 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
   const mcpState = searchParams.get('mcp_state')
+  const reason = searchParams.get('reason')
 
   useEffect(() => {
     const next = searchParams.get('next')
@@ -88,6 +89,14 @@ export default function LoginPage() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {reason === 'session_expired' && !error && (
+          <div
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            role="status"
+          >
+            Your session has expired. Please sign in again.
+          </div>
+        )}
         {error && (
           <div
             className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"

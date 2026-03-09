@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SponsorSidebar } from "@/components/sponsor/sponsor-sidebar";
 import { TimezoneProvider } from "@/lib/timezone-context";
+import { SessionMonitor } from "@/components/auth/session-monitor";
 
 export default async function SponsorDashboardLayout({
   children,
@@ -31,6 +32,7 @@ export default async function SponsorDashboardLayout({
 
   return (
     <TimezoneProvider timezone={sponsor.timezone ?? null}>
+      <SessionMonitor />
       <SponsorSidebar user={user} sponsor={sponsor} activeRole={activeRole}>
         {children}
       </SponsorSidebar>

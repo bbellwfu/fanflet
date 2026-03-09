@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SponsorSettingsForm } from "@/components/sponsor/sponsor-settings-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSiteUrl } from "@/lib/config";
+import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
 
 export default async function SponsorSettingsPage() {
   const supabase = await createClient();
@@ -57,9 +58,12 @@ export default async function SponsorSettingsPage() {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-1">Server URL</p>
-              <code className="block rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-mono text-zinc-900 select-all">
-                {mcpServerUrl}
-              </code>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm font-mono text-zinc-900 select-all">
+                  {mcpServerUrl}
+                </code>
+                <CopyFanfletUrlButton url={mcpServerUrl} />
+              </div>
             </div>
           </div>
           <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">

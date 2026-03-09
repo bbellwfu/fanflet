@@ -1,5 +1,6 @@
 import { createClient } from "@fanflet/db/server";
 import { SettingsNotificationForm } from "./settings-notification-form";
+import { CopyUrlButton } from "./copy-url-button";
 
 function getAdminMcpUrl(): string {
   const url = process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3001";
@@ -66,9 +67,12 @@ export default async function SettingsPage() {
             </div>
             <div>
               <p className="text-[12px] font-medium text-fg-muted mb-1">Server URL</p>
-              <code className="block rounded-md border border-border-subtle bg-page px-3 py-2 text-[13px] font-mono text-fg select-all">
-                {mcpServerUrl}
-              </code>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-md border border-border-subtle bg-page px-3 py-2 text-[13px] font-mono text-fg select-all">
+                  {mcpServerUrl}
+                </code>
+                <CopyUrlButton url={mcpServerUrl} />
+              </div>
             </div>
           </div>
           <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-[12px] text-blue-800">

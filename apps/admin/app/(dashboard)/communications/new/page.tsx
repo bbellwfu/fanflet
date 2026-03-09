@@ -75,6 +75,9 @@ export default async function NewCommunicationPage({
     return { ...w, commStatus };
   });
 
+  // Archive sent worklogs: only show worklogs that are unused or have a draft (not already sent)
+  const worklogsForPicker = worklogsWithStatus.filter((w) => w.commStatus !== "sent");
+
   // Get opted-in speaker count
   const { count: optedInCount } = await supabase
     .from("platform_communication_preferences")
@@ -99,7 +102,7 @@ export default async function NewCommunicationPage({
 
       <NewCommunicationForm
         draft={existingDraft}
-        worklogs={worklogsWithStatus}
+        worklogs={worklogsForPicker}
         preselectedWorklog={worklogFilename ?? null}
       />
     </div>

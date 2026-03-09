@@ -18,6 +18,19 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { login, signInWithGoogle } from './actions'
 
+/** Map URL error codes to safe user-facing messages (no user enumeration). */
+function messageForErrorCode(code: string | null): string | null {
+  if (!code) return null
+  switch (code) {
+    case 'auth_callback_failed':
+      return "Sign-in didn't complete. Please try again."
+    case 'link_required':
+      return 'Sign in with your email and password below. You can then link Google in Settings (Sign-in options) so you can use either method next time.'
+    default:
+      return 'Sign-in failed. Please try again.'
+  }
+}
+
 export default function LoginPage() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +43,12 @@ export default function LoginPage() {
   useEffect(() => {
     const next = searchParams.get('next')
     if (next?.startsWith('/') && !next.startsWith('//')) setNextUrl(next)
+  }, [searchParams])
+
+  useEffect(() => {
+    const errorCode = searchParams.get('error')
+    const message = messageForErrorCode(errorCode)
+    if (message) setError(message)
   }, [searchParams])
 
   async function handleSubmit(formData: FormData) {
@@ -67,7 +86,7 @@ export default function LoginPage() {
         <Link
           href="/"
           className="flex items-center justify-center gap-2.5 hover:opacity-90 transition-opacity"
-          aria-label="Fanflet – home"
+          aria-label="Fanflet - home"
         >
           <Image
             src="/logo.png"

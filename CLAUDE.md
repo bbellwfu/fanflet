@@ -128,6 +128,8 @@ The MCP server (`packages/mcp/`) uses **branded Supabase client types** to enfor
 4. **The `buildToolContext()` function in `auth.ts` is the ONLY place** where the client type cast should appear. Do not cast `ServiceRoleClient` to `RlsScopedClient` anywhere else.
 5. **`SUPABASE_JWT_SECRET` must be set** in all environments. Without it, `createUserScopedClient()` throws (fail closed).
 6. **All changes to `packages/mcp/src/auth.ts` require security review.** The RLS isolation tests in `packages/mcp/src/__tests__/auth-rls-isolation.test.ts` must pass.
+7. **MCP access is gated by subscription tier.** The `mcp_access` feature flag (Pro+ plans) is checked in `createMcpServer()`. Free speakers receive a 403 with an upgrade URL. Per-tool gating uses `wrapTool(ctx, name, handler, { requiredFeature: "feature_key" })`.
+8. **Speaker entitlements are loaded during auth** via `loadSpeakerEntitlements()` and stored on `ctx.entitlements`. Future tools that require specific features (e.g., analytics) must pass `requiredFeature` to `wrapTool`.
 
 **CI enforcement:**
 - `.github/scripts/check-mcp-client-isolation.sh` — static check that non-admin tool files don't reference `serviceClient`

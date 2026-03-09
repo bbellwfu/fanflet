@@ -58,17 +58,13 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.identities && Array.isArray(user.identities)) {
-      const list = user.identities as Array<Record<string, unknown>>
       setIdentities(
-        list.map((i) => {
-          const id = (i.identity_id ?? i.id) as string | undefined
-          return {
-            provider: (i.provider as string) ?? '',
-            id,
-            identity_id: id,
-            user_id: i.user_id as string | undefined,
-          }
-        }),
+        user.identities.map((i) => ({
+          provider: i.provider ?? '',
+          id: i.id,
+          identity_id: i.identity_id ?? i.id,
+          user_id: i.user_id,
+        })),
       )
     }
     setIsLoading(false)
@@ -111,7 +107,7 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
     if (!payload || identities.length < 2) return
     const supabase = createClient()
     setIsUnlinking(true)
-    const { error } = await supabase.auth.unlinkIdentity(payload)
+    const { error } = await supabase.auth.unlinkIdentity(payload as unknown as Parameters<typeof supabase.auth.unlinkIdentity>[0])
     setUnlinkTarget(null)
     if (error) {
       toast.error(error.message)

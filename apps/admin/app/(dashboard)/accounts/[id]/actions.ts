@@ -1,23 +1,33 @@
 "use server";
 
 import { createServiceClient } from "@fanflet/db/service";
-import { createClient } from "@fanflet/db/server";
 import { FREE_PLAN_NAME } from "@fanflet/db";
 import { revalidatePath } from "next/cache";
+import { requireAdmin, requireSuperAdmin } from "@/lib/admin-auth";
+import { auditAdminAction } from "@/lib/audit";
+import { z } from "zod";
+
+const speakerIdSchema = z.string().uuid();
+const toggleSuspensionSchema = z.object({
+  speakerId: z.string().uuid(),
+  currentStatus: z.enum(["active", "suspended"]),
+  reason: z.string().max(1000).optional(),
+});
+const changeSpeakerPlanSchema = z.object({
+  speakerId: z.string().uuid(),
+  planId: z.string().uuid().nullable(),
+});
 
 export async function resetAccountToNew(speakerId: string) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = speakerIdSchema.safeParse(speakerId);
+  if (!parsed.success) return { error: "Invalid input" };
+  const validSpeakerId = parsed.data;
 
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
-
-  const appMetadata = user.app_metadata ?? {};
-  if (appMetadata.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
@@ -25,7 +35,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { data: speaker, error: speakerError } = await supabase
     .from("speakers")
     .select("id, auth_user_id")
-    .eq("id", speakerId)
+    .eq("id", validSpeakerId)
     .single();
 
   if (speakerError || !speaker) {
@@ -41,7 +51,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: connError } = await supabase
     .from("sponsor_connections")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (connError) {
     return { error: "Failed to delete sponsor connections" };
   }
@@ -50,7 +60,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: fanfletsError } = await supabase
     .from("fanflets")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (fanfletsError) {
     return { error: "Failed to delete fanflets" };
   }
@@ -59,7 +69,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: subsError } = await supabase
     .from("subscribers")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (subsError) {
     return { error: "Failed to delete subscribers" };
   }
@@ -68,7 +78,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: surveyError } = await supabase
     .from("survey_questions")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (surveyError) {
     return { error: "Failed to delete survey questions" };
   }
@@ -77,7 +87,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: libError } = await supabase
     .from("resource_library")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (libError) {
     return { error: "Failed to delete resource library" };
   }
@@ -86,7 +96,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: overridesError } = await supabase
     .from("speaker_feature_overrides")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (overridesError) {
     return { error: "Failed to delete feature overrides" };
   }
@@ -95,7 +105,7 @@ export async function resetAccountToNew(speakerId: string) {
   const { error: subError } = await supabase
     .from("speaker_subscriptions")
     .delete()
-    .eq("speaker_id", speakerId);
+    .eq("speaker_id", validSpeakerId);
   if (subError) {
     return { error: "Failed to delete subscription" };
   }
@@ -109,7 +119,7 @@ export async function resetAccountToNew(speakerId: string) {
       slug: null,
       social_links: {},
     })
-    .eq("id", speakerId);
+    .eq("id", validSpeakerId);
   if (updateError) {
     return { error: "Failed to clear speaker profile" };
   }
@@ -117,7 +127,7 @@ export async function resetAccountToNew(speakerId: string) {
   // 9. Storage: avatars/{auth_user_id}/ and file-uploads/{speaker_id}/
   const [avatarList, fileUploadDirsList] = await Promise.all([
     supabase.storage.from("avatars").list(authUserId, { limit: 1000 }),
-    supabase.storage.from("file-uploads").list(speakerId, { limit: 1000 }),
+    supabase.storage.from("file-uploads").list(validSpeakerId, { limit: 1000 }),
   ]);
 
   const avatarFiles = avatarList.data ?? [];
@@ -133,17 +143,28 @@ export async function resetAccountToNew(speakerId: string) {
     if (!dir.name) continue;
     const subList = await supabase.storage
       .from("file-uploads")
-      .list(`${speakerId}/${dir.name}`, { limit: 1000 });
+      .list(`${validSpeakerId}/${dir.name}`, { limit: 1000 });
     const subFiles = subList.data ?? [];
     const paths = subFiles
       .filter((item) => item.name)
-      .map((f) => `${speakerId}/${dir.name}/${f.name}`);
+      .map((f) => `${validSpeakerId}/${dir.name}/${f.name}`);
     if (paths.length > 0) {
       await supabase.storage.from("file-uploads").remove(paths);
     }
   }
 
-  revalidatePath(`/accounts/${speakerId}`);
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "account.reset",
+    category: "account",
+    targetType: "speaker",
+    targetId: validSpeakerId,
+    details: { speakerAuthUserId: authUserId },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath(`/accounts/${validSpeakerId}`);
   revalidatePath("/accounts");
   return { success: true };
 }
@@ -153,40 +174,49 @@ export async function toggleSuspension(
   currentStatus: string,
   reason?: string
 ) {
-  // Verify the caller is an admin
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = toggleSuspensionSchema.safeParse({
+    speakerId,
+    currentStatus,
+    reason,
+  });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { speakerId: validSpeakerId, currentStatus: validStatus, reason: validReason } = parsed.data;
 
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
-
-  const appMetadata = user.app_metadata ?? {};
-  if (appMetadata.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
 
-  if (currentStatus === "active") {
-    // Suspend
+  if (validStatus === "active") {
     const { error } = await supabase
       .from("speakers")
       .update({
         status: "suspended",
         suspended_at: new Date().toISOString(),
-        suspended_by: user.id,
-        suspension_reason: reason ?? null,
+        suspended_by: admin.user.id,
+        suspension_reason: validReason ?? null,
       })
-      .eq("id", speakerId);
+      .eq("id", validSpeakerId);
 
     if (error) {
       return { error: "Failed to suspend account" };
     }
+
+    await auditAdminAction({
+      adminId: admin.user.id,
+      action: "account.suspend",
+      category: "account",
+      targetType: "speaker",
+      targetId: validSpeakerId,
+      details: { reason: validReason ?? null },
+      ipAddress: admin.ipAddress,
+      userAgent: admin.userAgent,
+    });
   } else {
-    // Reactivate
     const { error } = await supabase
       .from("speakers")
       .update({
@@ -195,14 +225,24 @@ export async function toggleSuspension(
         suspended_by: null,
         suspension_reason: null,
       })
-      .eq("id", speakerId);
+      .eq("id", validSpeakerId);
 
     if (error) {
       return { error: "Failed to reactivate account" };
     }
+
+    await auditAdminAction({
+      adminId: admin.user.id,
+      action: "account.reactivate",
+      category: "account",
+      targetType: "speaker",
+      targetId: validSpeakerId,
+      ipAddress: admin.ipAddress,
+      userAgent: admin.userAgent,
+    });
   }
 
-  revalidatePath(`/accounts/${speakerId}`);
+  revalidatePath(`/accounts/${validSpeakerId}`);
   revalidatePath("/accounts");
   return { success: true };
 }
@@ -211,31 +251,40 @@ export async function changeSpeakerPlan(
   speakerId: string,
   planId: string | null
 ): Promise<{ error?: string }> {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = changeSpeakerPlanSchema.safeParse({ speakerId, planId });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { speakerId: validSpeakerId, planId: validPlanId } = parsed.data;
 
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
-
-  const appMetadata = user.app_metadata ?? {};
-  if (appMetadata.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
 
-  if (planId === null) {
+  if (validPlanId === null) {
     const { error } = await supabase
       .from("speaker_subscriptions")
       .delete()
-      .eq("speaker_id", speakerId);
+      .eq("speaker_id", validSpeakerId);
     if (error) {
       return { error: "Failed to remove subscription" };
     }
-    revalidatePath(`/accounts/${speakerId}`);
+
+    await auditAdminAction({
+      adminId: admin.user.id,
+      action: "plan.change_speaker",
+      category: "plan",
+      targetType: "speaker",
+      targetId: validSpeakerId,
+      details: { newPlanId: null },
+      ipAddress: admin.ipAddress,
+      userAgent: admin.userAgent,
+    });
+
+    revalidatePath(`/accounts/${validSpeakerId}`);
     revalidatePath("/accounts");
     return {};
   }
@@ -243,7 +292,7 @@ export async function changeSpeakerPlan(
   const { data: plan, error: planError } = await supabase
     .from("plans")
     .select("id, name, limits")
-    .eq("id", planId)
+    .eq("id", validPlanId)
     .single();
 
   if (planError || !plan) {
@@ -254,11 +303,23 @@ export async function changeSpeakerPlan(
     const { error } = await supabase
       .from("speaker_subscriptions")
       .delete()
-      .eq("speaker_id", speakerId);
+      .eq("speaker_id", validSpeakerId);
     if (error) {
       return { error: "Failed to remove subscription" };
     }
-    revalidatePath(`/accounts/${speakerId}`);
+
+    await auditAdminAction({
+      adminId: admin.user.id,
+      action: "plan.change_speaker",
+      category: "plan",
+      targetType: "speaker",
+      targetId: validSpeakerId,
+      details: { newPlanId: validPlanId, newPlanName: plan.name },
+      ipAddress: admin.ipAddress,
+      userAgent: admin.userAgent,
+    });
+
+    revalidatePath(`/accounts/${validSpeakerId}`);
     revalidatePath("/accounts");
     return {};
   }
@@ -266,7 +327,7 @@ export async function changeSpeakerPlan(
   const { data: featureRows } = await supabase
     .from("plan_features")
     .select("feature_flags(key)")
-    .eq("plan_id", planId);
+    .eq("plan_id", validPlanId);
 
   const featureKeys = (featureRows ?? [])
     .map((r) => {
@@ -279,8 +340,8 @@ export async function changeSpeakerPlan(
     .from("speaker_subscriptions")
     .upsert(
       {
-        speaker_id: speakerId,
-        plan_id: planId,
+        speaker_id: validSpeakerId,
+        plan_id: validPlanId,
         status: "active",
         limits_snapshot: plan.limits,
         features_snapshot: featureKeys,
@@ -293,7 +354,18 @@ export async function changeSpeakerPlan(
     return { error: "Failed to update subscription" };
   }
 
-  revalidatePath(`/accounts/${speakerId}`);
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "plan.change_speaker",
+    category: "plan",
+    targetType: "speaker",
+    targetId: validSpeakerId,
+    details: { newPlanId: validPlanId, newPlanName: plan.name },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath(`/accounts/${validSpeakerId}`);
   revalidatePath("/accounts");
   return {};
 }

@@ -23,7 +23,9 @@ export function renderAnnouncementEmail({
     .card { background: #ffffff; border-radius: 8px; overflow: hidden; }
     .header { background: #1B365D; padding: 24px 32px; }
     .header h1 { color: #ffffff; font-size: 20px; font-weight: 600; margin: 0; }
-    .header .brand { color: rgba(255,255,255,0.7); font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+    .header .brand-row { margin-bottom: 16px; }
+    .header .brand-row img { display: inline-block; vertical-align: middle; border-radius: 6px; }
+    .header .brand-row span { display: inline-block; vertical-align: middle; color: #ffffff; font-size: 18px; font-weight: 600; margin-left: 10px; letter-spacing: -0.2px; }
     .body { padding: 32px; color: #334155; font-size: 15px; line-height: 1.6; }
     .body h2 { color: #1B365D; font-size: 17px; margin: 24px 0 8px; }
     .body h3 { color: #1B365D; font-size: 15px; margin: 20px 0 6px; }
@@ -31,6 +33,8 @@ export function renderAnnouncementEmail({
     .body ul { padding-left: 20px; margin: 0 0 16px; }
     .body li { margin-bottom: 6px; }
     .body a { color: #2563eb; }
+    .feedback { margin: 32px 0 0; padding: 24px 0 0; border-top: 1px solid #e2e8f0; }
+    .feedback p { color: #64748b; font-size: 14px; line-height: 1.6; margin: 0; }
     .footer { padding: 20px 32px; border-top: 1px solid #e2e8f0; text-align: center; }
     .footer p { color: #94a3b8; font-size: 12px; margin: 0 0 4px; }
     .footer a { color: #94a3b8; text-decoration: underline; }
@@ -40,11 +44,17 @@ export function renderAnnouncementEmail({
   <div class="container">
     <div class="card">
       <div class="header">
-        <div class="brand">Fanflet</div>
+        <div class="brand-row">
+          <img src="https://fanflet.com/logo.png" alt="Fanflet" width="32" height="32" />
+          <span>Fanflet</span>
+        </div>
         <h1>${escapeHtml(title)}</h1>
       </div>
       <div class="body">
         ${bodyHtml}
+        <div class="feedback">
+          <p>Have ideas or suggestions? Just reply to this email &mdash; we read every response.</p>
+        </div>
       </div>
       <div class="footer">
         <p>You're receiving this because you opted in to platform announcements.</p>

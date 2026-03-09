@@ -52,6 +52,9 @@ marketing_site/
 # Pitch deck assets (not part of the application)
 pitch_deck/
 
+# Admin worklog index (build artifact)
+apps/admin/generated/
+
 # Misc
 *.pptx
 medium_logo_mark.png

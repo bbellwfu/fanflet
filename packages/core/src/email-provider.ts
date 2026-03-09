@@ -10,6 +10,7 @@ export interface EmailMessage {
   subject: string;
   bodyHtml: string;
   bodyPlain?: string;
+  replyTo?: string;
 }
 
 export interface EmailSendResult {

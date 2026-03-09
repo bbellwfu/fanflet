@@ -1,31 +1,67 @@
 "use server";
 
 import { createServiceClient } from "@fanflet/db/service";
-import { createClient } from "@fanflet/db/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireSuperAdmin } from "@/lib/admin-auth";
+import { auditAdminAction } from "@/lib/audit";
+import { z } from "zod";
+
+const flagIdSchema = z.string().uuid();
+const planIdSchema = z.string().uuid();
+const toggleFeatureGlobalSchema = z.object({
+  flagId: z.string().uuid(),
+  isGlobal: z.boolean(),
+});
+const updatePlanFeaturesSchema = z.object({
+  planId: z.string().uuid(),
+  featureFlagIds: z.array(z.string().uuid()).max(100),
+});
+const updatePlanSchema = z.object({
+  planId: z.string().uuid(),
+  data: z.object({
+    display_name: z.string().max(200).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    limits: z.record(z.string(), z.number()).optional(),
+    is_public: z.boolean().optional(),
+    is_active: z.boolean().optional(),
+  }),
+});
+const refreshPlanEntitlementsSchema = z.string().uuid();
 
 export async function toggleFeatureGlobal(flagId: string, isGlobal: boolean) {
-  // Verify admin
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = toggleFeatureGlobalSchema.safeParse({ flagId, isGlobal });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { flagId: validFlagId, isGlobal: validIsGlobal } = parsed.data;
 
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
 
   const { error } = await supabase
     .from("feature_flags")
-    .update({ is_global: isGlobal })
-    .eq("id", flagId);
+    .update({ is_global: validIsGlobal })
+    .eq("id", validFlagId);
 
   if (error) {
     return { error: "Failed to update feature flag" };
   }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "feature_flag.toggle_global",
+    category: "feature",
+    targetType: "feature_flag",
+    targetId: validFlagId,
+    details: { isGlobal: validIsGlobal },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
 
   revalidatePath("/features");
   return { success: true };
@@ -35,13 +71,15 @@ export async function updatePlanFeatures(
   planId: string,
   featureFlagIds: string[]
 ) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = updatePlanFeaturesSchema.safeParse({ planId, featureFlagIds });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { planId: validPlanId, featureFlagIds: validFeatureFlagIds } = parsed.data;
 
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
@@ -49,16 +87,16 @@ export async function updatePlanFeatures(
   const { error: deleteError } = await supabase
     .from("plan_features")
     .delete()
-    .eq("plan_id", planId);
+    .eq("plan_id", validPlanId);
 
   if (deleteError) {
     return { error: "Failed to update plan features" };
   }
 
-  if (featureFlagIds.length > 0) {
+  if (validFeatureFlagIds.length > 0) {
     const { error: insertError } = await supabase.from("plan_features").insert(
-      featureFlagIds.map((feature_flag_id) => ({
-        plan_id: planId,
+      validFeatureFlagIds.map((feature_flag_id) => ({
+        plan_id: validPlanId,
         feature_flag_id,
       }))
     );
@@ -68,9 +106,20 @@ export async function updatePlanFeatures(
     }
   }
 
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "plan.update_features",
+    category: "plan",
+    targetType: "plan",
+    targetId: validPlanId,
+    details: { featureFlagIds: validFeatureFlagIds },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
   revalidatePath("/features");
   revalidatePath("/features/plans");
-  revalidatePath(`/features/plans/${planId}`);
+  revalidatePath(`/features/plans/${validPlanId}`);
   return { success: true };
 }
 
@@ -84,36 +133,49 @@ export async function updatePlan(
     is_active?: boolean;
   }
 ) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = updatePlanSchema.safeParse({ planId, data });
+  if (!parsed.success) return { error: "Invalid input" };
+  const { planId: validPlanId, data: validData } = parsed.data;
 
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
 
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (data.display_name !== undefined) payload.display_name = data.display_name;
-  if (data.description !== undefined) payload.description = data.description;
-  if (data.limits !== undefined) payload.limits = data.limits;
-  if (data.is_public !== undefined) payload.is_public = data.is_public;
-  if (data.is_active !== undefined) payload.is_active = data.is_active;
+  if (validData.display_name !== undefined) payload.display_name = validData.display_name;
+  if (validData.description !== undefined) payload.description = validData.description;
+  if (validData.limits !== undefined) payload.limits = validData.limits;
+  if (validData.is_public !== undefined) payload.is_public = validData.is_public;
+  if (validData.is_active !== undefined) payload.is_active = validData.is_active;
 
   const { error } = await supabase
     .from("plans")
     .update(payload)
-    .eq("id", planId);
+    .eq("id", validPlanId);
 
   if (error) {
     return { error: "Failed to update plan" };
   }
 
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "plan.update",
+    category: "plan",
+    targetType: "plan",
+    targetId: validPlanId,
+    details: validData as Record<string, unknown>,
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
   revalidatePath("/features");
   revalidatePath("/features/plans");
-  revalidatePath(`/features/plans/${planId}`);
+  revalidatePath(`/features/plans/${validPlanId}`);
   return { success: true };
 }
 
@@ -121,15 +183,13 @@ export async function updatePlanWithFeatures(
   planId: string,
   formData: FormData
 ) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
-
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  const validPlanId = planIdSchema.safeParse(planId);
+  if (!validPlanId.success) {
+    redirect("/features?tab=plans");
+    return;
   }
-
+  const planIdParsed = validPlanId.data;
+  // updatePlan and updatePlanFeatures both call requireSuperAdmin internally
   const display_name = formData.get("display_name");
   const description = formData.get("description");
   const maxFanfletsRaw = formData.get("max_fanflets");
@@ -145,7 +205,7 @@ export async function updatePlanWithFeatures(
   const { data: existingPlan } = await supabase
     .from("plans")
     .select("limits")
-    .eq("id", planId)
+    .eq("id", planIdParsed)
     .single();
 
   const existingLimits = (existingPlan?.limits ?? {}) as Record<string, number>;
@@ -174,7 +234,7 @@ export async function updatePlanWithFeatures(
     else if (n === -1) limits.signed_url_minutes = -1;
   }
 
-  const updateResult = await updatePlan(planId, {
+  const updateResult = await updatePlan(planIdParsed, {
     ...(typeof display_name === "string" && display_name.trim()
       ? { display_name: display_name.trim() }
       : {}),
@@ -188,13 +248,13 @@ export async function updatePlanWithFeatures(
 
   if (updateResult.error) return updateResult;
 
-  const featuresResult = await updatePlanFeatures(planId, featureFlagIds);
+  const featuresResult = await updatePlanFeatures(planIdParsed, featureFlagIds);
   if (featuresResult.error) return featuresResult;
 
   redirect(`/features?tab=plans`);
 }
 
-/** Form action wrapper that returns void for use in plan edit form (avoids passing inline functions to Client Components). */
+/** Form action wrapper that returns void for use in plan edit form. */
 export async function submitPlanEditForm(
   planId: string,
   formData: FormData
@@ -204,13 +264,11 @@ export async function submitPlanEditForm(
 
 /** Create a new plan with optional description, limits, and feature assignments. */
 export async function createPlanWithFeatures(formData: FormData) {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
-
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const nameRaw = formData.get("name");
@@ -221,7 +279,9 @@ export async function createPlanWithFeatures(formData: FormData) {
   const storageMbRaw = formData.get("storage_mb");
   const maxFileMbRaw = formData.get("max_file_mb");
   const signedUrlMinutesRaw = formData.get("signed_url_minutes");
-  const featureFlagIds = formData.getAll("feature_flag_id") as string[];
+  const featureFlagIdsRaw = formData.getAll("feature_flag_id");
+  const featureFlagIdsParsed = z.array(z.string().uuid()).max(100).safeParse(featureFlagIdsRaw);
+  const featureFlagIds = featureFlagIdsParsed.success ? featureFlagIdsParsed.data : [];
 
   if (
     typeof nameRaw !== "string" ||
@@ -326,6 +386,17 @@ export async function createPlanWithFeatures(formData: FormData) {
     }
   }
 
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "plan.create",
+    category: "plan",
+    targetType: "plan",
+    targetId: newPlan.id,
+    details: { name, display_name, limits, featureFlagIds },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
   revalidatePath("/features");
   redirect(`/features?tab=plans`);
 }
@@ -348,13 +419,15 @@ export async function submitPlanCreateForm(formData: FormData): Promise<void> {
 export async function refreshPlanEntitlements(
   planId: string
 ): Promise<{ error?: string; count?: number }> {
-  const userSupabase = await createClient();
-  const {
-    data: { user },
-  } = await userSupabase.auth.getUser();
+  const parsed = refreshPlanEntitlementsSchema.safeParse(planId);
+  if (!parsed.success) return { error: "Invalid input" };
+  const validPlanId = parsed.data;
 
-  if (!user || user.app_metadata?.role !== "platform_admin") {
-    return { error: "Not authorized" };
+  let admin: Awaited<ReturnType<typeof requireSuperAdmin>>;
+  try {
+    admin = await requireSuperAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
   }
 
   const supabase = createServiceClient();
@@ -362,7 +435,7 @@ export async function refreshPlanEntitlements(
   const { data: plan } = await supabase
     .from("plans")
     .select("limits")
-    .eq("id", planId)
+    .eq("id", validPlanId)
     .single();
 
   if (!plan) return { error: "Plan not found" };
@@ -370,7 +443,7 @@ export async function refreshPlanEntitlements(
   const { data: featureRows } = await supabase
     .from("plan_features")
     .select("feature_flags(key)")
-    .eq("plan_id", planId);
+    .eq("plan_id", validPlanId);
 
   const featureKeys = (featureRows ?? [])
     .map((r) => {
@@ -382,7 +455,7 @@ export async function refreshPlanEntitlements(
   const { data: subs, error: fetchError } = await supabase
     .from("speaker_subscriptions")
     .select("id")
-    .eq("plan_id", planId)
+    .eq("plan_id", validPlanId)
     .eq("status", "active");
 
   if (fetchError) return { error: "Failed to fetch subscribers" };
@@ -400,6 +473,17 @@ export async function refreshPlanEntitlements(
 
   if (updateError) return { error: "Failed to refresh entitlements" };
 
-  revalidatePath(`/features/plans/${planId}`);
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "plan.refresh_entitlements",
+    category: "plan",
+    targetType: "plan",
+    targetId: validPlanId,
+    details: { subscriberCount: subIds.length },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath(`/features/plans/${validPlanId}`);
   return { count: subIds.length };
 }

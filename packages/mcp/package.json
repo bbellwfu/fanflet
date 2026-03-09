@@ -11,13 +11,18 @@
     "./oauth": "./src/oauth.ts",
     "./types": "./src/types.ts"
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
     "@fanflet/db": "*",
     "@fanflet/types": "*",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

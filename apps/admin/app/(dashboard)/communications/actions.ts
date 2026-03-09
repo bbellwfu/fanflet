@@ -624,7 +624,7 @@ export async function resendFailedRecipients(
     const result = results[i];
     const { deliveryId } = resendList[i];
     if (result.success && result.externalId) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("communication_deliveries")
         .update({
           provider_message_id: result.externalId,
@@ -632,6 +632,13 @@ export async function resendFailedRecipients(
           email_provider: provider.name,
         })
         .eq("id", deliveryId);
+      if (updateError) {
+        console.error(
+          "[communications] resendFailedRecipients update delivery:",
+          deliveryId,
+          updateError.message
+        );
+      }
     }
   }
 

@@ -18,8 +18,13 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 
-/** Identity from Supabase Auth (provider + id for unlink). */
-type AuthIdentity = { provider: string; id?: string }
+/** Shape we need for display and for unlinkIdentity (matches Supabase UserIdentity). */
+type IdentityRow = {
+  provider: string
+  id?: string
+  identity_id?: string
+  user_id?: string
+}
 
 const PROVIDER_LABELS: Record<string, string> = {
   email: 'Email and password',
@@ -30,14 +35,21 @@ function providerLabel(provider: string): string {
   return PROVIDER_LABELS[provider] ?? provider
 }
 
+/** Build the object Supabase auth.unlinkIdentity() expects (UserIdentity). */
+function toUserIdentity(row: IdentityRow): { identity_id: string; user_id: string; provider: string } | null {
+  const id = row.identity_id ?? row.id
+  if (!id || !row.user_id) return null
+  return { identity_id: id, user_id: row.user_id, provider: row.provider }
+}
+
 export function SignInOptionsCard({ initialProviders }: { initialProviders: string[] }) {
   const router = useRouter()
-  const [identities, setIdentities] = useState<AuthIdentity[]>(
+  const [identities, setIdentities] = useState<IdentityRow[]>(
     initialProviders.map((p) => ({ provider: p })),
   )
   const [isLoading, setIsLoading] = useState(true)
   const [isLinking, setIsLinking] = useState(false)
-  const [unlinkTarget, setUnlinkTarget] = useState<AuthIdentity | null>(null)
+  const [unlinkTarget, setUnlinkTarget] = useState<IdentityRow | null>(null)
   const [isUnlinking, setIsUnlinking] = useState(false)
 
   const refreshIdentities = useCallback(async () => {
@@ -46,11 +58,17 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.identities && Array.isArray(user.identities)) {
+      const list = user.identities as Array<Record<string, unknown>>
       setIdentities(
-        (user.identities as AuthIdentity[]).map((i) => ({
-          provider: i.provider,
-          id: i.id,
-        })),
+        list.map((i) => {
+          const id = (i.identity_id ?? i.id) as string | undefined
+          return {
+            provider: (i.provider as string) ?? '',
+            id,
+            identity_id: id,
+            user_id: i.user_id as string | undefined,
+          }
+        }),
       )
     }
     setIsLoading(false)
@@ -88,11 +106,12 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
     setIsLinking(false)
   }
 
-  async function handleUnlink(identity: AuthIdentity) {
-    if (!identity.id || identities.length < 2) return
+  async function handleUnlink(identity: IdentityRow) {
+    const payload = toUserIdentity(identity)
+    if (!payload || identities.length < 2) return
     const supabase = createClient()
     setIsUnlinking(true)
-    const { error } = await supabase.auth.unlinkIdentity(identity)
+    const { error } = await supabase.auth.unlinkIdentity(payload)
     setUnlinkTarget(null)
     if (error) {
       toast.error(error.message)
@@ -157,7 +176,7 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {identities
-                      .filter((i) => i.id != null)
+                      .filter((i) => toUserIdentity(i) != null)
                       .map((identity) => (
                         <Button
                           key={identity.provider}

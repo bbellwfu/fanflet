@@ -49,7 +49,12 @@ export async function middleware(request: NextRequest) {
 
   // All non-login routes require authentication + platform_admin role
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const hadSession = request.cookies.getAll().some(c => c.name.startsWith("sb-") && c.name.includes("auth-token"));
+    const loginUrl = new URL("/login", request.url);
+    if (hadSession) {
+      loginUrl.searchParams.set("reason", "session_expired");
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   const appMetadataRole = (user.app_metadata as Record<string, unknown> | undefined)?.role;

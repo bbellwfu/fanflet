@@ -3,6 +3,7 @@ import {
   createMcpServer,
   authenticateFromHeaders,
   McpAuthError,
+  McpEntitlementError,
 } from "@fanflet/mcp";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,18 @@ async function handleMcpRequest(req: Request): Promise<Response> {
           "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadataUrl}"`,
         },
       });
+    }
+
+    if (err instanceof McpEntitlementError) {
+      return new Response(
+        JSON.stringify({
+          error: "subscription_required",
+          message: err.message,
+          plan_required: err.planRequired,
+          upgrade_url: `${getWebBaseUrl()}/pricing`,
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
     }
 
     const message =

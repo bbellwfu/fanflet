@@ -11,6 +11,7 @@ export default async function AdminLoginPage({
   const code = typeof params.code === "string" ? params.code : null;
   const next = typeof params.next === "string" ? params.next : "/";
   const errorParam = typeof params.error === "string" ? params.error : null;
+  const reasonParam = typeof params.reason === "string" ? params.reason : null;
   const mcpState = typeof params.mcp_state === "string" ? params.mcp_state : null;
 
   // If Supabase redirected here with a code (shouldn't normally happen, but handle it),
@@ -52,5 +53,5 @@ export default async function AdminLoginPage({
     }
   }
 
-  return <LoginForm error={errorParam} mcpState={mcpState} />;
+  return <LoginForm error={errorParam} reason={reasonParam} mcpState={mcpState} />;
 }

@@ -49,6 +49,8 @@ export default async function PricingPage() {
   const rawPlanFeatures = planFeaturesResult.data ?? [];
 
   const planFeatureMap: Record<string, string[]> = {};
+  const featureMatrix: Record<string, string[]> = {};
+  const featureDisplayNames: Record<string, string> = {};
   for (const pf of rawPlanFeatures) {
     const plan = pf.plans as unknown as { name: string } | null;
     const flag = pf.feature_flags as unknown as {
@@ -59,6 +61,10 @@ export default async function PricingPage() {
       const arr = planFeatureMap[plan.name] ?? [];
       arr.push(flag.display_name);
       planFeatureMap[plan.name] = arr;
+      const keys = featureMatrix[plan.name] ?? [];
+      if (flag.key && !keys.includes(flag.key)) keys.push(flag.key);
+      featureMatrix[plan.name] = keys;
+      if (flag.key) featureDisplayNames[flag.key] = flag.display_name;
     }
   }
 
@@ -69,6 +75,12 @@ export default async function PricingPage() {
     price_monthly_cents: p.price_monthly_cents,
     limits: p.limits as Record<string, number> | null,
     features: planFeatureMap[p.name] ?? [],
+  }));
+
+  const comparisonPlans = publicPlans.map((p) => ({
+    name: p.name,
+    display_name: p.display_name,
+    limits: p.limits ?? {},
   }));
 
   return (
@@ -136,7 +148,11 @@ export default async function PricingPage() {
       </section>
 
       <PricingTiers plans={publicPlans} />
-      <FeatureComparison />
+      <FeatureComparison
+        plans={comparisonPlans}
+        featureMatrix={featureMatrix}
+        featureDisplayNames={featureDisplayNames}
+      />
       <PricingFAQ />
 
       {/* BottomCTA — PRD structure + SubscribeForm */}

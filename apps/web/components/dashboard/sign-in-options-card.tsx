@@ -57,7 +57,9 @@ export function SignInOptionsCard({ initialProviders }: { initialProviders: stri
   }, [])
 
   useEffect(() => {
-    refreshIdentities()
+    void (async () => {
+      await refreshIdentities()
+    })()
   }, [refreshIdentities])
 
   const hasGoogle = identities.some((i) => i.provider === 'google')

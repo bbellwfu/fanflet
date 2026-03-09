@@ -7,6 +7,7 @@ import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib
 import { notifyAdmins } from "@/lib/admin-notifications";
 import { TimezoneProvider } from "@/lib/timezone-context";
 import { TimezoneSync } from "@/lib/timezone-sync";
+import { SessionMonitor } from "@/components/auth/session-monitor";
 
 export default async function DashboardLayout({
   children,
@@ -114,6 +115,7 @@ export default async function DashboardLayout({
   return (
     <TimezoneProvider timezone={speakerTimezone}>
       <TimezoneSync currentTimezone={speakerTimezone} />
+      <SessionMonitor />
       <Sidebar
         user={user}
         speaker={speaker}

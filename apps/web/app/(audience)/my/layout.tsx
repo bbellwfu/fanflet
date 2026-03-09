@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { SessionMonitor } from "@/components/auth/session-monitor";
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -34,6 +35,7 @@ export default async function AudiencePortalLayout({
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SessionMonitor />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="mx-auto max-w-3xl flex items-center justify-between px-4 h-14">
           <Link

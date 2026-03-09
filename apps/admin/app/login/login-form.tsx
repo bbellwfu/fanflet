@@ -19,10 +19,11 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 interface LoginFormProps {
   error: string | null;
+  reason?: string | null;
   mcpState?: string | null;
 }
 
-export function LoginForm({ error: initialError, mcpState }: LoginFormProps) {
+export function LoginForm({ error: initialError, reason, mcpState }: LoginFormProps) {
   const [error, setError] = useState<string | null>(
     initialError ? ERROR_MESSAGES[initialError] ?? initialError : null
   );
@@ -77,6 +78,14 @@ export function LoginForm({ error: initialError, mcpState }: LoginFormProps) {
 
         {/* Content */}
         <div className="px-6 pb-6 space-y-4">
+          {reason === "session_expired" && !error && (
+            <div
+              className="rounded-lg border border-amber-300/40 bg-amber-50 px-3 py-2 text-[13px] text-amber-800"
+              role="status"
+            >
+              Your session has expired. Please sign in again.
+            </div>
+          )}
           {error && (
             <div
               className="rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-[13px] text-error"

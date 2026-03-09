@@ -26,18 +26,30 @@ export type ToolHandler = (input: Record<string, unknown>) => Promise<unknown>;
  */
 export type RegisterToolsFn = (server: McpServer, ctx: ToolContext) => void;
 
+export interface WrapToolOptions {
+  /**
+   * Feature flag key required to use this tool. If set and the speaker's
+   * entitlements don't include this feature, the tool returns a structured
+   * upgrade prompt instead of executing.
+   *
+   * Only applies to roles with entitlements (currently speaker).
+   * Admin tools are never gated.
+   */
+  requiredFeature?: string;
+}
+
 /**
- * Wraps a raw tool handler with rate limiting, audit logging, and
- * structured MCP responses. Use this for every tool in every role.
+ * Wraps a raw tool handler with entitlement checks, rate limiting, audit
+ * logging, and structured MCP responses. Use this for every tool in every role.
  *
  * @example
  * ```ts
  * server.tool(
- *   "speaker_list_fanflets",
- *   "List all fanflets for the authenticated speaker",
- *   { limit: z.number().default(20) },
- *   wrapTool(ctx, "speaker_list_fanflets", async (input) => {
- *     return listFanflets(ctx.supabase, input.limit as number);
+ *   "speaker_get_fanflet_analytics",
+ *   "Get analytics for a specific fanflet",
+ *   { fanfletId: z.string().uuid() },
+ *   wrapTool(ctx, "speaker_get_fanflet_analytics", handler, {
+ *     requiredFeature: "click_through_analytics",
  *   })
  * );
  * ```
@@ -45,9 +57,32 @@ export type RegisterToolsFn = (server: McpServer, ctx: ToolContext) => void;
 export function wrapTool(
   ctx: ToolContext,
   toolName: string,
-  handler: ToolHandler
+  handler: ToolHandler,
+  options?: WrapToolOptions
 ) {
   return async (input: Record<string, unknown>) => {
+    // Per-tool entitlement check
+    if (options?.requiredFeature && ctx.entitlements) {
+      if (!ctx.entitlements.features.has(options.requiredFeature)) {
+        const planName = ctx.entitlements.planDisplayName ?? "Free";
+        await writeAuditLog(ctx, toolName, input, "denied", 0);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                error: "feature_not_available",
+                message: `This tool requires the "${options.requiredFeature}" feature, which is not included in your ${planName} plan. Upgrade at https://fanflet.com/pricing`,
+                current_plan: planName,
+                required_feature: options.requiredFeature,
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
     checkRateLimit(ctx);
     const start = Date.now();
     try {

@@ -1,5 +1,5 @@
 import { createServiceClient } from "@fanflet/db/service";
-import { createUserScopedClient } from "@fanflet/db";
+import { createUserScopedClient, loadSpeakerEntitlements } from "@fanflet/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { McpAuthError } from "./types";
 import type {
@@ -38,8 +38,14 @@ async function resolveAdminRole(
   return !!roleRow;
 }
 
+interface RoleResolution {
+  role: McpRole;
+  speakerId?: string;
+  sponsorId?: string;
+}
+
 /**
- * Resolves the MCP role for a user. Checks in priority order:
+ * Resolves the MCP role for a user along with entity IDs. Checks in priority order:
  * 1. platform_admin (app_metadata or user_roles)
  * 2. sponsor (has a sponsor_accounts row)
  * 3. speaker (has a speakers row — default for authenticated users)
@@ -49,9 +55,9 @@ async function resolveUserRole(
   serviceClient: SupabaseClient,
   userId: string,
   appMetadataRole?: string
-): Promise<McpRole> {
+): Promise<RoleResolution> {
   if (await resolveAdminRole(serviceClient, userId, appMetadataRole)) {
-    return "platform_admin";
+    return { role: "platform_admin" };
   }
 
   const { data: sponsorRow } = await serviceClient
@@ -59,16 +65,44 @@ async function resolveUserRole(
     .select("id")
     .eq("auth_user_id", userId)
     .maybeSingle();
-  if (sponsorRow) return "sponsor";
+  if (sponsorRow) return { role: "sponsor", sponsorId: sponsorRow.id };
 
   const { data: speakerRow } = await serviceClient
     .from("speakers")
     .select("id")
     .eq("auth_user_id", userId)
     .maybeSingle();
-  if (speakerRow) return "speaker";
+  if (speakerRow) return { role: "speaker", speakerId: speakerRow.id };
 
-  return "audience";
+  return { role: "audience" };
+}
+
+/**
+ * Resolves entity IDs for a known role. Used by the API key auth path
+ * where the role is determined by the key, not by database lookup.
+ */
+async function resolveEntityIds(
+  serviceClient: SupabaseClient,
+  userId: string,
+  role: McpRole
+): Promise<RoleResolution> {
+  if (role === "speaker") {
+    const { data } = await serviceClient
+      .from("speakers")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+    return { role, speakerId: data?.id };
+  }
+  if (role === "sponsor") {
+    const { data } = await serviceClient
+      .from("sponsor_accounts")
+      .select("id")
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+    return { role, sponsorId: data?.id };
+  }
+  return { role };
 }
 
 function resolveApiKeyRole(
@@ -82,7 +116,8 @@ function resolveApiKeyRole(
 }
 
 /**
- * Builds a ToolContext with the correct Supabase client for the role.
+ * Builds a ToolContext with the correct Supabase client for the role,
+ * resolved entity IDs, and speaker entitlements (for subscription gating).
  *
  * - platform_admin: both clients are the service-role client (full cross-tenant access)
  * - speaker/sponsor/audience: ctx.supabase is an RLS-scoped client where auth.uid()
@@ -90,10 +125,11 @@ function resolveApiKeyRole(
  */
 async function buildToolContext(
   userId: string,
-  role: McpRole,
+  resolved: RoleResolution,
   rawServiceClient: SupabaseClient,
   apiKeyId?: string
 ): Promise<ToolContext> {
+  const { role, speakerId, sponsorId } = resolved;
   const serviceClient = rawServiceClient as ServiceRoleClient;
 
   // SECURITY: non-admin roles MUST get an RLS-scoped client.
@@ -104,13 +140,27 @@ async function buildToolContext(
     ? (rawServiceClient as RlsScopedClient)
     : (await createUserScopedClient(userId)) as RlsScopedClient;
 
-  return {
+  const ctx: ToolContext = {
     userId,
     role,
     apiKeyId,
     supabase,
     serviceClient,
+    speakerId,
+    sponsorId,
   };
+
+  // Load entitlements for speakers so MCP access and per-tool features can be gated.
+  // Uses the service client because entitlement tables (plans, plan_features, etc.)
+  // may not have SELECT policies for the authenticated role.
+  if (role === "speaker" && speakerId) {
+    ctx.entitlements = await loadSpeakerEntitlements(
+      rawServiceClient,
+      speakerId
+    );
+  }
+
+  return ctx;
 }
 
 export async function authenticateFromApiKey(
@@ -155,7 +205,9 @@ export async function authenticateFromApiKey(
     );
   }
 
-  return buildToolContext(keyRow.auth_user_id, role, serviceClient, keyRow.id);
+  // Resolve entity IDs so entitlements can be loaded for speaker keys
+  const resolved = await resolveEntityIds(serviceClient, keyRow.auth_user_id, role);
+  return buildToolContext(keyRow.auth_user_id, resolved, serviceClient, keyRow.id);
 }
 
 export async function authenticateFromHeaders(
@@ -177,8 +229,8 @@ export async function authenticateFromHeaders(
   // Try MCP OAuth token first
   const oauthResult = await verifyOAuthToken(token);
   if (oauthResult) {
-    const role = await resolveUserRole(serviceClient, oauthResult.userId);
-    return buildToolContext(oauthResult.userId, role, serviceClient);
+    const resolved = await resolveUserRole(serviceClient, oauthResult.userId);
+    return buildToolContext(oauthResult.userId, resolved, serviceClient);
   }
 
   // Fallback: try as a raw Supabase JWT (for dev/direct access)
@@ -193,7 +245,7 @@ export async function authenticateFromHeaders(
   const appMetadataRole = (user.app_metadata as Record<string, unknown>)
     ?.role as string | undefined;
 
-  const role = await resolveUserRole(serviceClient, user.id, appMetadataRole);
+  const resolved = await resolveUserRole(serviceClient, user.id, appMetadataRole);
 
-  return buildToolContext(user.id, role, serviceClient);
+  return buildToolContext(user.id, resolved, serviceClient);
 }

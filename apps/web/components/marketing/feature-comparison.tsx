@@ -18,66 +18,178 @@ const COLORS = {
 
 type CellValue = string | boolean;
 
-interface FeatureRow {
-  feature: string;
-  free: CellValue;
-  pro: CellValue;
-  enterprise: CellValue;
+interface FeatureDisplayConfig {
+  label: string;
+  category: string;
+  sortOrder: number;
+  overrides?: Record<string, string>;
 }
 
-interface FeatureCategory {
-  name: string;
-  accentColor: string;
-  accentColorLight: string;
-  rows: FeatureRow[];
-}
+/** Marketing presentation metadata keyed by feature_flag.key. DB owns which plans have which features. */
+const MARKETING_METADATA: Record<string, FeatureDisplayConfig> = {
+  personalized_branded_urls: {
+    label: "Personalized branded URLs",
+    category: "Content & Branding",
+    sortOrder: 20,
+  },
+  profile_bio_photo: {
+    label: "Profile and bio with photo",
+    category: "Content & Branding",
+    sortOrder: 30,
+  },
+  custom_resources_links: {
+    label: "Custom resources and links",
+    category: "Content & Branding",
+    sortOrder: 40,
+  },
+  multiple_theme_colors: {
+    label: "Theme colors",
+    category: "Content & Branding",
+    sortOrder: 50,
+    overrides: { free: "1", pro: "Multiple", enterprise: "Custom" },
+  },
+  surveys_session_feedback: {
+    label: "Surveys and session feedback",
+    category: "Engagement",
+    sortOrder: 10,
+  },
+  email_list_building: {
+    label: "Opt-in email list building",
+    category: "Engagement",
+    sortOrder: 20,
+  },
+  custom_expiration: {
+    label: "Fanflet expiration",
+    category: "Engagement",
+    sortOrder: 30,
+    overrides: { free: "14 days", pro: "30, 60, 90 days", enterprise: "Custom" },
+  },
+  basic_engagement_stats: {
+    label: "Basic engagement stats",
+    category: "Analytics",
+    sortOrder: 10,
+  },
+  click_through_analytics: {
+    label: "Click-through analytics",
+    category: "Analytics",
+    sortOrder: 20,
+  },
+  advanced_reporting: {
+    label: "Advanced reporting",
+    category: "Analytics",
+    sortOrder: 30,
+  },
+  email_support: {
+    label: "Email support",
+    category: "Support & Admin",
+    sortOrder: 10,
+  },
+  priority_support: {
+    label: "Priority support",
+    category: "Support & Admin",
+    sortOrder: 20,
+  },
+  dedicated_account_manager: {
+    label: "Dedicated account manager",
+    category: "Support & Admin",
+    sortOrder: 30,
+  },
+  sso_team_management: {
+    label: "SSO and team management",
+    category: "Support & Admin",
+    sortOrder: 40,
+  },
+  api_access: {
+    label: "API access",
+    category: "Support & Admin",
+    sortOrder: 50,
+  },
+  mcp_access: {
+    label: "MCP AI Assistant Access",
+    category: "Support & Admin",
+    sortOrder: 55,
+  },
+  sponsor_visibility: {
+    label: "Sponsor visibility and links",
+    category: "Sponsor & Files",
+    sortOrder: 10,
+  },
+  file_upload: {
+    label: "File upload and secure delivery",
+    category: "Sponsor & Files",
+    sortOrder: 20,
+  },
+  sponsor_reports: {
+    label: "Sponsor engagement reports",
+    category: "Sponsor & Files",
+    sortOrder: 30,
+  },
+  enterprise_integrations: {
+    label: "Enterprise Integrations",
+    category: "Sponsor & Files",
+    sortOrder: 40,
+  },
+};
 
-const categories: FeatureCategory[] = [
-  {
-    name: "Content & Branding",
+const CATEGORY_ORDER = [
+  "Content & Branding",
+  "Engagement",
+  "Analytics",
+  "Support & Admin",
+  "Sponsor & Files",
+  "Other Features",
+] as const;
+
+const CATEGORY_STYLES: Record<
+  string,
+  { accentColor: string; accentColorLight: string }
+> = {
+  "Content & Branding": {
     accentColor: COLORS.emerald,
     accentColorLight: "rgba(16, 185, 129, 0.06)",
-    rows: [
-      { feature: "Number of fanflets", free: "5", pro: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Personalized branded URLs", free: true, pro: true, enterprise: true },
-      { feature: "Profile and bio with photo", free: true, pro: true, enterprise: true },
-      { feature: "Custom resources and links", free: true, pro: true, enterprise: true },
-      { feature: "Theme colors", free: "1", pro: "Multiple", enterprise: "Custom" },
-    ],
   },
-  {
-    name: "Engagement",
+  Engagement: {
     accentColor: COLORS.blue,
     accentColorLight: "rgba(59, 130, 246, 0.06)",
-    rows: [
-      { feature: "Surveys and session feedback", free: false, pro: true, enterprise: true },
-      { feature: "Opt-in email list building", free: false, pro: true, enterprise: true },
-      { feature: "Fanflet expiration", free: "14 days", pro: "30, 60, 90 days", enterprise: "Custom" },
-    ],
   },
-  {
-    name: "Analytics",
+  Analytics: {
     accentColor: COLORS.amber,
     accentColorLight: "rgba(245, 158, 11, 0.06)",
-    rows: [
-      { feature: "Basic engagement stats", free: true, pro: true, enterprise: true },
-      { feature: "Click-through analytics", free: false, pro: true, enterprise: true },
-      { feature: "Advanced reporting", free: false, pro: false, enterprise: true },
-    ],
   },
-  {
-    name: "Support & Admin",
+  "Support & Admin": {
     accentColor: COLORS.violet,
     accentColorLight: "rgba(124, 58, 237, 0.06)",
-    rows: [
-      { feature: "Email support", free: true, pro: true, enterprise: true },
-      { feature: "Priority support", free: false, pro: true, enterprise: true },
-      { feature: "Dedicated account manager", free: false, pro: false, enterprise: true },
-      { feature: "SSO and team management", free: false, pro: false, enterprise: true },
-      { feature: "API access", free: false, pro: false, enterprise: true },
-    ],
+  },
+  "Sponsor & Files": {
+    accentColor: COLORS.emerald,
+    accentColorLight: "rgba(16, 185, 129, 0.08)",
+  },
+  "Other Features": {
+    accentColor: COLORS.gray600,
+    accentColorLight: "rgba(71, 85, 105, 0.06)",
+  },
+};
+
+/** Limit-based rows derived from plans.limits (not feature flags). */
+const LIMIT_ROWS: { label: string; limitKey: string; format: (val: number) => string }[] = [
+  {
+    label: "Number of fanflets",
+    limitKey: "max_fanflets",
+    format: (val) => (val === -1 || val === undefined ? "Unlimited" : String(val)),
   },
 ];
+
+export interface ComparisonPlan {
+  name: string;
+  display_name: string;
+  limits: Record<string, number>;
+}
+
+interface FeatureComparisonProps {
+  plans: ComparisonPlan[];
+  featureMatrix: Record<string, string[]>;
+  featureDisplayNames: Record<string, string>;
+}
 
 function CellContent({ value }: { value: CellValue }) {
   if (typeof value === "string") {
@@ -114,7 +226,111 @@ function AccentDot({ color }: { color: string }) {
   );
 }
 
-export function FeatureComparison() {
+/** Build feature key set per plan from featureMatrix arrays. */
+function buildPlanFeatureSets(
+  plans: ComparisonPlan[],
+  featureMatrix: Record<string, string[]>
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+  for (const plan of plans) {
+    const keys = featureMatrix[plan.name] ?? [];
+    map.set(plan.name, new Set(keys));
+  }
+  return map;
+}
+
+interface BuiltRow {
+  featureLabel: string;
+  category: string;
+  values: Record<string, CellValue>;
+}
+
+function buildRows(
+  plans: ComparisonPlan[],
+  planFeatureSets: Map<string, Set<string>>,
+  featureDisplayNames: Record<string, string>
+): { category: string; rows: BuiltRow[] }[] {
+  const mappedKeys = new Set(Object.keys(MARKETING_METADATA));
+  const allKeysFromMatrix = new Set<string>();
+  for (const set of planFeatureSets.values()) {
+    for (const k of set) allKeysFromMatrix.add(k);
+  }
+  const unmappedKeys = [...allKeysFromMatrix].filter((k) => !mappedKeys.has(k));
+
+  const categoryToRows = new Map<string, BuiltRow[]>();
+
+  // Limit-based rows (e.g. Number of fanflets)
+  for (const limitRow of LIMIT_ROWS) {
+    const values: Record<string, CellValue> = {};
+    for (const plan of plans) {
+      const raw = plan.limits[limitRow.limitKey];
+      const num = typeof raw === "number" ? raw : undefined;
+      values[plan.name] = limitRow.format(num ?? -1);
+    }
+    const category = "Content & Branding";
+    const list = categoryToRows.get(category) ?? [];
+    list.push({ featureLabel: limitRow.label, category, values });
+    categoryToRows.set(category, list);
+  }
+
+  // Rows from MARKETING_METADATA (sorted by category then sortOrder)
+  const metaEntries = Object.entries(MARKETING_METADATA).sort(
+    (a, b) =>
+      CATEGORY_ORDER.indexOf(a[1].category as (typeof CATEGORY_ORDER)[number]) -
+        CATEGORY_ORDER.indexOf(b[1].category as (typeof CATEGORY_ORDER)[number]) ||
+      a[1].sortOrder - b[1].sortOrder
+  );
+  for (const [key, config] of metaEntries) {
+    const values: Record<string, CellValue> = {};
+    for (const plan of plans) {
+      if (config.overrides && config.overrides[plan.name] !== undefined) {
+        values[plan.name] = config.overrides[plan.name];
+      } else {
+        values[plan.name] = planFeatureSets.get(plan.name)?.has(key) ?? false;
+      }
+    }
+    const list = categoryToRows.get(config.category) ?? [];
+    list.push({ featureLabel: config.label, category: config.category, values });
+    categoryToRows.set(config.category, list);
+  }
+
+  // Other Features: unmapped keys with boolean display
+  if (unmappedKeys.length > 0) {
+    const otherRows: BuiltRow[] = unmappedKeys.map((key) => {
+      const values: Record<string, CellValue> = {};
+      for (const plan of plans) {
+        values[plan.name] = planFeatureSets.get(plan.name)?.has(key) ?? false;
+      }
+      return {
+        featureLabel: featureDisplayNames[key] ?? key,
+        category: "Other Features",
+        values,
+      };
+    });
+    categoryToRows.set("Other Features", otherRows);
+  }
+
+  // Turn map into array of { category, rows } in CATEGORY_ORDER
+  const result: { category: string; rows: BuiltRow[] }[] = [];
+  for (const cat of CATEGORY_ORDER) {
+    const rows = categoryToRows.get(cat);
+    if (rows?.length) result.push({ category: cat, rows });
+  }
+  return result;
+}
+
+export function FeatureComparison({
+  plans,
+  featureMatrix,
+  featureDisplayNames,
+}: FeatureComparisonProps) {
+  const planFeatureSets = buildPlanFeatureSets(plans, featureMatrix);
+  const categoryRows = buildRows(plans, planFeatureSets, featureDisplayNames);
+
+  if (plans.length === 0) return null;
+
+  const colCount = plans.length + 1;
+
   return (
     <section
       className="w-full py-20 sm:py-24 px-4 sm:px-6"
@@ -141,131 +357,149 @@ export function FeatureComparison() {
                     Features
                   </span>
                 </th>
-                <th className="text-center py-4 px-4 w-1/5">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <AccentDot color={COLORS.emerald} />
-                    <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
-                      Free
-                    </span>
-                  </div>
-                </th>
-                <th
-                  className="text-center py-4 px-4 w-1/5"
-                  style={{ background: "rgba(59, 130, 246, 0.05)" }}
-                >
-                  <div className="flex flex-col items-center gap-1">
-                    <span
-                      className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                      style={{ background: COLORS.blueLight, color: COLORS.blue }}
+                {plans.map((plan, idx) => {
+                  const isPro = plan.name === "pro";
+                  return (
+                    <th
+                      key={plan.name}
+                      className="text-center py-4 px-4 w-1/5"
+                      style={isPro ? { background: "rgba(59, 130, 246, 0.05)" } : undefined}
                     >
-                      Popular
-                    </span>
-                    <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
-                      Pro
-                    </span>
-                  </div>
-                </th>
-                <th className="text-center py-4 px-4 w-1/5">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <AccentDot color={COLORS.violet} />
-                    <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
-                      Enterprise
-                    </span>
-                  </div>
-                </th>
+                      {isPro ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <span
+                            className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                            style={{ background: COLORS.blueLight, color: COLORS.blue }}
+                          >
+                            Popular
+                          </span>
+                          <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
+                            {plan.display_name}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <AccentDot
+                            color={
+                              plan.name === "free"
+                                ? COLORS.emerald
+                                : plan.name === "enterprise"
+                                  ? COLORS.violet
+                                  : COLORS.gray600
+                            }
+                          />
+                          <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
+                            {plan.display_name}
+                          </span>
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {categories.map((category, catIdx) => (
-                <Fragment key={category.name}>
-                  <tr
-                    style={{
-                      background: category.accentColorLight,
-                      borderTop: catIdx > 0 ? `1px solid ${COLORS.gray200}` : undefined,
-                    }}
-                  >
-                    <td
-                      colSpan={4}
-                      className="py-3 px-6 text-xs font-bold uppercase tracking-wider"
-                      style={{
-                        color: category.accentColor,
-                        borderLeft: `4px solid ${category.accentColor}`,
-                      }}
-                    >
-                      {category.name}
-                    </td>
-                  </tr>
-                  {category.rows.map((row, rowIdx) => (
+              {categoryRows.map(({ category, rows }, catIdx) => {
+                const styles = CATEGORY_STYLES[category] ?? CATEGORY_STYLES["Other Features"];
+                return (
+                  <Fragment key={category}>
                     <tr
-                      key={row.feature}
                       style={{
-                        borderTop: `1px solid ${COLORS.gray100}`,
-                        background: rowIdx % 2 === 1 ? "rgba(248, 250, 252, 0.5)" : "white",
+                        background: styles.accentColorLight,
+                        borderTop: catIdx > 0 ? `1px solid ${COLORS.gray200}` : undefined,
                       }}
                     >
-                      <td className="py-3.5 px-6 text-sm" style={{ color: COLORS.gray600 }}>
-                        {row.feature}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <CellContent value={row.free} />
-                      </td>
                       <td
-                        className="py-3.5 px-4 text-center"
-                        style={{ background: "rgba(59, 130, 246, 0.05)" }}
+                        colSpan={colCount}
+                        className="py-3 px-6 text-xs font-bold uppercase tracking-wider"
+                        style={{
+                          color: styles.accentColor,
+                          borderLeft: `4px solid ${styles.accentColor}`,
+                        }}
                       >
-                        <CellContent value={row.pro} />
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <CellContent value={row.enterprise} />
+                        {category}
                       </td>
                     </tr>
-                  ))}
-                </Fragment>
-              ))}
+                    {rows.map((row, rowIdx) => (
+                      <tr
+                        key={row.featureLabel}
+                        style={{
+                          borderTop: `1px solid ${COLORS.gray100}`,
+                          background: rowIdx % 2 === 1 ? "rgba(248, 250, 252, 0.5)" : "white",
+                        }}
+                      >
+                        <td className="py-3.5 px-6 text-sm" style={{ color: COLORS.gray600 }}>
+                          {row.featureLabel}
+                        </td>
+                        {plans.map((plan) => (
+                          <td
+                            key={plan.name}
+                            className="py-3.5 px-4 text-center"
+                            style={plan.name === "pro" ? { background: "rgba(59, 130, 246, 0.05)" } : undefined}
+                          >
+                            <CellContent value={row.values[plan.name] ?? false} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile Cards */}
         <div className="md:hidden space-y-6">
-          {(["Free", "Pro", "Enterprise"] as const).map((tier) => {
-            const tierKey = tier.toLowerCase() as "free" | "pro" | "enterprise";
-            const isHighlighted = tier === "Pro";
-            const isFree = tier === "Free";
-            const isEnterprise = tier === "Enterprise";
+          {plans.map((plan, planIdx) => {
+            const isHighlighted = plan.name === "pro";
+            const isFree = plan.name === "free";
+            const isEnterprise = plan.name === "enterprise";
             const headerStyle: React.CSSProperties = isFree
-              ? { background: COLORS.emerald, color: "white", borderBottom: `1px solid ${COLORS.emerald}` }
+              ? {
+                  background: COLORS.emerald,
+                  color: "white",
+                  borderBottom: `1px solid ${COLORS.emerald}`,
+                }
               : isHighlighted
-                ? { background: COLORS.blue, color: "white", borderBottom: `1px solid ${COLORS.blue}` }
+                ? {
+                    background: COLORS.blue,
+                    color: "white",
+                    borderBottom: `1px solid ${COLORS.blue}`,
+                  }
                 : {
                     background: `linear-gradient(135deg, ${COLORS.violet}, ${COLORS.navy})`,
                     color: "white",
                     borderBottom: `1px solid ${COLORS.violet}`,
                   };
-            const borderColor = isFree ? COLORS.emerald : isHighlighted ? COLORS.blue : COLORS.violet;
+            const borderColor = isFree
+              ? COLORS.emerald
+              : isHighlighted
+                ? COLORS.blue
+                : COLORS.violet;
 
             return (
               <div
-                key={tier}
+                key={plan.name}
                 className="rounded-xl overflow-hidden border"
                 style={{ borderColor, background: "white" }}
               >
                 <div className="px-5 py-4 font-bold text-base" style={headerStyle}>
-                  {tier}
+                  {plan.display_name}
                 </div>
                 <div>
-                  {categories.map((category) =>
-                    category.rows.map((row) => {
-                      const val = row[tierKey];
+                  {categoryRows.map(({ rows }) =>
+                    rows.map((row) => {
+                      const val = row.values[plan.name];
                       if (val === false) return null;
                       return (
                         <div
-                          key={row.feature}
+                          key={row.featureLabel}
                           className="flex items-center justify-between px-5 py-3"
                           style={{ borderBottom: `1px solid ${COLORS.gray100}` }}
                         >
                           <span className="text-sm" style={{ color: COLORS.gray600 }}>
-                            {row.feature}
+                            {row.featureLabel}
                           </span>
                           <div className="flex-shrink-0 ml-3">
                             <CellContent value={val} />

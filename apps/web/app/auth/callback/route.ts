@@ -16,69 +16,94 @@ function isSafeNext(next: string | null): next is string {
   return trimmed.startsWith('/') && !trimmed.startsWith('//')
 }
 
+/** Supabase may return this when OAuth email matches an existing user (same-email / multiple accounts). */
+function isLinkRelatedOAuthError(errorDescription: string | null): boolean {
+  if (!errorDescription) return false
+  const lower = errorDescription.toLowerCase()
+  return (
+    lower.includes('multiple accounts') ||
+    lower.includes('same email') ||
+    lower.includes('same email address')
+  )
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const errorParam = searchParams.get('error')
+  const errorDescription = searchParams.get('error_description')
   const ref = searchParams.get('ref')
   const role = searchParams.get('role')
   const next = searchParams.get('next')
 
+  // Handle OAuth error params first; never put error_description in redirect (no user enumeration).
+  if (errorParam) {
+    const isLinkRelated = isLinkRelatedOAuthError(errorDescription)
+    const q = new URLSearchParams({ error: isLinkRelated ? 'link_required' : 'auth_callback_failed' })
+    if (isSafeNext(next)) q.set('next', next)
+    return NextResponse.redirect(`${origin}/login?${q.toString()}`)
+  }
+
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
-      const metadataUpdates: Record<string, string> = {}
-      if (ref) metadataUpdates.referred_by_fanflet_id = ref
-      if (role === 'sponsor') metadataUpdates.signup_role = 'sponsor'
-      if (role === 'audience') metadataUpdates.signup_role = 'audience'
-
-      if (Object.keys(metadataUpdates).length > 0) {
-        await supabase.auth.updateUser({ data: metadataUpdates })
-      }
-
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user && role === 'audience') {
-        await handleAudiencePostSignup(supabase, user.id, ref)
-      }
-
-      if (isSafeNext(next)) {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
-
-      if (user) {
-        const appRoles = Array.isArray(user.app_metadata?.roles)
-          ? (user.app_metadata.roles as string[])
-          : []
-
-        if (appRoles.length > 0) {
-          const cookieStore = await cookies()
-          const activeRoleCookie = cookieStore.get('active_role')?.value
-          const activeRole = activeRoleCookie && appRoles.includes(activeRoleCookie)
-            ? activeRoleCookie
-            : appRoles[0]
-          const destination = ROLE_HOME[activeRole] ?? '/dashboard'
-          return NextResponse.redirect(`${origin}${destination}`)
-        }
-
-        const signupRole = user.user_metadata?.signup_role
-        if (signupRole === 'sponsor') {
-          const { data: sponsor } = await supabase
-            .from('sponsor_accounts')
-            .select('id')
-            .eq('auth_user_id', user.id)
-            .maybeSingle()
-          const destination = sponsor ? '/sponsor/dashboard' : '/sponsor/onboarding'
-          return NextResponse.redirect(`${origin}${destination}`)
-        }
-
-        if (signupRole === 'audience') {
-          return NextResponse.redirect(`${origin}/my`)
-        }
-      }
-
-      return NextResponse.redirect(`${origin}/dashboard`)
+    if (error) {
+      const q = new URLSearchParams({ error: 'auth_callback_failed' })
+      if (isSafeNext(next)) q.set('next', next)
+      return NextResponse.redirect(`${origin}/login?${q.toString()}`)
     }
+
+    const metadataUpdates: Record<string, string> = {}
+    if (ref) metadataUpdates.referred_by_fanflet_id = ref
+    if (role === 'sponsor') metadataUpdates.signup_role = 'sponsor'
+    if (role === 'audience') metadataUpdates.signup_role = 'audience'
+
+    if (Object.keys(metadataUpdates).length > 0) {
+      await supabase.auth.updateUser({ data: metadataUpdates })
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user && role === 'audience') {
+      await handleAudiencePostSignup(supabase, user.id, ref)
+    }
+
+    if (isSafeNext(next)) {
+      return NextResponse.redirect(`${origin}${next}`)
+    }
+
+    if (user) {
+      const appRoles = Array.isArray(user.app_metadata?.roles)
+        ? (user.app_metadata.roles as string[])
+        : []
+
+      if (appRoles.length > 0) {
+        const cookieStore = await cookies()
+        const activeRoleCookie = cookieStore.get('active_role')?.value
+        const activeRole = activeRoleCookie && appRoles.includes(activeRoleCookie)
+          ? activeRoleCookie
+          : appRoles[0]
+        const destination = ROLE_HOME[activeRole] ?? '/dashboard'
+        return NextResponse.redirect(`${origin}${destination}`)
+      }
+
+      const signupRole = user.user_metadata?.signup_role
+      if (signupRole === 'sponsor') {
+        const { data: sponsor } = await supabase
+          .from('sponsor_accounts')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle()
+        const destination = sponsor ? '/sponsor/dashboard' : '/sponsor/onboarding'
+        return NextResponse.redirect(`${origin}${destination}`)
+      }
+
+      if (signupRole === 'audience') {
+        return NextResponse.redirect(`${origin}/my`)
+      }
+    }
+
+    return NextResponse.redirect(`${origin}/dashboard`)
   }
   return NextResponse.redirect(`${origin}/login?error=auth_callback_failed`)
 }

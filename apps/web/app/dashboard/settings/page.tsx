@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { getSiteUrl } from "@/lib/config";
 import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
+import { SignInOptionsCard } from "@/components/dashboard/sign-in-options-card";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -17,6 +18,10 @@ export default async function SettingsPage() {
   if (!user) {
     redirect("/login");
   }
+
+  const initialProviders: string[] = Array.isArray((user as { identities?: { provider: string }[] }).identities)
+    ? (user as { identities?: { provider: string }[] }).identities!.map((i) => i.provider)
+    : [];
 
   const { data: speaker } = await supabase
     .from("speakers")
@@ -60,6 +65,8 @@ export default async function SettingsPage() {
         />
 
         <NotificationPreferences initialOptedIn={platformAnnouncementsOptedIn} />
+
+        <SignInOptionsCard initialProviders={initialProviders} />
 
         <Card id="subscription" className="border-[#e2e8f0]">
           <CardHeader>

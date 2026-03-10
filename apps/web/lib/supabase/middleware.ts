@@ -13,10 +13,27 @@ const ROLE_HOME: Record<string, string> = {
   audience: "/my",
 };
 
+const CONSENT_EXEMPT_COUNTRIES = new Set(["US", "CA"]);
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
+
+  // Set geo-based cookie consent flag for GTM.
+  // Vercel provides x-vercel-ip-country on deployed environments.
+  const country = request.headers.get("x-vercel-ip-country") ?? "US";
+  const needsConsent = !CONSENT_EXEMPT_COUNTRIES.has(country);
+  supabaseResponse.headers.set("x-user-country", country);
+  if (!request.cookies.has("cookie_consent")) {
+    supabaseResponse.cookies.set("cookie_consent_required", needsConsent ? "1" : "0", {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -162,7 +179,44 @@ export async function updateSession(request: NextRequest) {
     return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
   }
 
+  // Add AI crawler opt-out headers on public speaker content pages.
+  // Any path that isn't a known app route is a speaker page ([speakerSlug]/[fanfletSlug]).
+  // This backs up the robots.txt and meta tag directives with HTTP headers,
+  // which also cover non-HTML resources (PDFs, images, etc.).
+  if (!isProtected && !isKnownAppRoute(pathname)) {
+    supabaseResponse.headers.set(
+      "X-Robots-Tag",
+      "noai, noimageai"
+    );
+  }
+
   return supabaseResponse;
+}
+
+/** Routes that belong to the app (not speaker-generated content). */
+const KNOWN_APP_PREFIXES = [
+  "/api/",
+  "/auth/",
+  "/login",
+  "/signup",
+  "/dashboard",
+  "/sponsor/",
+  "/my",
+  "/become-speaker",
+  "/demo",
+  "/about",
+  "/contact",
+  "/pricing",
+  "/terms",
+  "/privacy",
+  "/legal",
+  "/reports/",
+  "/llms.txt",
+];
+
+function isKnownAppRoute(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return KNOWN_APP_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 function resolveRoles(user: { app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown> }): string[] {

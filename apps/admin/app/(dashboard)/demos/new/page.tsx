@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2Icon, CheckCircle2Icon, XCircleIcon } from "lucide-react";
@@ -16,6 +16,64 @@ import {
   SelectValue,
 } from "@fanflet/ui/select";
 import { createDemoEnvironment, pollDemoStatus } from "../actions";
+
+interface SpecialtyPreset {
+  label: string;
+  specialty: string;
+  credentials: string;
+  sponsors: string;
+}
+
+const SPECIALTY_PRESETS: SpecialtyPreset[] = [
+  {
+    label: "General Dentistry",
+    specialty: "General Dentistry",
+    credentials: "DDS",
+    sponsors: "Dentsply Sirona, Henry Schein, Patterson Dental",
+  },
+  {
+    label: "Endodontics",
+    specialty: "Endodontics",
+    credentials: "DDS, MS",
+    sponsors: "VOCO, Brasseler USA, Dentsply Sirona",
+  },
+  {
+    label: "Orthodontics",
+    specialty: "Orthodontics",
+    credentials: "DMD, MS",
+    sponsors: "3M Oral Care, Align Technology, American Orthodontics",
+  },
+  {
+    label: "Periodontics",
+    specialty: "Periodontics",
+    credentials: "DDS, MS",
+    sponsors: "Straumann, Geistlich, BioHorizons",
+  },
+  {
+    label: "Prosthodontics",
+    specialty: "Prosthodontics",
+    credentials: "DDS, MS",
+    sponsors: "Ivoclar, Zirkonzahn, Vita Zahnfabrik",
+  },
+  {
+    label: "Oral Surgery",
+    specialty: "Oral & Maxillofacial Surgery",
+    credentials: "DDS, MD",
+    sponsors: "KLS Martin, Stryker, Zimmer Biomet",
+  },
+  {
+    label: "Pediatric Dentistry",
+    specialty: "Pediatric Dentistry",
+    credentials: "DDS, MS",
+    sponsors: "3M, Hu-Friedy, Sprig Oral Health",
+  },
+  {
+    label: "Dental Hygiene",
+    specialty: "Dental Hygiene",
+    credentials: "RDH",
+    sponsors: "Colgate, Philips Sonicare, TePe",
+  },
+];
 
 type ProvisioningState =
   | { phase: "idle" }
@@ -257,176 +315,217 @@ export default function NewDemoPage() {
         </div>
       )}
 
-      <form action={handleSubmit}>
-        <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-subtle">
-            <h2 className="text-sm font-semibold text-fg">
-              Prospect Information
-            </h2>
-          </div>
+      <DemoForm isWorking={isWorking} phase={state.phase} handleSubmit={handleSubmit} />
+    </div>
+  );
+}
 
-          <div className="px-5 py-5 space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="full_name">
-                  Full Name <span className="text-error">*</span>
-                </Label>
-                <Input
-                  id="full_name"
-                  name="full_name"
-                  placeholder="Ryan Walsh, DDS"
-                  required
-                  disabled={isWorking}
-                />
-              </div>
+interface DemoFormProps {
+  isWorking: boolean;
+  phase: ProvisioningState["phase"];
+  handleSubmit: (formData: FormData) => Promise<void>;
+}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="specialty">
-                  Specialty <span className="text-error">*</span>
-                </Label>
-                <Input
-                  id="specialty"
-                  name="specialty"
-                  placeholder="Endodontics"
-                  required
-                  disabled={isWorking}
-                />
-              </div>
-            </div>
+function DemoForm({ isWorking, phase, handleSubmit }: DemoFormProps) {
+  const specialtyRef = useRef<HTMLInputElement>(null);
+  const credentialsRef = useRef<HTMLInputElement>(null);
+  const sponsorsRef = useRef<HTMLInputElement>(null);
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="ryan@example.com"
-                  disabled={isWorking}
-                />
-                <p className="text-[12px] text-fg-muted">
-                  Their real email, for conversion matching later
-                </p>
-              </div>
+  function applyPreset(index: string) {
+    if (index === "") return;
+    const preset = SPECIALTY_PRESETS[Number(index)];
+    if (!preset) return;
+    if (specialtyRef.current) specialtyRef.current.value = preset.specialty;
+    if (credentialsRef.current) credentialsRef.current.value = preset.credentials;
+    if (sponsorsRef.current) sponsorsRef.current.value = preset.sponsors;
+  }
 
-              <div className="space-y-1.5">
-                <Label htmlFor="credentials">Credentials</Label>
-                <Input
-                  id="credentials"
-                  name="credentials"
-                  placeholder="DDS, MS"
-                  disabled={isWorking}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="website_url">Website</Label>
-                <Input
-                  id="website_url"
-                  name="website_url"
-                  type="url"
-                  placeholder="https://..."
-                  disabled={isWorking}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="linkedin_url">LinkedIn</Label>
-                <Input
-                  id="linkedin_url"
-                  name="linkedin_url"
-                  type="url"
-                  placeholder="https://linkedin.com/in/..."
-                  disabled={isWorking}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="sponsors">Known Sponsors</Label>
-              <Input
-                id="sponsors"
-                name="sponsors"
-                placeholder="VOCO, Vista Apex, Brasseler"
-                disabled={isWorking}
-              />
-              <p className="text-[12px] text-fg-muted">
-                Comma-separated company names. AI will fill in details and
-                add more relevant ones.
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Notes / Context</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                placeholder="Any context from your conversation — upcoming talks, interests, pain points..."
-                disabled={isWorking}
-              />
-              <p className="text-[12px] text-fg-muted">
-                Optional. Helps AI generate more relevant content.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-1.5">
-                <Label htmlFor="photo_url">Photo URL</Label>
-                <Input
-                  id="photo_url"
-                  name="photo_url"
-                  type="url"
-                  placeholder="https://..."
-                  disabled={isWorking}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="theme">Theme</Label>
-                <Select name="theme" defaultValue="" disabled={isWorking}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="AI chooses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">AI chooses</SelectItem>
-                    <SelectItem value="navy">Navy</SelectItem>
-                    <SelectItem value="crimson">Crimson</SelectItem>
-                    <SelectItem value="forest">Forest</SelectItem>
-                    <SelectItem value="sunset">Sunset</SelectItem>
-                    <SelectItem value="royal">Royal</SelectItem>
-                    <SelectItem value="slate">Slate</SelectItem>
-                    <SelectItem value="midnight">Midnight</SelectItem>
-                    <SelectItem value="terracotta">Terracotta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-4 border-t border-border-subtle flex justify-end gap-3">
-            <Link href="/demos">
-              <Button variant="outline" type="button" disabled={isWorking}>
-                Cancel
-              </Button>
-            </Link>
-            <Button type="submit" disabled={isWorking}>
-              {isWorking ? (
-                <>
-                  <Loader2Icon className="w-4 h-4 animate-spin mr-1.5" />
-                  {state.phase === "provisioning"
-                    ? "Generating..."
-                    : "Creating..."}
-                </>
-              ) : (
-                "Create Demo"
-              )}
-            </Button>
+  return (
+    <form action={handleSubmit}>
+      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-fg">
+            Prospect Information
+          </h2>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="preset" className="text-xs text-fg-muted whitespace-nowrap">
+              Quick fill:
+            </Label>
+            <Select
+              defaultValue=""
+              disabled={isWorking}
+              onValueChange={applyPreset}
+            >
+              <SelectTrigger id="preset" className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Choose a specialty..." />
+              </SelectTrigger>
+              <SelectContent>
+                {SPECIALTY_PRESETS.map((p, i) => (
+                  <SelectItem key={p.label} value={String(i)}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
-      </form>
-    </div>
+
+        <div className="px-5 py-5 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="full_name">
+                Full Name <span className="text-error">*</span>
+              </Label>
+              <Input
+                id="full_name"
+                name="full_name"
+                required
+                disabled={isWorking}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="specialty">
+                Specialty <span className="text-error">*</span>
+              </Label>
+              <Input
+                ref={specialtyRef}
+                id="specialty"
+                name="specialty"
+                required
+                disabled={isWorking}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                disabled={isWorking}
+              />
+              <p className="text-[12px] text-fg-muted">
+                Their real email, for conversion matching later
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="credentials">Credentials</Label>
+              <Input
+                ref={credentialsRef}
+                id="credentials"
+                name="credentials"
+                disabled={isWorking}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="website_url">Website</Label>
+              <Input
+                id="website_url"
+                name="website_url"
+                type="url"
+                disabled={isWorking}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="linkedin_url">LinkedIn</Label>
+              <Input
+                id="linkedin_url"
+                name="linkedin_url"
+                type="url"
+                disabled={isWorking}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sponsors">Known Sponsors</Label>
+            <Input
+              ref={sponsorsRef}
+              id="sponsors"
+              name="sponsors"
+              disabled={isWorking}
+            />
+            <p className="text-[12px] text-fg-muted">
+              Comma-separated company names. AI will fill in details and
+              add more relevant ones.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes / Context</Label>
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              placeholder="Any context from your conversation — upcoming talks, interests, pain points..."
+              disabled={isWorking}
+            />
+            <p className="text-[12px] text-fg-muted">
+              Optional. Helps AI generate more relevant content.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="photo_url">Photo URL</Label>
+              <Input
+                id="photo_url"
+                name="photo_url"
+                type="url"
+                disabled={isWorking}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="theme">Theme</Label>
+              <Select name="theme" defaultValue="" disabled={isWorking}>
+                <SelectTrigger>
+                  <SelectValue placeholder="AI chooses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">AI chooses</SelectItem>
+                  <SelectItem value="navy">Navy</SelectItem>
+                  <SelectItem value="crimson">Crimson</SelectItem>
+                  <SelectItem value="forest">Forest</SelectItem>
+                  <SelectItem value="sunset">Sunset</SelectItem>
+                  <SelectItem value="royal">Royal</SelectItem>
+                  <SelectItem value="slate">Slate</SelectItem>
+                  <SelectItem value="midnight">Midnight</SelectItem>
+                  <SelectItem value="terracotta">Terracotta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-border-subtle flex justify-end gap-3">
+          <Link href="/demos">
+            <Button variant="outline" type="button" disabled={isWorking}>
+              Cancel
+            </Button>
+          </Link>
+          <Button type="submit" disabled={isWorking}>
+            {isWorking ? (
+              <>
+                <Loader2Icon className="w-4 h-4 animate-spin mr-1.5" />
+                {phase === "provisioning"
+                  ? "Generating..."
+                  : "Creating..."}
+              </>
+            ) : (
+              "Create Demo"
+            )}
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }

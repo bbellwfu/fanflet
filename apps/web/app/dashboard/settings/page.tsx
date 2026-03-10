@@ -70,7 +70,7 @@ export default async function SettingsPage() {
 
         <NotificationPreferences initialOptedIn={platformAnnouncementsOptedIn} />
 
-        <SignInOptionsCard initialProviders={initialProviders} />
+        <SignInOptionsCard initialProviders={initialProviders} userEmail={user.email ?? ""} />
 
         <Card id="subscription" className="border-[#e2e8f0]">
           <CardHeader>

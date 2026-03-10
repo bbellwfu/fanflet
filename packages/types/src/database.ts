@@ -12,8 +12,105 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_id: string
+          category: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: unknown
+          target_id: string | null
+          target_type: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          category: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          category?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      admin_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by: string
+          role?: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: string
+          token_hash?: string
+        }
+        Relationships: []
+      }
       admin_notification_preferences: {
         Row: {
           admin_user_id: string
@@ -59,6 +156,7 @@ export type Database = {
           id: string
           referrer: string | null
           resource_block_id: string | null
+          source: string | null
           visitor_hash: string | null
         }
         Insert: {
@@ -69,6 +167,7 @@ export type Database = {
           id?: string
           referrer?: string | null
           resource_block_id?: string | null
+          source?: string | null
           visitor_hash?: string | null
         }
         Update: {
@@ -79,6 +178,7 @@ export type Database = {
           id?: string
           referrer?: string | null
           resource_block_id?: string | null
+          source?: string | null
           visitor_hash?: string | null
         }
         Relationships: [
@@ -181,6 +281,53 @@ export type Database = {
             columns: ["fanflet_id"]
             isOneToOne: false
             referencedRelation: "fanflets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_deliveries: {
+        Row: {
+          audience_type: string
+          channel: string
+          communication_id: string
+          email_hash: string | null
+          email_provider: string | null
+          id: string
+          provider_message_id: string | null
+          recipient_id: string | null
+          recipient_type: string
+          sent_at: string
+        }
+        Insert: {
+          audience_type: string
+          channel?: string
+          communication_id: string
+          email_hash?: string | null
+          email_provider?: string | null
+          id?: string
+          provider_message_id?: string | null
+          recipient_id?: string | null
+          recipient_type: string
+          sent_at?: string
+        }
+        Update: {
+          audience_type?: string
+          channel?: string
+          communication_id?: string
+          email_hash?: string | null
+          email_provider?: string | null
+          id?: string
+          provider_message_id?: string | null
+          recipient_id?: string | null
+          recipient_type?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_deliveries_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "platform_communications"
             referencedColumns: ["id"]
           },
         ]
@@ -548,6 +695,281 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_api_keys: {
+        Row: {
+          auth_user_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          role: string
+          scopes: string[] | null
+        }
+        Insert: {
+          auth_user_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          role?: string
+          scopes?: string[] | null
+        }
+        Update: {
+          auth_user_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          role?: string
+          scopes?: string[] | null
+        }
+        Relationships: []
+      }
+      mcp_audit_log: {
+        Row: {
+          admin_action: boolean | null
+          api_key_id: string | null
+          auth_user_id: string
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          input_summary: Json | null
+          result_status: string
+          target_entity_id: string | null
+          target_entity_type: string | null
+          tool_name: string
+        }
+        Insert: {
+          admin_action?: boolean | null
+          api_key_id?: string | null
+          auth_user_id: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input_summary?: Json | null
+          result_status: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          tool_name: string
+        }
+        Update: {
+          admin_action?: boolean | null
+          api_key_id?: string | null
+          auth_user_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          input_summary?: Json | null
+          result_status?: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          tool_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_audit_log_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_oauth_clients: {
+        Row: {
+          client_id: string
+          client_id_issued_at: number | null
+          client_name: string | null
+          client_secret: string | null
+          client_secret_expires_at: number | null
+          client_uri: string | null
+          created_at: string
+          grant_types: string[] | null
+          logo_uri: string | null
+          redirect_uris: string[]
+          response_types: string[] | null
+          scope: string | null
+          token_endpoint_auth_method: string | null
+        }
+        Insert: {
+          client_id?: string
+          client_id_issued_at?: number | null
+          client_name?: string | null
+          client_secret?: string | null
+          client_secret_expires_at?: number | null
+          client_uri?: string | null
+          created_at?: string
+          grant_types?: string[] | null
+          logo_uri?: string | null
+          redirect_uris?: string[]
+          response_types?: string[] | null
+          scope?: string | null
+          token_endpoint_auth_method?: string | null
+        }
+        Update: {
+          client_id?: string
+          client_id_issued_at?: number | null
+          client_name?: string | null
+          client_secret?: string | null
+          client_secret_expires_at?: number | null
+          client_uri?: string | null
+          created_at?: string
+          grant_types?: string[] | null
+          logo_uri?: string | null
+          redirect_uris?: string[]
+          response_types?: string[] | null
+          scope?: string | null
+          token_endpoint_auth_method?: string | null
+        }
+        Relationships: []
+      }
+      mcp_oauth_codes: {
+        Row: {
+          auth_user_id: string
+          client_id: string
+          code: string
+          code_challenge: string
+          created_at: string
+          expires_at: string
+          redirect_uri: string
+          scope: string | null
+          state: string | null
+          used: boolean | null
+        }
+        Insert: {
+          auth_user_id: string
+          client_id: string
+          code?: string
+          code_challenge: string
+          created_at?: string
+          expires_at?: string
+          redirect_uri: string
+          scope?: string | null
+          state?: string | null
+          used?: boolean | null
+        }
+        Update: {
+          auth_user_id?: string
+          client_id?: string
+          code?: string
+          code_challenge?: string
+          created_at?: string
+          expires_at?: string
+          redirect_uri?: string
+          scope?: string | null
+          state?: string | null
+          used?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_codes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      mcp_oauth_pending_requests: {
+        Row: {
+          client_id: string
+          code_challenge: string
+          created_at: string
+          id: string
+          redirect_uri: string
+          scope: string | null
+          state: string | null
+        }
+        Insert: {
+          client_id: string
+          code_challenge: string
+          created_at?: string
+          id?: string
+          redirect_uri: string
+          scope?: string | null
+          state?: string | null
+        }
+        Update: {
+          client_id?: string
+          code_challenge?: string
+          created_at?: string
+          id?: string
+          redirect_uri?: string
+          scope?: string | null
+          state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_pending_requests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
+      mcp_oauth_tokens: {
+        Row: {
+          access_token_expires_at: string
+          access_token_hash: string
+          auth_user_id: string
+          client_id: string
+          created_at: string
+          id: string
+          refresh_token_expires_at: string | null
+          refresh_token_hash: string | null
+          revoked_at: string | null
+          scope: string | null
+        }
+        Insert: {
+          access_token_expires_at: string
+          access_token_hash: string
+          auth_user_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          refresh_token_expires_at?: string | null
+          refresh_token_hash?: string | null
+          revoked_at?: string | null
+          scope?: string | null
+        }
+        Update: {
+          access_token_expires_at?: string
+          access_token_hash?: string
+          auth_user_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          refresh_token_expires_at?: string | null
+          refresh_token_hash?: string | null
+          revoked_at?: string | null
+          scope?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_tokens_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_oauth_clients"
+            referencedColumns: ["client_id"]
+          },
+        ]
+      }
       plan_features: {
         Row: {
           feature_flag_id: string
@@ -625,6 +1047,149 @@ export type Database = {
           sort_order?: number
           stripe_price_id_monthly?: string | null
           stripe_price_id_yearly?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      platform_communication_preferences: {
+        Row: {
+          category: string
+          email_hash: string | null
+          id: string
+          opted_in: boolean
+          opted_in_at: string | null
+          recipient_type: string
+          speaker_id: string | null
+          sponsor_account_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          email_hash?: string | null
+          id?: string
+          opted_in?: boolean
+          opted_in_at?: string | null
+          recipient_type: string
+          speaker_id?: string | null
+          sponsor_account_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          email_hash?: string | null
+          id?: string
+          opted_in?: boolean
+          opted_in_at?: string | null
+          recipient_type?: string
+          speaker_id?: string | null
+          sponsor_account_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_communication_preferences_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_communication_preferences_sponsor_account_id_fkey"
+            columns: ["sponsor_account_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_communication_unsubscribes: {
+        Row: {
+          category: string | null
+          email_hash: string
+          unsubscribed_at: string
+        }
+        Insert: {
+          category?: string | null
+          email_hash: string
+          unsubscribed_at?: string
+        }
+        Update: {
+          category?: string | null
+          email_hash?: string
+          unsubscribed_at?: string
+        }
+        Relationships: []
+      }
+      platform_communication_variants: {
+        Row: {
+          audience_type: string
+          body_html: string
+          body_plain: string | null
+          communication_id: string
+          id: string
+          subject: string
+        }
+        Insert: {
+          audience_type: string
+          body_html: string
+          body_plain?: string | null
+          communication_id: string
+          id?: string
+          subject: string
+        }
+        Update: {
+          audience_type?: string
+          body_html?: string
+          body_plain?: string | null
+          communication_id?: string
+          id?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_communication_variants_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "platform_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_communications: {
+        Row: {
+          created_at: string
+          created_by_admin_id: string
+          id: string
+          scheduled_at: string | null
+          sent_at: string | null
+          source_reference: string | null
+          source_type: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_admin_id: string
+          id?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          source_reference?: string | null
+          source_type?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_admin_id?: string
+          id?: string
+          scheduled_at?: string | null
+          sent_at?: string | null
+          source_reference?: string | null
+          source_type?: string
+          status?: string
+          title?: string
           updated_at?: string
         }
         Relationships: []
@@ -1158,6 +1723,36 @@ export type Database = {
           },
         ]
       }
+      sponsor_plan_features: {
+        Row: {
+          feature_flag_id: string
+          plan_id: string
+        }
+        Insert: {
+          feature_flag_id: string
+          plan_id: string
+        }
+        Update: {
+          feature_flag_id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_plan_features_feature_flag_id_fkey"
+            columns: ["feature_flag_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_plan_features_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sponsor_plans: {
         Row: {
           created_at: string
@@ -1490,6 +2085,9 @@ export type Database = {
           created_at: string
           granted_by: string | null
           id: string
+          invited_at: string | null
+          invited_by: string | null
+          removed_at: string | null
           role: string
           scope_id: string | null
           scope_type: string
@@ -1500,6 +2098,9 @@ export type Database = {
           created_at?: string
           granted_by?: string | null
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          removed_at?: string | null
           role: string
           scope_id?: string | null
           scope_type?: string
@@ -1510,6 +2111,9 @@ export type Database = {
           created_at?: string
           granted_by?: string | null
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          removed_at?: string | null
           role?: string
           scope_id?: string | null
           scope_type?: string
@@ -1667,6 +2271,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

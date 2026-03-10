@@ -225,6 +225,11 @@ function StatusBadge({ status }: { status: string }) {
     active: "bg-success/10 text-success",
     suspended: "bg-warning/10 text-warning",
     deactivated: "bg-error/10 text-error",
+    pending_delete: "bg-error/10 text-error",
+  };
+
+  const labels: Record<string, string> = {
+    pending_delete: "Pending Delete",
   };
 
   return (
@@ -233,7 +238,7 @@ function StatusBadge({ status }: { status: string }) {
         styles[status] ?? "bg-surface-elevated text-fg-muted"
       }`}
     >
-      {status}
+      {labels[status] ?? status}
     </span>
   );
 }

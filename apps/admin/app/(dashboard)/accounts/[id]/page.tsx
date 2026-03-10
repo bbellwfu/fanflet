@@ -7,6 +7,8 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink, UserIcon, AlertTriangleIcon } from "lucide-react";
 import { SuspendButton } from "./suspend-button";
 import { ResetAccountButton } from "./reset-account-button";
+import { DeleteAccountButton } from "./delete-account-button";
+import { RestoreAccountButton } from "./restore-account-button";
 import { PlanSelector } from "./plan-selector";
 import { ImpersonateButton } from "./impersonate-button";
 
@@ -164,6 +166,16 @@ export default async function AccountDetailPage({
               analyticsEventsCount: totalEvents,
             }}
           />
+          <DeleteAccountButton
+            speakerEmail={speaker.email}
+            speakerName={speaker.name}
+          />
+          {speaker.status === "pending_delete" && (
+            <RestoreAccountButton
+              speakerEmail={speaker.email}
+              speakerName={speaker.name}
+            />
+          )}
           {speaker.auth_user_id && (
             <ImpersonateButton
               targetUserId={speaker.auth_user_id}
@@ -315,6 +327,11 @@ function StatusBadge({ status }: { status: string }) {
     active: "bg-success/10 text-success",
     suspended: "bg-warning/10 text-warning",
     deactivated: "bg-error/10 text-error",
+    pending_delete: "bg-error/10 text-error",
+  };
+
+  const labels: Record<string, string> = {
+    pending_delete: "Pending Delete",
   };
 
   return (
@@ -323,7 +340,7 @@ function StatusBadge({ status }: { status: string }) {
         styles[status] ?? "bg-surface-elevated text-fg-muted"
       }`}
     >
-      {status}
+      {labels[status] ?? status}
     </span>
   );
 }

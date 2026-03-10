@@ -19,6 +19,7 @@ import {
   EyeIcon,
   BarChart3Icon,
   ShieldIcon,
+  ShieldCheckIcon,
   ScrollTextIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
@@ -116,6 +117,12 @@ const navItems: NavItem[] = [
     label: "Audit Log",
     icon: <ScrollTextIcon className="w-[18px] h-[18px]" />,
     superAdminOnly: true,
+  },
+  {
+    id: "compliance",
+    href: "/compliance",
+    label: "Compliance",
+    icon: <ShieldCheckIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "settings",

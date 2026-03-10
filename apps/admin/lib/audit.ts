@@ -11,7 +11,8 @@ export type AuditCategory =
   | "admin_management"
   | "setting"
   | "impersonation"
-  | "system";
+  | "system"
+  | "compliance";
 
 export interface AuditEntry {
   adminId: string;

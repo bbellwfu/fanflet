@@ -2,9 +2,12 @@
 
 ## Release Summary
 
-Major platform maturity push spanning analytics intelligence, compliance infrastructure, billing self-service, survey-gated content, and sponsor attribution. The analytics system now detects bots, captures visitor geography, and classifies referrer sources. A full GDPR/CCPA compliance management system was added to the admin portal with a 12-step deletion pipeline. Speakers can now manage their plan and billing in-dashboard, gate resources behind survey prompts, and attribute any resource type to connected sponsors for engagement tracking.
+Major platform maturity push spanning AI-powered demo environments, analytics intelligence, compliance infrastructure, billing self-service, survey-gated content, and sponsor attribution. A new AI demo system lets admins create personalized demo accounts for prospects — Claude Haiku generates talks, resources, sponsors, and surveys tailored to the prospect's specialty. The analytics system now detects bots, captures visitor geography, and classifies referrer sources. A full GDPR/CCPA compliance management system was added to the admin portal with a 12-step deletion pipeline. Speakers can now manage their plan and billing in-dashboard, gate resources behind survey prompts, and attribute any resource type to connected sponsors for engagement tracking.
 
 ### New Features
+
+**AI-Powered Demo Environments**
+Admins can now create personalized demo accounts for sales prospects from the admin portal. Enter a prospect's name and specialty, and AI generates realistic talks, resources, sponsor connections, survey questions, and a bio tailored to their field. Demo accounts are prefixed with "demo-" in URLs, include auto-generated avatar photos, and have the setup checklist pre-completed up to the final "Publish" step — ready to walk through live with the prospect. Includes retry for failed provisioning, auto-polling status updates, impersonation pre-filled for demo context, and full lifecycle management (extend TTL, convert to real account, delete).
 
 **Bot Detection, Geo Tracking, and Referrer Intelligence**
 Analytics events now automatically detect bot traffic (filtered from all reports), capture visitor location from Vercel geo headers, and classify referrer sources (search, social, email, QR, etc.) at insert time. The admin analytics dashboard shows bot traffic indicators, visitor location maps, and top referring domains. Fixed a bug where QR scan source attribution was always recorded as "direct."
@@ -32,6 +35,7 @@ The fanflet editor now has a sticky bottom bar for Save/Publish visible on all s
 
 ### Bug Fixes
 
+- Fixed communication draft edits being overwritten by worklog re-population when reloading the compose page
 - Fixed source attribution bug where QR scans were always recorded as "direct" traffic
 - Fixed email_signup tracking event that was defined but never fired from the subscribe form
 - Fixed GTM script placement that threw errors in Next.js 16 Turbopack
@@ -43,7 +47,9 @@ The fanflet editor now has a sticky bottom bar for Save/Publish visible on all s
 - Added geo-targeted cookie consent: non-US/CA visitors must opt in before GTM loads
 - Added Acceptable Use Policy page and robots.txt with AI bot directives
 - Added JSON-LD structured data to public fanflet pages
+- Consolidated duplicate ImpersonateButton component (accounts + sponsors) into single shared component
 - Sidebar now conditionally hides "Sponsor connections" link for Free plan users
+- Added Turbo globalDependencies for worklog/ to fix stale admin communication builds
 
 ---
 
@@ -53,12 +59,17 @@ The fanflet editor now has a sticky bottom bar for Save/Publish visible on all s
 
 | PR | Title |
 |----|-------|
+| #96 | AI demo environments, impersonation fixes, comms draft persistence |
+| #95 | Fix: Worklog indexing for admin communications |
+| #94 | Release: Analytics, Compliance, Billing, Surveys, Sponsor Attribution |
 | #93 | Major development work on audience experience, analytics, compliance and comms |
 | #92 | Fix GTM script placement for Next.js 16 compat |
 
 ### Commits
 
 ```
+535bcbd feat(admin): demo environment polish, impersonation fixes, comms draft persistence
+bf60066 fix(build): add worklog/ to Turbo globalDependencies
 49e600d docs: session handoff 2026-03-10 18:39
 0a50cef fix(lint): resolve 3 CI lint errors
 e1720b1 feat: multi-survey questions, entitlement guards, and CI sponsor check
@@ -79,10 +90,26 @@ bbe7b9e feat(billing): add in-dashboard billing & plan management page
 |-----------|---------|
 | `20260314100000_compliance_management.sql` | data_subject_requests, deletion_pipeline_steps, compliance_audit_log tables with RLS |
 | `20260314200000_analytics_traffic_intelligence.sql` | Add is_bot, country_code, city, region, referrer_category to analytics_events |
+| `20260315100000_demo_environments.sql` | Demo environment tracking, is_demo flags on speakers and sponsor_accounts |
 
 ### Key Files Changed
 
+### Environment Variables
+
+**Admin app requires:**
+- `ANTHROPIC_API_KEY` — Anthropic API key for Claude Haiku demo content generation (server-only)
+
+**Admin app env clarification:**
+- `NEXT_PUBLIC_SITE_URL` = web app URL (http://localhost:3000) — used for public links, impersonation redirects
+- `NEXT_PUBLIC_ADMIN_URL` = admin portal URL (http://localhost:3001) — used for OAuth, login redirects, MCP endpoint
+
 **New files:**
+- `packages/core/src/demo-ai.ts` — AI content generation via Anthropic Claude Haiku API
+- `packages/core/src/demo-seeder.ts` — Database seeding for demo environments (auth users, speakers, sponsors, fanflets, resources, surveys)
+- `packages/core/src/demo-cleanup.ts` — Cleanup, conversion to real accounts, and TTL expiration
+- `apps/admin/app/(dashboard)/demos/` — Full admin UI (list, create, detail with polling, retry, impersonate, extend, convert, delete)
+- `apps/admin/app/(dashboard)/demos/[id]/demo-provisioning-banner.tsx` — Auto-polling banner during provisioning
+- `supabase/migrations/20260315100000_demo_environments.sql` — Demo environment tracking table and is_demo flags
 - `apps/web/lib/entitlement-guards.ts` — Reusable requireFeature/requireActiveConnection server-side authorization guards
 - `apps/web/lib/plan-features.ts` — Shared plan feature metadata for marketing and dashboard
 - `.github/scripts/check-sponsor-entitlements.sh` — CI script enforcing entitlement checks on sponsor actions
@@ -106,3 +133,9 @@ bbe7b9e feat(billing): add in-dashboard billing & plan management page
 - `apps/web/app/api/track/route.ts` — Bot detection, geo headers, referrer classification
 - `apps/web/components/landing/analytics-script.tsx` — Source attribution fix, email_signup tracking
 - `.github/workflows/ci.yml` — Added sponsor entitlement check step
+- `apps/admin/app/(dashboard)/accounts/[id]/impersonate-button.tsx` — Added defaultReason/defaultWriteEnabled props
+- `apps/admin/app/(dashboard)/sponsors/[id]/page.tsx` — Now imports shared ImpersonateButton (removed duplicate)
+- `apps/admin/components/admin-sidebar.tsx` — Added Demos nav item
+- `apps/admin/app/(dashboard)/communications/new/new-communication-form.tsx` — Fixed draft overwrite on worklog reload
+- `packages/core/package.json` — Added demo-ai, demo-seeder, demo-cleanup exports
+- `turbo.json` — Added worklog/ to globalDependencies

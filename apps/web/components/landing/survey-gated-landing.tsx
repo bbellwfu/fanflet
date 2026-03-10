@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { isPreviewMode } from "./analytics-script";
 import { SurveyPrompt, SURVEY_STORAGE_KEY_PREFIX } from "./survey-prompt";
 import type { SurveyQuestion } from "./survey-prompt";
@@ -68,21 +68,14 @@ export function SurveyGatedLanding({
   fanfletSlug,
   surveyQuestions,
 }: SurveyGatedLandingProps) {
-  const [gateCleared, setGateCleared] = useState(false);
-
-  useEffect(() => {
-    if (isPreviewMode()) {
-      setGateCleared(true);
-      return;
-    }
-
+  const [gateCleared, setGateCleared] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (isPreviewMode()) return true;
     const stored = localStorage.getItem(
       `${SURVEY_STORAGE_KEY_PREFIX}${fanflet.id}`
     );
-    if (stored === "submitted" || stored === "dismissed") {
-      setGateCleared(true);
-    }
-  }, [fanflet.id]);
+    return stored === "submitted" || stored === "dismissed";
+  });
 
   if (gateCleared) {
     return (

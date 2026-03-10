@@ -109,7 +109,7 @@ export function PlanComparisonGrid({ plans, currentPlanName }: PlanComparisonGri
   function handleCtaClick(plan: PlanCardData) {
     const cta = getCtaConfig(plan.name, currentPlanName);
     if (cta.action === "contact") {
-      window.location.href = "mailto:hello@fanflet.com?subject=Enterprise%20Plan%20Inquiry";
+      window.location.assign("mailto:hello@fanflet.com?subject=Enterprise%20Plan%20Inquiry");
       return;
     }
     if (cta.action === "switch" && !cta.disabled) {

@@ -39,7 +39,22 @@ interface CookieConsentProps {
 }
 
 export function CookieConsent({ gtmId }: CookieConsentProps) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(() => {
+    if (typeof document === "undefined") return false;
+
+    const consent = getCookie("cookie_consent");
+    const consentRequired = getCookie("cookie_consent_required");
+
+    if (consent === "accepted" || consent === "declined") {
+      return false;
+    }
+
+    if (consentRequired === "0") {
+      return false;
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     const consent = getCookie("cookie_consent");
@@ -54,16 +69,10 @@ export function CookieConsent({ gtmId }: CookieConsentProps) {
       return;
     }
 
-    // No consent decision yet
     if (consentRequired === "0") {
-      // US/CA: auto-accept and load GTM
       setCookie("cookie_consent", "accepted", 365);
       if (gtmId) loadGTM(gtmId);
-      return;
     }
-
-    // Non-exempt country or unknown: show banner
-    setVisible(true);
   }, [gtmId]);
 
   const handleAccept = useCallback(() => {

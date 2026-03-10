@@ -214,7 +214,7 @@ export default function MarketingHome() {
               <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 mb-6">
                 <Heart className="w-6 h-6" />
               </div>
-              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl mb-4">For Fans</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl mb-4">For <i>Fans</i>  &nbsp; (Event Audience)</h2>
               <p className="text-lg text-slate-600 mb-6">
                 Instant access to everything from your favorite speakers. No app to install,
                 no account to create, no friction. Just scan and go.

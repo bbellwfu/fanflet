@@ -34,8 +34,10 @@ const CONTENT = (base: string) => `# Fanflet
 
 ## Legal
 
+- [Legal Hub](${base}/legal): All policies and agreements
 - [Terms of Service](${base}/terms)
 - [Privacy Policy](${base}/privacy)
+- [Acceptable Use Policy](${base}/legal/acceptable-use)
 `;
 
 export function GET() {

@@ -69,6 +69,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${resolvedFanflet.title} | ${speaker.name}`,
     description: `${resolvedFanflet.title} by ${speaker.name}. ${eventContext}.`,
+    // Allow search engines to index speaker pages for discoverability,
+    // but block AI training crawlers from using speaker content.
+    // These per-page meta tags complement the site-level robots.txt
+    // and the X-Robots-Tag header set in middleware.
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large" as const,
+    },
+    other: {
+      // AI training opt-out meta tags (noai/noimageai proposed standard)
+      robots: "noai, noimageai",
+    },
   };
 }
 

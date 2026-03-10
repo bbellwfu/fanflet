@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib/speaker-preferences";
+import { getSpeakerEntitlements } from "@fanflet/db";
 import { notifyAdmins } from "@/lib/admin-notifications";
 import { TimezoneProvider } from "@/lib/timezone-context";
 import { TimezoneSync } from "@/lib/timezone-sync";
@@ -107,6 +108,9 @@ export default async function DashboardLayout({
     }
   }
 
+  const entitlements = await getSpeakerEntitlements(speaker.id);
+  const showSponsorConnections = entitlements.features.has("sponsor_visibility");
+
   const cookieStore = await cookies();
   const activeRole = cookieStore.get("active_role")?.value ?? "speaker";
 
@@ -124,6 +128,7 @@ export default async function DashboardLayout({
         surveyQuestionCount={surveyQuestionCount}
         resourceLibraryCount={resourceLibraryCount}
         activeRole={activeRole}
+        showSponsorConnections={showSponsorConnections}
       >
         {children}
       </Sidebar>

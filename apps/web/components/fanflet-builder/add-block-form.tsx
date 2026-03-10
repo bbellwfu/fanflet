@@ -329,8 +329,9 @@ export function AddBlockForm({
       payload.metadata = {
         cta_text: sponsorCta || "Learn More",
       };
-      if (linkedSponsorId) payload.sponsor_account_id = linkedSponsorId;
     }
+
+    if (linkedSponsorId) payload.sponsor_account_id = linkedSponsorId;
 
     const result = await addResourceBlock(fanfletId, payload);
     setSubmitting(false);
@@ -597,25 +598,25 @@ export function AddBlockForm({
         </div>
       )}
 
-      {selectedType === "sponsor" && connectedSponsors.length > 0 && (
+      {connectedSponsors.length > 0 && (
         <div className="space-y-2">
-          <Label>Link to connected sponsor</Label>
+          <Label>Attribute to a connected sponsor</Label>
           <Select
             value={linkedSponsorId || "none"}
             onValueChange={(value) => {
               const id = value === "none" ? "" : value;
               setLinkedSponsorId(id);
-              if (id && !title) {
+              if (selectedType === "sponsor" && id && !title) {
                 const sponsor = connectedSponsors.find((s) => s.id === id);
                 if (sponsor) setTitle(sponsor.company_name);
               }
             }}
           >
             <SelectTrigger className="border-[#e2e8f0]">
-              <SelectValue placeholder="None — manual sponsor only" />
+              <SelectValue placeholder="None" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">None - Not linked to a Connected Sponsor</SelectItem>
+              <SelectItem value="none">None</SelectItem>
               {connectedSponsors.filter((s) => s?.id).map((s) => (
                 <SelectItem key={s.id} value={s.id}>
                   {s.company_name}
@@ -624,7 +625,7 @@ export function AddBlockForm({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Linking attributes leads and clicks to that sponsor in reports.
+            Clicks and downloads on this resource will be attributed to the selected sponsor in their reports.
           </p>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { requireSpeaker } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
+import { requireFeature, entitlementErrorToResult } from '@/lib/entitlement-guards'
 
 interface AvailableSponsor {
   id: string
@@ -18,6 +19,12 @@ export async function listAvailableSponsors(): Promise<{
   error?: string
 }> {
   const { speakerId, supabase } = await requireSpeaker()
+
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return { sponsors: [], ...entitlementErrorToResult(err) }
+  }
 
   const { data: existingConnections } = await supabase
     .from('sponsor_connections')
@@ -52,6 +59,12 @@ export async function requestSponsorConnection(
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites()
   const { speakerId, supabase } = await requireSpeaker()
+
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return entitlementErrorToResult(err)
+  }
 
   let sponsorId: string
 
@@ -123,6 +136,12 @@ export async function rescindSponsorConnection(
   await blockImpersonationWrites()
   const { speakerId, supabase } = await requireSpeaker()
 
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return entitlementErrorToResult(err)
+  }
+
   const { data: conn, error: fetchError } = await supabase
     .from('sponsor_connections')
     .select('id, speaker_id, status, initiated_by')
@@ -151,6 +170,12 @@ export async function endSponsorConnection(
   await blockImpersonationWrites()
   const { speakerId, supabase } = await requireSpeaker()
 
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return entitlementErrorToResult(err)
+  }
+
   const { data: conn, error: fetchError } = await supabase
     .from('sponsor_connections')
     .select('id, speaker_id, status, ended_at')
@@ -178,6 +203,12 @@ export async function hideSponsorConnectionFromView(
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites()
   const { speakerId, supabase } = await requireSpeaker()
+
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return entitlementErrorToResult(err)
+  }
 
   const { data: conn } = await supabase
     .from('sponsor_connections')

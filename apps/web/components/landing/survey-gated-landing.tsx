@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { isPreviewMode } from "./analytics-script";
 import { SurveyPrompt, SURVEY_STORAGE_KEY_PREFIX } from "./survey-prompt";
+import type { SurveyQuestion } from "./survey-prompt";
 import { LandingPage } from "./landing-page";
 
 type Speaker = {
@@ -55,11 +56,7 @@ interface SurveyGatedLandingProps {
   showSmsBookmark: boolean;
   speakerSlug: string;
   fanfletSlug: string;
-  survey: {
-    questionId: string;
-    questionText: string;
-    questionType: "nps" | "yes_no" | "rating";
-  };
+  surveyQuestions: SurveyQuestion[];
 }
 
 export function SurveyGatedLanding({
@@ -69,7 +66,7 @@ export function SurveyGatedLanding({
   showSmsBookmark,
   speakerSlug,
   fanfletSlug,
-  survey,
+  surveyQuestions,
 }: SurveyGatedLandingProps) {
   const [gateCleared, setGateCleared] = useState(false);
 
@@ -104,9 +101,7 @@ export function SurveyGatedLanding({
     <>
       <SurveyPrompt
         fanfletId={fanflet.id}
-        questionId={survey.questionId}
-        questionText={survey.questionText}
-        questionType={survey.questionType}
+        questions={surveyQuestions}
         onComplete={() => setGateCleared(true)}
       />
       <SurveyGateHero speaker={speaker} fanflet={fanflet} />

@@ -364,6 +364,7 @@ export type Database = {
           speaker_id: string
           status: string
           survey_question_id: string | null
+          survey_question_ids: string[]
           theme_config: Json | null
           title: string
           updated_at: string
@@ -384,6 +385,7 @@ export type Database = {
           speaker_id: string
           status?: string
           survey_question_id?: string | null
+          survey_question_ids?: string[]
           theme_config?: Json | null
           title: string
           updated_at?: string
@@ -404,6 +406,7 @@ export type Database = {
           speaker_id?: string
           status?: string
           survey_question_id?: string | null
+          survey_question_ids?: string[]
           theme_config?: Json | null
           title?: string
           updated_at?: string

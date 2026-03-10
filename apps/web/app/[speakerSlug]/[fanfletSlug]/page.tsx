@@ -163,15 +163,31 @@ export default async function AudienceLandingPage({ params }: Props) {
     .select("*", { count: "exact", head: true })
     .eq("speaker_id", speaker.id);
 
-  // Fetch survey question if the fanflet has one configured
-  let surveyQuestion: { id: string; question_text: string; question_type: string } | null = null;
-  if (fanflet.survey_question_id) {
+  // Fetch survey questions (prefer array, fall back to legacy single column)
+  const surveyIds: string[] =
+    (fanflet.survey_question_ids as string[] | undefined)?.length
+      ? (fanflet.survey_question_ids as string[])
+      : fanflet.survey_question_id
+        ? [fanflet.survey_question_id]
+        : [];
+
+  let surveyQuestions: { id: string; text: string; type: "nps" | "yes_no" | "rating" }[] = [];
+  if (surveyIds.length > 0) {
     const { data } = await supabase
       .from("survey_questions")
       .select("id, question_text, question_type")
-      .eq("id", fanflet.survey_question_id)
-      .single();
-    surveyQuestion = data;
+      .in("id", surveyIds);
+    if (data) {
+      const byId = new Map(data.map((q) => [q.id, q]));
+      surveyQuestions = surveyIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((q) => ({
+          id: q!.id,
+          text: q!.question_text,
+          type: q!.question_type as "nps" | "yes_no" | "rating",
+        }));
+    }
   }
 
   // SMS Bookmark is feature-flagged (requires Twilio setup)
@@ -193,7 +209,7 @@ export default async function AudienceLandingPage({ params }: Props) {
   return (
     <div style={themeVars}>
       <AnalyticsScript fanfletId={fanflet.id} />
-      {surveyQuestion ? (
+      {surveyQuestions.length > 0 ? (
         <SurveyGatedLanding
           speaker={speaker}
           fanflet={fanfletWithBlocks}
@@ -201,11 +217,7 @@ export default async function AudienceLandingPage({ params }: Props) {
           showSmsBookmark={showSmsBookmark}
           speakerSlug={speakerSlug}
           fanfletSlug={fanfletSlug}
-          survey={{
-            questionId: surveyQuestion.id,
-            questionText: surveyQuestion.question_text,
-            questionType: surveyQuestion.question_type as "nps" | "yes_no" | "rating",
-          }}
+          surveyQuestions={surveyQuestions}
         />
       ) : (
         <LandingPage

@@ -210,7 +210,7 @@ export function ResourceBlockCard({
       image_url: imageUrl || undefined,
       section_name: sectionName || undefined,
       metadata: Object.keys(metadata).length ? metadata : undefined,
-      ...(block.type === "sponsor" && { sponsor_account_id: sponsorAccountId || null }),
+      ...(connectedSponsors.length > 0 && { sponsor_account_id: sponsorAccountId || null }),
     });
     setSaving(false);
     if (result.error) {
@@ -443,15 +443,15 @@ export function ResourceBlockCard({
             }
             return null;
           })()}
-          {block.type === "sponsor" && connectedSponsors.length > 0 && (
+          {connectedSponsors.length > 0 && (
             <div className="space-y-2">
-              <Label>Link to sponsor</Label>
+              <Label>Attribute to sponsor</Label>
               <Select
                 value={sponsorAccountId && sponsorAccountId !== "" ? sponsorAccountId : "__none__"}
                 onValueChange={(v) => setSponsorAccountId(v === "__none__" ? null : v)}
               >
                 <SelectTrigger className="border-[#e2e8f0]">
-                  <SelectValue placeholder="Select a sponsor (for lead attribution)" />
+                  <SelectValue placeholder="None" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">None</SelectItem>
@@ -463,7 +463,7 @@ export function ResourceBlockCard({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Connects this block to the sponsor for engagement and lead reports.
+                Clicks and downloads on this resource will be attributed to the selected sponsor.
               </p>
             </div>
           )}

@@ -23,6 +23,7 @@ const STATUS_OPTIONS = [
   { value: "active", label: "Active" },
   { value: "suspended", label: "Suspended" },
   { value: "deactivated", label: "Deactivated" },
+  { value: "pending_delete", label: "Pending Delete" },
 ] as const;
 
 export function AccountsFilterForm({

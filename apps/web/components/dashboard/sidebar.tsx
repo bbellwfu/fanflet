@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Users, Link2, Settings, LogOut } from "lucide-react";
+import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Users, Link2, CreditCard, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { readPhotoFrame } from "@/lib/photo-frame";
@@ -12,14 +12,22 @@ import { SetupChecklistPanel } from "@/components/dashboard/setup-checklist-pane
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 import { hasStoredDefaultThemePreset, isOnboardingDismissed } from "@/lib/speaker-preferences";
 
-const sidebarItems = [
+interface SidebarItem {
+  icon: typeof LayoutDashboard;
+  label: string;
+  href: string;
+  key?: string;
+}
+
+const BASE_SIDEBAR_ITEMS: SidebarItem[] = [
   { icon: LayoutDashboard, label: "Overview", href: "/dashboard" },
   { icon: FileText, label: "My Fanflets", href: "/dashboard/fanflets" },
   { icon: BarChart3, label: "Analytics", href: "/dashboard/analytics" },
   { icon: MessageSquare, label: "Survey Questions", href: "/dashboard/surveys" },
   { icon: BookOpen, label: "Resource Library", href: "/dashboard/resources" },
   { icon: Users, label: "Subscribers", href: "/dashboard/subscribers" },
-  { icon: Link2, label: "Sponsor connections", href: "/dashboard/sponsor-connections" },
+  { icon: Link2, label: "Sponsor connections", href: "/dashboard/sponsor-connections", key: "sponsor-connections" },
+  { icon: CreditCard, label: "Billing", href: "/dashboard/billing" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
@@ -46,9 +54,10 @@ interface SidebarContentProps {
   initials: string;
   roles?: string[];
   activeRole?: string;
+  items: SidebarItem[];
 }
 
-function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials, roles, activeRole }: SidebarContentProps) {
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials, roles, activeRole, items }: SidebarContentProps) {
   return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -57,7 +66,7 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-1">
-        {sidebarItems.map((item) => {
+        {items.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <Link
@@ -133,6 +142,7 @@ interface SidebarProps {
   surveyQuestionCount: number;
   resourceLibraryCount: number;
   activeRole?: string;
+  showSponsorConnections?: boolean;
   children: React.ReactNode;
 }
 
@@ -144,6 +154,7 @@ export function Sidebar({
   surveyQuestionCount,
   resourceLibraryCount,
   activeRole,
+  showSponsorConnections = true,
   children,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -155,6 +166,9 @@ export function Sidebar({
   const initials = getInitials(speaker?.name ?? user.user_metadata?.full_name ?? null, displayEmail);
   const roles = (Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : []) as string[];
   const resolvedActiveRole = activeRole ?? roles[0] ?? "speaker";
+  const sidebarItems = showSponsorConnections
+    ? BASE_SIDEBAR_ITEMS
+    : BASE_SIDEBAR_ITEMS.filter((item) => item.key !== "sponsor-connections");
   const isChecklistDismissed = isOnboardingDismissed(speaker?.social_links ?? null);
   const hasCreatedFanflet =
     fanfletCount > 0 ||
@@ -175,7 +189,7 @@ export function Sidebar({
     <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
-        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} />
       </aside>
 
       {/* Main Content */}
@@ -193,7 +207,7 @@ export function Sidebar({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} />
             </SheetContent>
           </Sheet>
         </header>

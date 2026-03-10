@@ -465,8 +465,9 @@ export function ResourceLibrary({
       payload.url = url || undefined;
       payload.description = description || undefined;
       payload.metadata = { cta_text: sponsorCta || "Learn More" };
-      payload.default_sponsor_account_id = defaultSponsorId || null;
     }
+
+    if (defaultSponsorId) payload.default_sponsor_account_id = defaultSponsorId;
 
     const result = await createLibraryResource(payload);
     setSaving(false);
@@ -502,7 +503,7 @@ export function ResourceLibrary({
       image_url: editImageUrl || undefined,
       section_name: editSectionName || undefined,
       metadata: Object.keys(editMetadata).length ? editMetadata : undefined,
-      default_sponsor_account_id: editingResource?.type === "sponsor" ? (editDefaultSponsorId || null) : undefined,
+      default_sponsor_account_id: editDefaultSponsorId || null,
     });
     setSaving(false);
     if (result.error) {
@@ -746,15 +747,15 @@ export function ResourceLibrary({
               </div>
             )}
 
-            {selectedType === "sponsor" && connectedSponsors.length > 0 && (
+            {connectedSponsors.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Link to a Connected Sponsor for tracking?</Label>
+                <Label className="text-white/90 font-medium">Attribute to a connected sponsor</Label>
                 <Select
                   value={defaultSponsorId || "none"}
                   onValueChange={(v) => setDefaultSponsorId(v === "none" ? "" : v)}
                 >
                   <SelectTrigger className="bg-white border-white/20">
-                    <SelectValue placeholder="None (set when adding to a Fanflet)" />
+                    <SelectValue placeholder="None" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
@@ -766,7 +767,7 @@ export function ResourceLibrary({
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-white/60">
-                  When you add this resource to a Fanflet, the block will be linked to this sponsor by default.
+                  When you add this resource to a Fanflet, the block will be attributed to this sponsor by default.
                 </p>
               </div>
             )}
@@ -1022,9 +1023,9 @@ export function ResourceLibrary({
                     />
                   </div>
                 )}
-                {r.type === "sponsor" && (connectedSponsors.length > 0 || endedSponsors.length > 0) && (
+                {(connectedSponsors.length > 0 || endedSponsors.length > 0) && (
                   <div className="space-y-2">
-                    <Label>Default sponsor</Label>
+                    <Label>Attributed sponsor</Label>
                     {editDefaultSponsorId && endedSponsors.some((s) => s.id === editDefaultSponsorId) && (
                       <p className="text-sm text-slate-600 rounded-md border border-slate-200 bg-slate-50 p-2">
                         Connection ended on{" "}

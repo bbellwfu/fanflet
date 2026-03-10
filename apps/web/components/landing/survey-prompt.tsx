@@ -1,45 +1,90 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Star, ThumbsUp, ThumbsDown, CheckCircle, X } from "lucide-react";
-import { isPreviewMode } from "./analytics-script";
+import { useState, useEffect, useCallback } from "react";
+import { Star, ThumbsUp, ThumbsDown, CheckCircle } from "lucide-react";
+import { isPreviewMode, getSourceFromRef } from "./analytics-script";
+
+export interface SurveyQuestion {
+  id: string;
+  text: string;
+  type: "nps" | "yes_no" | "rating";
+}
 
 interface SurveyPromptProps {
   fanfletId: string;
-  questionId: string;
-  questionText: string;
-  questionType: "nps" | "yes_no" | "rating";
+  questions: SurveyQuestion[];
+  onComplete?: () => void;
 }
 
-const STORAGE_KEY_PREFIX = "fanflet-survey-";
+export const SURVEY_STORAGE_KEY_PREFIX = "fanflet-survey-";
 
 export function SurveyPrompt({
   fanfletId,
-  questionId,
-  questionText,
-  questionType,
+  questions,
+  onComplete,
 }: SurveyPromptProps) {
   const [visible, setVisible] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
 
+  const total = questions.length;
+  const current = questions[currentIndex];
+  const isLast = currentIndex >= total - 1;
+
   useEffect(() => {
-    // Skip in preview mode
     if (isPreviewMode()) return;
 
-    // Check localStorage — don't show if already submitted or dismissed
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${fanfletId}`);
+    const stored = localStorage.getItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`);
     if (stored === "submitted" || stored === "dismissed") return;
 
-    // Show the modal (defer to satisfy set-state-in-effect rule)
     queueMicrotask(() => setVisible(true));
   }, [fanfletId]);
 
-  const dismiss = () => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${fanfletId}`, "dismissed");
+  useEffect(() => {
+    if (!visible) return;
+
+    const source = getSourceFromRef();
+    const payload = JSON.stringify({
+      fanflet_id: fanfletId,
+      event_type: "survey_shown",
+      source,
+    });
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(
+        "/api/track",
+        new Blob([payload], { type: "application/json" })
+      );
+    } else {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).catch(() => {});
+    }
+  }, [visible, fanfletId]);
+
+  const skipAll = useCallback(() => {
+    localStorage.setItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`, "dismissed");
     setVisible(false);
-  };
+    onComplete?.();
+  }, [fanfletId, onComplete]);
+
+  const advanceOrFinish = useCallback(() => {
+    if (isLast) {
+      localStorage.setItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`, "submitted");
+      setSubmitted(true);
+      setTimeout(() => {
+        setVisible(false);
+        onComplete?.();
+      }, 1500);
+    } else {
+      setCurrentIndex((i) => i + 1);
+      setHoveredRating(0);
+    }
+  }, [isLast, fanfletId, onComplete]);
 
   const submitResponse = async (value: string) => {
     if (submitting || submitted) return;
@@ -48,7 +93,7 @@ export function SurveyPrompt({
     try {
       const payload = JSON.stringify({
         fanflet_id: fanfletId,
-        question_id: questionId,
+        question_id: current.id,
         response_value: value,
       });
 
@@ -68,36 +113,18 @@ export function SurveyPrompt({
       // Fail silently
     }
 
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${fanfletId}`, "submitted");
     setSubmitting(false);
-    setSubmitted(true);
-
-    // Auto-close after showing thank you
-    setTimeout(() => setVisible(false), 1500);
+    advanceOrFinish();
   };
 
-  if (!visible) return null;
+  if (!visible || !current) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-      {/* Modal card */}
       <div className="relative w-[92%] max-w-md mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-        {/* Dismiss button */}
-        {!submitted && (
-          <button
-            onClick={dismiss}
-            className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors z-10"
-            aria-label="Dismiss survey"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-
         {submitted ? (
-          /* Thank-you state */
           <div className="py-12 px-6 text-center">
             <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
             <p className="text-lg font-semibold text-slate-900">Thank you!</p>
@@ -106,23 +133,42 @@ export function SurveyPrompt({
             </p>
           </div>
         ) : (
-          /* Question state */
           <div className="px-6 pt-8 pb-6">
+            {total > 1 && (
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-400">
+                  Question {currentIndex + 1} of {total}
+                </p>
+                <div className="flex gap-1">
+                  {questions.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1 w-6 rounded-full transition-colors ${
+                        i <= currentIndex
+                          ? "bg-[var(--theme-accent)]"
+                          : "bg-slate-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="text-xs font-medium text-[var(--theme-accent)] uppercase tracking-wider mb-2">
               Quick Feedback
             </p>
-            <h2 className="text-lg font-semibold text-slate-900 leading-snug pr-6">
-              {questionText}
+            <h2 className="text-lg font-semibold text-slate-900 leading-snug">
+              {current.text}
             </h2>
 
             <div className="mt-5">
-              {questionType === "nps" && (
+              {current.type === "nps" && (
                 <NpsInput onSubmit={submitResponse} disabled={submitting} />
               )}
-              {questionType === "yes_no" && (
+              {current.type === "yes_no" && (
                 <YesNoInput onSubmit={submitResponse} disabled={submitting} />
               )}
-              {questionType === "rating" && (
+              {current.type === "rating" && (
                 <RatingInput
                   onSubmit={submitResponse}
                   disabled={submitting}
@@ -132,12 +178,22 @@ export function SurveyPrompt({
               )}
             </div>
 
-            <button
-              onClick={dismiss}
-              className="mt-5 w-full text-center text-sm text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Skip
-            </button>
+            <div className="mt-5 flex items-center justify-center gap-4">
+              {!isLast && (
+                <button
+                  onClick={() => advanceOrFinish()}
+                  className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Next
+                </button>
+              )}
+              <button
+                onClick={skipAll}
+                className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Skip
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -145,7 +201,6 @@ export function SurveyPrompt({
   );
 }
 
-// NPS: 0-10 number buttons
 function NpsInput({
   onSubmit,
   disabled,
@@ -175,7 +230,6 @@ function NpsInput({
   );
 }
 
-// Yes/No: two buttons
 function YesNoInput({
   onSubmit,
   disabled,
@@ -205,7 +259,6 @@ function YesNoInput({
   );
 }
 
-// Rating: 1-5 stars
 function RatingInput({
   onSubmit,
   disabled,

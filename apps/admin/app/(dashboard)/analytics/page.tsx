@@ -8,6 +8,8 @@ import {
   ArrowUpRightIcon,
   TrendingUpIcon,
   TrendingDownIcon,
+  BotIcon,
+  GlobeIcon,
 } from "lucide-react";
 import {
   getPlatformKPIs,
@@ -17,6 +19,8 @@ import {
   getEventDistribution,
   getTopFanflets,
   getPeakActivityHeatmap,
+  getGeoBreakdown,
+  getTopReferrerDomains,
 } from "./actions";
 import { PlatformChart } from "./components/platform-chart";
 import { DeviceChart } from "./components/device-chart";
@@ -69,7 +73,7 @@ function KPICard({ title, value, prev, current, icon, format = "number" }: KPICa
 }
 
 export default async function AnalyticsPage() {
-  const [kpis, timeSeries, devices, referrers, events, topFanflets, heatmap] =
+  const [kpis, timeSeries, devices, referrers, events, topFanflets, heatmap, geo, topDomains] =
     await Promise.all([
       getPlatformKPIs(),
       getPlatformTimeSeries(),
@@ -78,6 +82,8 @@ export default async function AnalyticsPage() {
       getEventDistribution(),
       getTopFanflets(),
       getPeakActivityHeatmap(),
+      getGeoBreakdown(),
+      getTopReferrerDomains(),
     ]);
 
   return (
@@ -139,6 +145,23 @@ export default async function AnalyticsPage() {
           format="percent"
         />
       </div>
+
+      {/* Bot Traffic Indicator */}
+      {kpis.botEvents > 0 && (
+        <div className="bg-surface rounded-lg border border-border-subtle p-4 flex items-center gap-4">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+            <BotIcon className="w-4.5 h-4.5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium text-fg">
+              Bot Traffic Detected
+            </p>
+            <p className="text-[12px] text-fg-muted mt-0.5">
+              {kpis.botEvents.toLocaleString()} of {kpis.totalEvents.toLocaleString()} total events ({((kpis.botEvents / kpis.totalEvents) * 100).toFixed(1)}%) identified as bot traffic and excluded from all metrics above.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Trend Chart */}
       <div className="bg-surface rounded-lg border border-border-subtle p-5">
@@ -241,6 +264,75 @@ export default async function AnalyticsPage() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Geographic Breakdown + Top Referring Domains */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        {/* Geo Breakdown */}
+        <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-2">
+            <GlobeIcon className="w-4 h-4 text-fg-muted" />
+            <h2 className="text-sm font-semibold text-fg">Visitor Locations</h2>
+          </div>
+          {geo.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-[13px] text-fg-muted">
+                No geographic data yet. Location data will appear for new visits.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border-subtle">
+              {geo.slice(0, 10).map((g, i) => {
+                const totalGeoViews = geo.reduce((s, r) => s + r.count, 0);
+                const pct = totalGeoViews > 0 ? (g.count / totalGeoViews) * 100 : 0;
+                return (
+                  <div key={`${g.countryCode}-${g.city}-${i}`} className="px-5 py-2.5 flex items-center gap-3">
+                    <span className="text-[13px] font-medium text-fg w-8 shrink-0">{g.countryCode}</span>
+                    <span className="text-[13px] text-fg-secondary flex-1 truncate">
+                      {g.city || "Unknown city"}
+                    </span>
+                    <span className="text-[13px] text-fg-secondary tabular-nums w-12 text-right">
+                      {g.count.toLocaleString()}
+                    </span>
+                    <span className="text-[11px] text-fg-muted tabular-nums w-12 text-right">
+                      {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Top Referring Domains */}
+        <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-border-subtle">
+            <h2 className="text-sm font-semibold text-fg">Top Referring Domains</h2>
+          </div>
+          {topDomains.length === 0 ? (
+            <div className="px-5 py-10 text-center">
+              <p className="text-[13px] text-fg-muted">
+                No referrer data yet. Domains will appear when visitors arrive from external links.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border-subtle">
+              {topDomains.map((d) => (
+                <div key={d.domain} className="px-5 py-2.5 flex items-center gap-3">
+                  <span className="text-[13px] font-medium text-fg flex-1 truncate">
+                    {d.domain}
+                  </span>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-surface-elevated text-fg-muted">
+                    {d.category}
+                  </span>
+                  <span className="text-[13px] text-fg-secondary tabular-nums w-12 text-right">
+                    {d.count.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Peak Activity Heatmap */}

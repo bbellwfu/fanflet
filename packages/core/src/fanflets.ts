@@ -25,6 +25,7 @@ export interface UpdateFanfletInput {
   event_date?: string | null;
   slug?: string;
   survey_question_id?: string | null;
+  survey_question_ids?: string[];
   theme_config?: Record<string, unknown>;
   expiration_date?: string | null;
   expiration_preset?: string;
@@ -199,6 +200,7 @@ export async function updateFanfletDetails(
   if (input.event_date !== undefined) updatePayload.event_date = input.event_date ?? null;
   if (input.slug !== undefined) updatePayload.slug = input.slug;
   if (input.survey_question_id !== undefined) updatePayload.survey_question_id = input.survey_question_id ?? null;
+  if (input.survey_question_ids !== undefined) updatePayload.survey_question_ids = input.survey_question_ids;
   if (input.theme_config !== undefined) updatePayload.theme_config = input.theme_config;
   if (input.confirmation_email_config !== undefined) updatePayload.confirmation_email_config = input.confirmation_email_config;
 
@@ -247,7 +249,7 @@ export async function cloneFanflet(
   const { data: source, error: sourceError } = await supabase
     .from("fanflets")
     .select(
-      "id, speaker_id, title, description, event_name, event_date, slug, theme_config, survey_question_id, expiration_date, expiration_preset, show_expiration_notice"
+      "id, speaker_id, title, description, event_name, event_date, slug, theme_config, survey_question_id, survey_question_ids, expiration_date, expiration_preset, show_expiration_notice"
     )
     .eq("id", sourceFanfletId)
     .eq("speaker_id", speakerId)
@@ -284,6 +286,7 @@ export async function cloneFanflet(
       published_at: null,
       theme_config: source.theme_config,
       survey_question_id: source.survey_question_id,
+      survey_question_ids: source.survey_question_ids ?? [],
       expiration_date: source.expiration_date,
       expiration_preset: source.expiration_preset,
       show_expiration_notice: source.show_expiration_notice,

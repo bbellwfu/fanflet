@@ -11,6 +11,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   "QR Code": "#ec4899",
   Portfolio: "#8b5cf6",
   "Share Link": "#06b6d4",
+  Messaging: "#f97316",
+  Internal: "#a78bfa",
   Other: "#94a3b8",
 };
 

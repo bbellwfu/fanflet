@@ -301,7 +301,18 @@ export default function SignupPage() {
           )}
         </Button>
       </CardContent>
-      <CardFooter className="flex justify-center">
+      <CardFooter className="flex flex-col items-center gap-3">
+        <p className="text-center text-xs text-muted-foreground max-w-[320px]">
+          By signing up, I agree to Fanflet&apos;s{' '}
+          <Link href="/terms" className="font-medium text-[#3BA5D9] hover:underline">
+            Terms of Service
+          </Link>
+          {' '}and{' '}
+          <Link href="/privacy" className="font-medium text-[#3BA5D9] hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
         <p className="text-sm text-muted-foreground">
           Already have an account?{' '}
           <Link

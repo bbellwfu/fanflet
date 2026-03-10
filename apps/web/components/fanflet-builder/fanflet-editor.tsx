@@ -75,6 +75,7 @@ type Fanflet = {
   slug: string;
   status: string;
   survey_question_id: string | null;
+  survey_question_ids: string[];
   theme_config: Record<string, unknown> | null;
   expiration_date: string | null;
   expiration_preset: string;
@@ -223,8 +224,12 @@ export function FanfletEditor({
     fanflet.event_date ? fanflet.event_date.slice(0, 10) : ""
   );
   const [slug, setSlug] = useState(fanflet.slug);
-  const [surveyQuestionId, setSurveyQuestionId] = useState(
-    fanflet.survey_question_id ?? "none"
+  const [surveyQuestionIds, setSurveyQuestionIds] = useState<string[]>(
+    fanflet.survey_question_ids?.length
+      ? fanflet.survey_question_ids
+      : fanflet.survey_question_id
+        ? [fanflet.survey_question_id]
+        : []
   );
   const [selectedThemeId, setSelectedThemeId] = useState(
     resolveThemeId(fanflet.theme_config)
@@ -329,7 +334,7 @@ export function FanfletEditor({
     formData.set("show_event_name", showEventName ? "true" : "false");
     formData.set("event_date", eventDate || "");
     formData.set("slug", slug);
-    formData.set("survey_question_id", surveyQuestionId === "none" ? "" : surveyQuestionId);
+    formData.set("survey_question_ids", JSON.stringify(surveyQuestionIds));
     formData.set(
       "theme_config",
       JSON.stringify(
@@ -404,7 +409,7 @@ export function FanfletEditor({
     );
 
   return (
-    <div className="w-full">
+    <div className="w-full pb-20">
       {/* Sticky header bar */}
       <div className="sticky top-16 md:top-0 z-30 bg-slate-50 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 pt-2 pb-4 border-b border-slate-200/80">
         <div className="w-full">
@@ -427,15 +432,6 @@ export function FanfletEditor({
 
           <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 mt-3">
             <div className="flex flex-wrap items-center gap-2">
-              {fanflet.status === "draft" && (
-                <Button
-                  size="sm"
-                  onClick={handlePublish}
-                  className="hidden md:inline-flex bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  Publish
-                </Button>
-              )}
               {fanflet.status === "published" && (
                 <Button
                   size="sm"
@@ -477,18 +473,6 @@ export function FanfletEditor({
               )}
             </div>
             <div className="hidden sm:block sm:flex-1" />
-            <Button
-              size="sm"
-              onClick={handleSaveClick}
-              disabled={saving}
-              className="hidden md:inline-flex bg-[#1B365D] hover:bg-[#152b4d]"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Save"
-              )}
-            </Button>
           </div>
 
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
@@ -875,16 +859,16 @@ export function FanfletEditor({
         </CardContent>
       </Card>
 
-      {/* Feedback Question */}
+      {/* Feedback Questions */}
       <Card id="fanflet-feedback-section" className="border-slate-200">
         <CardHeader className="pb-2">
           <CardTitle className="text-[#1B365D] flex items-center gap-2">
             <MessageSquare className="w-5 h-5" />
-            Feedback Question
+            Feedback Questions
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             {hasSurveys
-              ? "Optionally display a quick feedback question when visitors open this Fanflet."
+              ? "Add up to 3 quick feedback questions shown when visitors open this Fanflet."
               : "Upgrade your plan to add session feedback questions to your Fanflets."}
           </p>
         </CardHeader>
@@ -911,41 +895,98 @@ export function FanfletEditor({
             </div>
           ) : (
             <div className="space-y-3">
-              {!surveySelectMounted ? (
-                <div
-                  className="flex h-9 w-fit items-center justify-between gap-2 rounded-md border border-[#e2e8f0] bg-transparent px-3 py-2 text-sm text-muted-foreground shadow-xs"
-                  aria-hidden
-                >
-                  {surveyQuestions.find((q) => q.id === surveyQuestionId)?.question_text ?? "Select a question..."}
-                </div>
-              ) : (
-                <Select
-                  value={surveyQuestionId}
-                  onValueChange={setSurveyQuestionId}
-                >
-                  <SelectTrigger className="border-[#e2e8f0]">
-                    <SelectValue placeholder="Select a question..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None (no survey)</SelectItem>
-                    {surveyQuestions.map((q) => (
-                      <SelectItem key={q.id} value={q.id}>
-                        {q.question_text}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {surveyQuestionId !== "none" && (
+              {surveyQuestionIds.map((qId, idx) => {
+                const availableQuestions = surveyQuestions.filter(
+                  (q) => q.id === qId || !surveyQuestionIds.includes(q.id)
+                );
+                const question = surveyQuestions.find((q) => q.id === qId);
+                const typeLabel =
+                  question?.question_type === "nps"
+                    ? "NPS (0-10)"
+                    : question?.question_type === "yes_no"
+                      ? "Yes / No"
+                      : "Rating (1-5)";
+                return (
+                  <div key={idx} className="flex items-start gap-2">
+                    <span className="mt-2 text-xs font-semibold text-slate-400 w-4 shrink-0">
+                      {idx + 1}.
+                    </span>
+                    <div className="flex-1 space-y-1">
+                      {!surveySelectMounted ? (
+                        <div
+                          className="flex h-9 w-fit items-center gap-2 rounded-md border border-[#e2e8f0] bg-transparent px-3 py-2 text-sm text-muted-foreground shadow-xs"
+                          aria-hidden
+                        >
+                          {question?.question_text ?? "Select a question..."}
+                        </div>
+                      ) : (
+                        <Select
+                          value={qId}
+                          onValueChange={(val) => {
+                            const next = [...surveyQuestionIds];
+                            next[idx] = val;
+                            setSurveyQuestionIds(next);
+                          }}
+                        >
+                          <SelectTrigger className="border-[#e2e8f0]">
+                            <SelectValue placeholder="Select a question..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableQuestions.map((q) => (
+                              <SelectItem key={q.id} value={q.id}>
+                                {q.question_text}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {question && (
+                        <p className="text-xs text-muted-foreground pl-0.5">
+                          Type: {typeLabel}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSurveyQuestionIds(
+                          surveyQuestionIds.filter((_, i) => i !== idx)
+                        );
+                      }}
+                      className="mt-2 text-xs text-slate-400 hover:text-red-500 transition-colors"
+                      aria-label="Remove question"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                );
+              })}
+              {surveyQuestionIds.length < 3 &&
+                surveyQuestionIds.length < surveyQuestions.length && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const available = surveyQuestions.find(
+                        (q) => !surveyQuestionIds.includes(q.id)
+                      );
+                      if (available) {
+                        setSurveyQuestionIds([
+                          ...surveyQuestionIds,
+                          available.id,
+                        ]);
+                      }
+                    }}
+                    className="text-sm font-medium text-[#3BA5D9] hover:underline"
+                  >
+                    + Add question
+                    {surveyQuestionIds.length > 0 &&
+                      ` (${surveyQuestionIds.length}/3)`}
+                  </button>
+                )}
+              {surveyQuestionIds.length === 0 && (
                 <p className="text-xs text-muted-foreground">
-                  Type:{" "}
-                  {surveyQuestions.find((q) => q.id === surveyQuestionId)
-                    ?.question_type === "nps"
-                    ? "NPS (0-10 scale)"
-                    : surveyQuestions.find((q) => q.id === surveyQuestionId)
-                        ?.question_type === "yes_no"
-                    ? "Yes / No"
-                    : "Rating (1-5 Stars)"}
+                  No feedback questions selected. Click &quot;+ Add question&quot; to
+                  get started.
                 </p>
               )}
             </div>
@@ -1002,32 +1043,31 @@ export function FanfletEditor({
       </div>
       </div>
 
-      {/* Mobile fixed bottom action bar */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden z-40 bg-white border-t border-slate-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="flex items-center gap-2">
-          {fanflet.status === "draft" ? (
+      {/* Sticky bottom action bar — offset by sidebar width on desktop */}
+      <div className="fixed bottom-0 left-0 md:left-64 right-0 z-40 bg-slate-200 border-t border-slate-300 px-4 sm:px-6 md:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center justify-end gap-2 max-w-[1400px] mx-auto">
+          <Button
+            size="sm"
+            onClick={handleSaveClick}
+            disabled={saving}
+            className="flex-1 md:flex-none bg-[#1B365D] hover:bg-[#152b4d]"
+          >
+            {saving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "Save"
+            )}
+          </Button>
+          {fanflet.status === "draft" && (
             <Button
               size="sm"
               onClick={handlePublish}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               Publish
             </Button>
-          ) : (
-            <Button
-              size="sm"
-              onClick={handleSaveClick}
-              disabled={saving}
-              className="flex-1 bg-[#1B365D] hover:bg-[#152b4d]"
-            >
-              {saving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
           )}
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild className="md:hidden">
             <Link href={`/dashboard/fanflets/${fanflet.id}/qr`}>
               <QrCode className="w-4 h-4" />
             </Link>

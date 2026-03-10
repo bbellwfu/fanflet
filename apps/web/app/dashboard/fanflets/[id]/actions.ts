@@ -13,6 +13,7 @@ import {
   resolveExpirationDate,
 } from '@/lib/expiration'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
+import { requireActiveConnection, entitlementErrorToResult } from '@/lib/entitlement-guards'
 
 export async function updateFanfletDetails(
   id: string,
@@ -35,8 +36,18 @@ export async function updateFanfletDetails(
   const slug = formData.get('slug') as string
   const entitlements = await getSpeakerEntitlements(speakerId)
   const hasSurveys = entitlements.features.has('surveys_session_feedback')
-  const survey_question_id_raw = formData.get('survey_question_id') as string || null
-  const survey_question_id = hasSurveys ? survey_question_id_raw : null
+
+  let survey_question_ids: string[] = []
+  if (hasSurveys) {
+    const idsRaw = formData.get('survey_question_ids') as string || '[]'
+    try {
+      const parsed = JSON.parse(idsRaw)
+      if (Array.isArray(parsed)) survey_question_ids = parsed.slice(0, 3)
+    } catch {
+      // Keep empty
+    }
+  }
+  const survey_question_id = survey_question_ids[0] ?? null
 
   const theme_config_raw = formData.get('theme_config') as string || null
   let theme_config: Record<string, unknown> = {}
@@ -73,6 +84,7 @@ export async function updateFanfletDetails(
     event_date: event_date || null,
     slug,
     survey_question_id: survey_question_id || null,
+    survey_question_ids,
     theme_config,
     updated_at: new Date().toISOString(),
   }
@@ -216,15 +228,13 @@ export async function addResourceBlock(
   if (data.type === 'sponsor') {
     const entitlements = await getSpeakerEntitlements(speakerId)
     if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor blocks require a higher plan. Upgrade in Settings.' }
-    if (data.sponsor_account_id) {
-      const { data: conn } = await supabase
-        .from('sponsor_connections')
-        .select('id')
-        .eq('speaker_id', speakerId)
-        .eq('sponsor_id', data.sponsor_account_id)
-        .eq('status', 'active')
-        .maybeSingle()
-      if (!conn) return { error: 'Selected sponsor is not connected. Choose a connected sponsor or leave unlinked.' }
+  }
+
+  if (data.sponsor_account_id) {
+    try {
+      await requireActiveConnection(supabase, speakerId, data.sponsor_account_id)
+    } catch (err) {
+      return entitlementErrorToResult(err)
     }
   }
 
@@ -274,7 +284,7 @@ export async function addResourceBlock(
     section_name: sectionName,
     metadata: data.metadata ?? {},
   }
-  if (data.type === 'sponsor' && data.sponsor_account_id) {
+  if (data.sponsor_account_id) {
     insertData.sponsor_account_id = data.sponsor_account_id
   }
 
@@ -326,7 +336,15 @@ export async function updateResourceBlock(
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Fanflet not found' }
   }
-  const { supabase: authSupabase } = ctx
+  const { speakerId, supabase: authSupabase } = ctx
+
+  if (data.sponsor_account_id) {
+    try {
+      await requireActiveConnection(authSupabase, speakerId, data.sponsor_account_id)
+    } catch (err) {
+      return entitlementErrorToResult(err)
+    }
+  }
 
   const updateData: Record<string, unknown> = {}
   if (data.title !== undefined) updateData.title = data.title
@@ -406,15 +424,15 @@ export async function addLibraryBlockToFanflet(
 
   if (libError || !libItem) return { error: 'Library resource not found' }
 
-  // If sponsor-type library item has a default sponsor, apply it when speaker still has active connection
   let sponsorAccountIdToLink: string | null = null
-  if (libItem.type === 'sponsor' && libItem.default_sponsor_account_id) {
+  if (libItem.default_sponsor_account_id) {
     const { data: conn } = await supabase
       .from('sponsor_connections')
       .select('id')
       .eq('speaker_id', speakerId)
       .eq('sponsor_id', libItem.default_sponsor_account_id)
       .eq('status', 'active')
+      .is('ended_at', null)
       .maybeSingle()
     if (conn) sponsorAccountIdToLink = libItem.default_sponsor_account_id
   }

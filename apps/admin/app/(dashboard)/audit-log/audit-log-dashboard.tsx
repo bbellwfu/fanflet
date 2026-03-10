@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@fanflet/ui/button";
 import { Input } from "@fanflet/ui/input";
@@ -22,7 +22,7 @@ import type { AuditLogEntry } from "./actions";
 import { exportAuditLogCsv } from "./actions";
 
 const CATEGORIES = [
-  { value: "", label: "All Categories" },
+  { value: "__all__", label: "All Categories" },
   { value: "account", label: "Account" },
   { value: "plan", label: "Plan" },
   { value: "feature", label: "Feature" },
@@ -32,6 +32,7 @@ const CATEGORIES = [
   { value: "setting", label: "Setting" },
   { value: "impersonation", label: "Impersonation" },
   { value: "system", label: "System" },
+  { value: "compliance", label: "Compliance" },
 ];
 
 const ACTION_LABELS: Record<string, string> = {
@@ -60,6 +61,12 @@ const ACTION_LABELS: Record<string, string> = {
   "admin.resend_invite": "Resend Invitation",
   "admin.revoke_invite": "Revoke Invitation",
   "admin.accept_invite": "Accept Invitation",
+  "compliance.request_created": "Create Deletion Request",
+  "compliance.batch_created": "Batch Create Requests",
+  "compliance.request_approved": "Approve Deletion Request",
+  "compliance.pipeline_completed": "Pipeline Completed",
+  "compliance.pipeline_failed": "Pipeline Failed",
+  "compliance.request_cancelled": "Cancel Deletion Request",
 };
 
 const PAGE_SIZE = 50;
@@ -88,6 +95,8 @@ export function AuditLogDashboard({
   const [isPending, startTransition] = useTransition();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const page = currentFilters.page ?? 1;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
@@ -143,41 +152,49 @@ export function AuditLogDashboard({
       <div className="flex flex-wrap gap-3 items-end">
         <div className="space-y-1">
           <label className="text-xs font-medium text-fg-muted">Category</label>
-          <Select
-            value={currentFilters.category ?? ""}
-            onValueChange={(v) => updateFilters({ category: v || undefined })}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORIES.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {mounted ? (
+            <Select
+              value={currentFilters.category ?? "__all__"}
+              onValueChange={(v) => updateFilters({ category: v === "__all__" ? undefined : v })}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="h-9 w-48 rounded-md border border-input bg-transparent" />
+          )}
         </div>
 
         <div className="space-y-1">
           <label className="text-xs font-medium text-fg-muted">Admin</label>
-          <Select
-            value={currentFilters.adminId ?? ""}
-            onValueChange={(v) => updateFilters({ adminId: v || undefined })}
-          >
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="All Admins" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Admins</SelectItem>
-              {admins.map((a) => (
-                <SelectItem key={a.id} value={a.id}>
-                  {a.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {mounted ? (
+            <Select
+              value={currentFilters.adminId ?? "__all__"}
+              onValueChange={(v) => updateFilters({ adminId: v === "__all__" ? undefined : v })}
+            >
+              <SelectTrigger className="w-56">
+                <SelectValue placeholder="All Admins" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Admins</SelectItem>
+                {admins.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="h-9 w-56 rounded-md border border-input bg-transparent" />
+          )}
         </div>
 
         <div className="space-y-1">

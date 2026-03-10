@@ -1,17 +1,20 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Clipboard, Copy, Download, Lightbulb } from "lucide-react";
+import { ArrowLeft, Clipboard, Copy, Download, Lightbulb, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { publishFanflet } from "@/app/dashboard/fanflets/[id]/actions";
 
 interface QRDownloadProps {
   fanfletId: string;
   fanfletTitle: string;
   publicUrl: string | null;
   slug?: string;
+  status?: string;
 }
 
 export function QRDownload({
@@ -19,9 +22,12 @@ export function QRDownload({
   fanfletTitle,
   publicUrl,
   slug,
+  status,
 }: QRDownloadProps) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const handleCopyQR = async () => {
     try {
@@ -50,6 +56,21 @@ export function QRDownload({
     }
   };
 
+  const handlePublish = async () => {
+    setPublishing(true);
+    try {
+      const result = await publishFanflet(fanfletId);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Fanflet published!");
+        router.refresh();
+      }
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (!publicUrl) {
     return (
       <div className="space-y-8 max-w-lg mx-auto">
@@ -62,10 +83,26 @@ export function QRDownload({
           <h1 className="text-xl font-bold text-[#1B365D]">QR Code</h1>
         </div>
         <Card className="border-[#1B365D]/20">
-          <CardContent className="py-12 text-center">
+          <CardContent className="py-12 text-center space-y-4">
             <p className="text-muted-foreground">
               Publish your Fanflet to generate a QR code.
             </p>
+            {status === "draft" && (
+              <Button
+                onClick={handlePublish}
+                disabled={publishing}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {publishing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Publishing…
+                  </>
+                ) : (
+                  "Publish Fanflet"
+                )}
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

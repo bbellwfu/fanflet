@@ -17,7 +17,7 @@ export default async function TermsPage() {
   const html = await loadLegalMarkdown("TERMS_OF_SERVICE.md");
 
   return (
-    <LegalPageLayout title="Terms of Service" lastUpdated="March 8, 2026">
+    <LegalPageLayout title="Terms of Service" lastUpdated="March 10, 2026">
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </LegalPageLayout>
   );

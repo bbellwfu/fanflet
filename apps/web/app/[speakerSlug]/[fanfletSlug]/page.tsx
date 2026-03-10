@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing/landing-page";
 import { ExpiredFanfletPage } from "@/components/landing/expired-fanflet-page";
 import { AnalyticsScript } from "@/components/landing/analytics-script";
-import { SurveyPrompt } from "@/components/landing/survey-prompt";
+import { SurveyGatedLanding } from "@/components/landing/survey-gated-landing";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 import { isExpired } from "@/lib/expiration";
 
@@ -69,6 +69,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${resolvedFanflet.title} | ${speaker.name}`,
     description: `${resolvedFanflet.title} by ${speaker.name}. ${eventContext}.`,
+    // Allow search engines to index speaker pages for discoverability,
+    // but block AI training crawlers from using speaker content.
+    // These per-page meta tags complement the site-level robots.txt
+    // and the X-Robots-Tag header set in middleware.
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large" as const,
+    },
+    other: {
+      // AI training opt-out meta tags (noai/noimageai proposed standard)
+      robots: "noai, noimageai",
+    },
   };
 }
 
@@ -150,15 +163,31 @@ export default async function AudienceLandingPage({ params }: Props) {
     .select("*", { count: "exact", head: true })
     .eq("speaker_id", speaker.id);
 
-  // Fetch survey question if the fanflet has one configured
-  let surveyQuestion: { id: string; question_text: string; question_type: string } | null = null;
-  if (fanflet.survey_question_id) {
+  // Fetch survey questions (prefer array, fall back to legacy single column)
+  const surveyIds: string[] =
+    (fanflet.survey_question_ids as string[] | undefined)?.length
+      ? (fanflet.survey_question_ids as string[])
+      : fanflet.survey_question_id
+        ? [fanflet.survey_question_id]
+        : [];
+
+  let surveyQuestions: { id: string; text: string; type: "nps" | "yes_no" | "rating" }[] = [];
+  if (surveyIds.length > 0) {
     const { data } = await supabase
       .from("survey_questions")
       .select("id, question_text, question_type")
-      .eq("id", fanflet.survey_question_id)
-      .single();
-    surveyQuestion = data;
+      .in("id", surveyIds);
+    if (data) {
+      const byId = new Map(data.map((q) => [q.id, q]));
+      surveyQuestions = surveyIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((q) => ({
+          id: q!.id,
+          text: q!.question_text,
+          type: q!.question_type as "nps" | "yes_no" | "rating",
+        }));
+    }
   }
 
   // SMS Bookmark is feature-flagged (requires Twilio setup)
@@ -180,22 +209,26 @@ export default async function AudienceLandingPage({ params }: Props) {
   return (
     <div style={themeVars}>
       <AnalyticsScript fanfletId={fanflet.id} />
-      {surveyQuestion && (
-        <SurveyPrompt
-          fanfletId={fanflet.id}
-          questionId={surveyQuestion.id}
-          questionText={surveyQuestion.question_text}
-          questionType={surveyQuestion.question_type as "nps" | "yes_no" | "rating"}
+      {surveyQuestions.length > 0 ? (
+        <SurveyGatedLanding
+          speaker={speaker}
+          fanflet={fanfletWithBlocks}
+          subscriberCount={subscriberCount ?? 0}
+          showSmsBookmark={showSmsBookmark}
+          speakerSlug={speakerSlug}
+          fanfletSlug={fanfletSlug}
+          surveyQuestions={surveyQuestions}
+        />
+      ) : (
+        <LandingPage
+          speaker={speaker}
+          fanflet={fanfletWithBlocks}
+          subscriberCount={subscriberCount ?? 0}
+          showSmsBookmark={showSmsBookmark}
+          speakerSlug={speakerSlug}
+          fanfletSlug={fanfletSlug}
         />
       )}
-      <LandingPage
-        speaker={speaker}
-        fanflet={fanfletWithBlocks}
-        subscriberCount={subscriberCount ?? 0}
-        showSmsBookmark={showSmsBookmark}
-        speakerSlug={speakerSlug}
-        fanfletSlug={fanfletSlug}
-      />
     </div>
   );
 }

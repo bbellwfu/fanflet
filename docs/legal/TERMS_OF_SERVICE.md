@@ -1,7 +1,7 @@
 # Fanflet Terms of Service
 
 **Effective Date:** March 8, 2026
-**Last Updated:** March 8, 2026
+**Last Updated:** March 10, 2026
 
 ---
 
@@ -26,6 +26,7 @@ Throughout these Terms, the following definitions apply:
 - **"Subscriber Data"** — Personal information provided by Audience Members through fanflet pages, including email addresses, survey responses, and SMS bookmark requests.
 - **"Usage Data"** — Behavioral and interaction data generated through use of the Services, including page views, resource clicks, QR scan events, email subscription events, SMS bookmark requests, device information, and engagement timing.
 - **"Aggregate Data"** — De-identified data derived from Usage Data that is combined across multiple accounts and cannot reasonably be used to identify any individual user, Speaker, Sponsor, or Audience Member.
+- **"Platform Insights"** — Analytics, conclusions, benchmarks, scores, rankings, recommendations, trend analyses, and other derived outputs that Fanflet generates by processing Usage Data and Aggregate Data through its proprietary algorithms, statistical models, or machine learning systems. Platform Insights are the sole property of Fanflet regardless of the underlying data sources.
 - **"Fanflet" (lowercase)** — A single resource page created by a Speaker through the Services.
 
 ---
@@ -103,6 +104,8 @@ The Services, including the software, design, brand, logo, documentation, and al
 
 ## 5. Acceptable Use
 
+Your use of the Services is subject to the Fanflet Acceptable Use Policy ("AUP"), available at fanflet.com/legal/acceptable-use, which is incorporated into these Terms by reference. The AUP provides detailed guidance on prohibited conduct, content standards, and enforcement. The key provisions are summarized below.
+
 ### 5.1 General Conduct
 
 You agree not to:
@@ -150,7 +153,7 @@ Subscribers are your audience members. The subscriber relationships you build th
 
 ### 6.2 Fanflet's Role
 
-For the purposes of data protection law, Fanflet acts as a data processor when handling Subscriber Data on a Speaker's behalf. Fanflet's Data Processing Agreement, incorporated by reference into these Terms, governs this processing relationship. Speakers are the data controllers for Subscriber Data collected through their fanflets and are responsible for maintaining appropriate legal bases for collecting and using this data.
+For the purposes of data protection law, Fanflet acts as a data processor when handling Subscriber Data on a Speaker's behalf. Speakers are the data controllers for Subscriber Data collected through their fanflets and are responsible for maintaining appropriate legal bases for collecting and using this data. If Fanflet offers a Data Processing Agreement in the future, it will be incorporated into these Terms at that time.
 
 ### 6.3 Fanflet's Communications with Subscribers
 
@@ -181,7 +184,7 @@ Fanflet uses aggregated, de-identified usage signals across all accounts to impr
 
 ### 7.3 Speaker Content Is Never Used for AI Training
 
-The content you create on Fanflet — including resource titles, descriptions, links, files, text blocks, fanflet configurations, survey questions, and profile information — is never used to train any artificial intelligence or machine learning model, whether operated by Fanflet or a third party. This commitment applies to all forms of AI training, including fine-tuning, reinforcement learning, and embedding generation on individual content items.
+The content you create on Fanflet — including resource titles, descriptions, links, files, text blocks, fanflet configurations, survey questions, and profile information — is never used by Fanflet to train any artificial intelligence or machine learning model. This commitment applies to all forms of AI training, including fine-tuning, reinforcement learning, and embedding generation on individual content items.
 
 ### 7.4 Subscriber Data Is Never Used for AI Training
 
@@ -199,7 +202,15 @@ When Fanflet uses third-party AI services to power features (such as content sug
 - Not use any Fanflet customer data to train their own AI models; and
 - Adhere to zero-retention or short-retention data policies where available.
 
-### 7.7 Future AI Features
+### 7.7 Publicly Accessible Content and Third-Party Crawling
+
+Fanflet's commitments in this Section 7 apply solely to Fanflet's own use and processing of your data, and to third-party services operating under contract with Fanflet (as described in Section 7.6).
+
+**Fanflet cannot control how third parties outside our platform access or use publicly available content.** Public fanflet pages are accessible on the open internet by design — this is how your Audience Members find your resources. As with any publicly accessible web content, third-party crawlers, AI training systems, search engine indexers, and other automated tools operated by parties unrelated to Fanflet may access, cache, index, or otherwise process content displayed on public fanflet pages. Fanflet takes reasonable measures to discourage unauthorized scraping — including robots.txt directives and rate limiting — but cannot guarantee that third parties will respect these controls or refrain from using publicly accessible content for AI model training or other purposes.
+
+If controlling third-party access to your content is important to you, consider limiting what you publish on public fanflet pages and using gated or file-based resources that require subscriber access.
+
+### 7.8 Future AI Features
 
 If Fanflet introduces AI features that would require broader data use than described in this section, we will update these Terms, provide clear notice, and obtain any required consent before implementing such changes.
 
@@ -219,16 +230,19 @@ Fanflet processes four categories of data, each with distinct rights and protect
 
 **Aggregate Data** — De-identified data derived from Usage Data that is combined across multiple accounts and cannot reasonably be used to identify any individual. Fanflet owns all Aggregate Data.
 
-### 8.2 Fanflet's Use of Aggregate Data
+**Platform Insights** — Derived analytics, benchmarks, scores, and recommendations generated by Fanflet's proprietary systems from Usage Data and Aggregate Data. Fanflet owns all Platform Insights. Platform Insights may be incorporated into the Services, offered as standalone analytics products, or used to inform Fanflet's business decisions. Platform Insights never contain information that identifies an individual Speaker, Subscriber, or Audience Member.
 
-Fanflet may use Aggregate Data for any lawful purpose, including:
+### 8.2 Fanflet's Use of Aggregate Data and Platform Insights
+
+Fanflet may use Aggregate Data and Platform Insights for any lawful purpose, including:
 
 - (a) Operating, maintaining, and improving the Services;
 - (b) Developing new features and products;
 - (c) Generating performance benchmarks and comparative analytics (for example, showing Speakers how their engagement compares to platform averages);
 - (d) Training non-generative machine learning models that power platform features such as resource recommendations and engagement scoring;
-- (e) Producing industry research and anonymized market reports; and
-- (f) Providing Sponsors with platform-wide engagement benchmarks (without identifying individual Speakers, Subscribers, or Audience Members).
+- (e) Producing industry research, anonymized market reports, and trend analyses;
+- (f) Providing Sponsors with platform-wide engagement benchmarks (without identifying individual Speakers, Subscribers, or Audience Members); and
+- (g) Creating and commercializing analytics products, benchmarking tools, and industry intelligence offerings based on Platform Insights.
 
 ### 8.3 De-Identification Standard
 
@@ -379,7 +393,7 @@ Fanflet owns or licenses all rights in:
 
 - The Services, including software, design, user interface, and documentation;
 - The Fanflet name, logo, and brand assets;
-- All Aggregate Data; and
+- All Aggregate Data and Platform Insights; and
 - Any improvements, modifications, or derivative works of the Services.
 
 ### 13.3 Copyright Infringement (DMCA)
@@ -500,27 +514,23 @@ These Terms are governed by the laws of the State of North Carolina, without reg
 
 ## 17. International Users
 
-### 17.1 GDPR Rights (EU/EEA/UK Users)
+### 17.1 Service Availability
 
-If you are located in the European Union, European Economic Area, or the United Kingdom, you have the following rights under the General Data Protection Regulation (GDPR):
+The Services are designed for and primarily offered to users in the United States and North America. While users in other regions may access the Services, certain features, support, and compliance measures are optimized for the US market.
 
-- **Access** — Request a copy of the personal data we hold about you;
-- **Rectification** — Request correction of inaccurate data;
-- **Erasure** — Request deletion of your data (subject to legal retention obligations);
-- **Portability** — Receive your data in a structured, machine-readable format;
-- **Objection** — Object to processing based on legitimate interests;
-- **Restriction** — Request restriction of processing in certain circumstances; and
-- **Withdraw Consent** — Where processing is based on consent, withdraw that consent at any time.
+### 17.2 Data Processing Location
 
-To exercise these rights, contact privacy@fanflet.com.
+All data submitted to or collected by the Services is processed and stored in the United States (US East Coast). By using the Services, you consent to the transfer of your data to the United States.
 
-### 17.2 Data Transfers
+### 17.3 EU/EEA/UK Users
 
-Fanflet processes data in the United States. If you are located outside the United States, your data will be transferred to and processed in the United States. For EU/EEA/UK users, such transfers are made in accordance with Standard Contractual Clauses approved by the European Commission or other appropriate safeguards under applicable law.
+Fanflet does not currently maintain an establishment in the European Union, designate an EU representative under GDPR Article 27, or offer EU data residency. EU/EEA/UK users who require GDPR-compliant data processing with EU-based storage should evaluate whether the Services meet their requirements before creating an account.
 
-### 17.3 Data Processing Agreement
+If you are located in the EU/EEA/UK and wish to exercise data subject rights (access, rectification, erasure, portability), contact privacy@fanflet.com. We will respond to valid requests within a reasonable timeframe.
 
-For EU/EEA/UK Speakers who collect Subscriber Data through the Services, Fanflet's Data Processing Agreement (available at fanflet.com/legal/dpa) is incorporated into these Terms and governs Fanflet's processing of Subscriber Data on the Speaker's behalf.
+### 17.4 Future International Expansion
+
+Fanflet intends to expand its compliance and localization capabilities over time. We will update these Terms and provide notice when additional regional compliance measures (such as a Data Processing Agreement, EU representative, or localized data processing) become available.
 
 ---
 
@@ -540,7 +550,7 @@ Data accessed through APIs or integrations is subject to the same usage restrict
 
 ### 19.1 Entire Agreement
 
-These Terms, together with the Privacy Policy, Data Processing Agreement, and any plan-specific terms, constitute the entire agreement between you and Fanflet regarding the Services and supersede all prior agreements.
+These Terms, together with the Privacy Policy, Acceptable Use Policy, and any plan-specific terms, constitute the entire agreement between you and Fanflet regarding the Services and supersede all prior agreements.
 
 ### 19.2 Severability
 
@@ -586,4 +596,4 @@ If you have questions about these Terms, please contact us:
 
 ---
 
-*These Terms of Service were last updated on March 8, 2026.*
+*These Terms of Service were last updated on March 10, 2026.*

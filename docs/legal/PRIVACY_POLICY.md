@@ -1,7 +1,7 @@
 # Fanflet Privacy Policy
 
 **Effective Date:** March 8, 2026
-**Last Updated:** March 8, 2026
+**Last Updated:** March 10, 2026
 
 ---
 
@@ -238,37 +238,16 @@ Under the California Consumer Privacy Act and California Privacy Rights Act, Cal
 
 To exercise these rights, contact privacy@fanflet.com or use the controls in your account settings.
 
-### 6.3 EU/EEA/UK Residents (GDPR)
+### 6.3 EU/EEA/UK Residents
 
-Under the General Data Protection Regulation, EU/EEA/UK residents have the following rights:
+Fanflet acknowledges the rights granted under the General Data Protection Regulation. While Fanflet is a US-based service that does not currently maintain full GDPR compliance infrastructure (such as an EU representative, Data Processing Agreement, or EU data residency), we will honor reasonable data subject requests from EU/EEA/UK residents, including:
 
 - **Access** — Request a copy of your personal data
 - **Rectification** — Request correction of inaccurate data
-- **Erasure** — Request deletion of your data (subject to legal retention obligations)
-- **Data Portability** — Receive your data in a structured, machine-readable format
-- **Object** — Object to processing based on legitimate interests
-- **Restrict Processing** — Request restriction of processing in certain circumstances
-- **Withdraw Consent** — Where processing is based on consent, withdraw it at any time
+- **Erasure** — Request deletion of your data
+- **Data Portability** — Receive your data in a structured format
 
-**Legal bases for processing:**
-
-| Processing Activity | Legal Basis |
-|---------------------|-------------|
-| Operating the Services (account, content hosting) | Contract performance |
-| Processing payments | Contract performance |
-| Sending transactional emails | Contract performance |
-| Platform analytics and improvement | Legitimate interests |
-| Aggregate Data generation | Legitimate interests |
-| Non-generative ML for product features | Legitimate interests |
-| Security and fraud prevention | Legitimate interests |
-| Marketing emails (to account holders) | Consent |
-| Compliance with legal obligations | Legal obligation |
-
-**Data Protection Officer:** For GDPR inquiries, contact privacy@fanflet.com.
-
-**EU Representative:** [To be designated if required based on user base — required under GDPR Article 27 if processing EU resident data without an EU establishment.]
-
-**Complaints:** You have the right to lodge a complaint with your local data protection authority.
+To exercise these rights, contact privacy@fanflet.com. We aim to respond within 30 days.
 
 ---
 
@@ -281,17 +260,27 @@ Under the General Data Protection Regulation, EU/EEA/UK residents have the follo
 | Session cookie | Essential | Authentication and session management | Session |
 | CSRF token | Essential | Security (cross-site request forgery protection) | Session |
 | Preferences | Functional | Remember your settings (theme, timezone) | 1 year |
+| Cookie consent | Functional | Remember your cookie preference | 1 year |
 | Analytics events | Performance | Server-side event tracking for usage analytics | N/A (server-side) |
+| Google Tag Manager | Analytics | Site traffic analysis and marketing optimization (loaded only with consent for users outside the US and Canada) | Varies |
 
-### 7.2 What We Do Not Use
+### 7.2 Third-Party Analytics Cookies
+
+Fanflet uses Google Tag Manager (GTM) to analyze traffic on our marketing pages and understand how visitors interact with the site. GTM may set third-party cookies from Google Analytics and related services.
+
+**For users in the United States and Canada**, GTM loads automatically. US and Canadian law does not currently require opt-in consent for analytics cookies.
+
+**For users outside the United States and Canada**, GTM is blocked until you provide consent through our cookie banner. You may accept or decline analytics cookies when prompted. If you decline, GTM will not load and no third-party analytics cookies will be set. Our server-side analytics and Vercel Analytics (which are cookie-free) continue to operate regardless of your choice.
+
+### 7.3 What We Do Not Use
 
 - We do **not** use third-party advertising cookies
 - We do **not** use cross-site tracking pixels for behavioral advertising
 - We do **not** participate in ad networks or retargeting programs
 
-### 7.3 Your Choices
+### 7.4 Your Choices
 
-Essential cookies are required for the Services to function. You can disable non-essential cookies through your browser settings. Disabling cookies may affect certain features of the Services.
+Essential cookies are required for the Services to function. If you previously accepted or declined analytics cookies, you can clear the `cookie_consent` cookie from your browser to reset your preference and see the consent banner again on your next visit.
 
 ---
 
@@ -318,9 +307,11 @@ The Services are not directed at children under 18. We do not knowingly collect 
 
 ## 10. International Data Transfers
 
-Fanflet processes data in the United States. If you are located outside the United States, your information will be transferred to and processed in the United States.
+Fanflet processes and stores all data in the United States (US East Coast region). If you are located outside the United States, your information will be transferred to and processed in the United States.
 
-For EU/EEA/UK users, we rely on Standard Contractual Clauses (SCCs) approved by the European Commission as the mechanism for lawful data transfers. Copies of the applicable SCCs are available upon request.
+Fanflet does not currently offer regional data processing or EU-based data storage. Our subprocessors (listed in Section 4.4) process data in accordance with their own data processing agreements, which may include Standard Contractual Clauses or other transfer mechanisms. However, Fanflet has not independently executed Standard Contractual Clauses for EU data transfers at this time.
+
+Users outside the United States should review this policy and our Terms of Service to determine whether the Services meet their data protection requirements.
 
 ---
 
@@ -346,4 +337,4 @@ For GDPR-specific inquiries, please include "GDPR Request" in the subject line.
 
 ---
 
-*This Privacy Policy was last updated on March 8, 2026.*
+*This Privacy Policy was last updated on March 10, 2026.*

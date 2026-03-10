@@ -544,10 +544,10 @@ export function LandingPage({
           <ChevronRight className="w-4 h-4" />
         </Link>
         <div className="flex justify-center gap-4 mt-6 text-xs text-slate-400">
-          <Link href="#" className="hover:text-slate-600 transition-colors">
+          <Link href="/privacy" className="hover:text-slate-600 transition-colors">
             Privacy
           </Link>
-          <Link href="#" className="hover:text-slate-600 transition-colors">
+          <Link href="/terms" className="hover:text-slate-600 transition-colors">
             Terms
           </Link>
         </div>

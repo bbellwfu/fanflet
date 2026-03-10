@@ -64,6 +64,16 @@ export function MarketingFooter() {
                 Privacy Policy
               </Link>
             </li>
+            <li>
+              <Link href="/legal/acceptable-use" className="hover:text-white transition-colors">
+                Acceptable Use
+              </Link>
+            </li>
+            <li>
+              <Link href="/legal" className="hover:text-white transition-colors">
+                All Policies
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

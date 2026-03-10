@@ -142,16 +142,17 @@ export async function createLibraryResource(data: {
   if (data.type === 'sponsor') {
     const entitlements = await getSpeakerEntitlements(speakerId)
     if (!entitlements.features.has('sponsor_visibility')) return { error: 'Sponsor resources require a higher plan. Upgrade in Settings.' }
-    if (data.default_sponsor_account_id) {
-      const { data: conn } = await supabase
-        .from('sponsor_connections')
-        .select('id')
-        .eq('speaker_id', speakerId)
-        .eq('sponsor_id', data.default_sponsor_account_id)
-        .eq('status', 'active')
-        .maybeSingle()
-      if (!conn) return { error: 'Selected sponsor is not an active connection.' }
-    }
+  }
+
+  if (data.default_sponsor_account_id) {
+    const { data: conn } = await supabase
+      .from('sponsor_connections')
+      .select('id')
+      .eq('speaker_id', speakerId)
+      .eq('sponsor_id', data.default_sponsor_account_id)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!conn) return { error: 'Selected sponsor is not an active connection.' }
   }
 
   const insertPayload: Record<string, unknown> = {
@@ -165,7 +166,7 @@ export async function createLibraryResource(data: {
     section_name: data.section_name ?? (data.type === 'sponsor' ? 'Featured Partners' : 'Resources'),
     metadata: data.metadata ?? {},
   }
-  if (data.type === 'sponsor' && data.default_sponsor_account_id !== undefined) {
+  if (data.default_sponsor_account_id !== undefined) {
     insertPayload.default_sponsor_account_id = data.default_sponsor_account_id || null
   }
 
@@ -198,23 +199,15 @@ export async function updateLibraryResource(
   await blockImpersonationWrites()
   const { supabase, speakerId } = await requireSpeaker()
 
-  if (data.default_sponsor_account_id !== undefined) {
-    const { data: item } = await supabase
-      .from('resource_library')
-      .select('type')
-      .eq('id', id)
+  if (data.default_sponsor_account_id) {
+    const { data: conn } = await supabase
+      .from('sponsor_connections')
+      .select('id')
       .eq('speaker_id', speakerId)
-      .single()
-    if (item?.type === 'sponsor' && data.default_sponsor_account_id) {
-      const { data: conn } = await supabase
-        .from('sponsor_connections')
-        .select('id')
-        .eq('speaker_id', speakerId)
-        .eq('sponsor_id', data.default_sponsor_account_id)
-        .eq('status', 'active')
-        .maybeSingle()
-      if (!conn) return { error: 'Selected sponsor is not an active connection.' }
-    }
+      .eq('sponsor_id', data.default_sponsor_account_id)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (!conn) return { error: 'Selected sponsor is not an active connection.' }
   }
 
   const updateData: Record<string, unknown> = {}

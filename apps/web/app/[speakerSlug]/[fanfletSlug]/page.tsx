@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { LandingPage } from "@/components/landing/landing-page";
 import { ExpiredFanfletPage } from "@/components/landing/expired-fanflet-page";
 import { AnalyticsScript } from "@/components/landing/analytics-script";
-import { SurveyPrompt } from "@/components/landing/survey-prompt";
+import { SurveyGatedLanding } from "@/components/landing/survey-gated-landing";
 import { getThemeCSSVariables, resolveThemeId } from "@/lib/themes";
 import { isExpired } from "@/lib/expiration";
 
@@ -193,22 +193,30 @@ export default async function AudienceLandingPage({ params }: Props) {
   return (
     <div style={themeVars}>
       <AnalyticsScript fanfletId={fanflet.id} />
-      {surveyQuestion && (
-        <SurveyPrompt
-          fanfletId={fanflet.id}
-          questionId={surveyQuestion.id}
-          questionText={surveyQuestion.question_text}
-          questionType={surveyQuestion.question_type as "nps" | "yes_no" | "rating"}
+      {surveyQuestion ? (
+        <SurveyGatedLanding
+          speaker={speaker}
+          fanflet={fanfletWithBlocks}
+          subscriberCount={subscriberCount ?? 0}
+          showSmsBookmark={showSmsBookmark}
+          speakerSlug={speakerSlug}
+          fanfletSlug={fanfletSlug}
+          survey={{
+            questionId: surveyQuestion.id,
+            questionText: surveyQuestion.question_text,
+            questionType: surveyQuestion.question_type as "nps" | "yes_no" | "rating",
+          }}
+        />
+      ) : (
+        <LandingPage
+          speaker={speaker}
+          fanflet={fanfletWithBlocks}
+          subscriberCount={subscriberCount ?? 0}
+          showSmsBookmark={showSmsBookmark}
+          speakerSlug={speakerSlug}
+          fanfletSlug={fanfletSlug}
         />
       )}
-      <LandingPage
-        speaker={speaker}
-        fanflet={fanfletWithBlocks}
-        subscriberCount={subscriberCount ?? 0}
-        showSmsBookmark={showSmsBookmark}
-        speakerSlug={speakerSlug}
-        fanfletSlug={fanfletSlug}
-      />
     </div>
   );
 }

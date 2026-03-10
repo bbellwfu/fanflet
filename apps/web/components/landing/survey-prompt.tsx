@@ -1,23 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star, ThumbsUp, ThumbsDown, CheckCircle, X } from "lucide-react";
-import { isPreviewMode } from "./analytics-script";
+import { Star, ThumbsUp, ThumbsDown, CheckCircle } from "lucide-react";
+import { isPreviewMode, getSourceFromRef } from "./analytics-script";
 
 interface SurveyPromptProps {
   fanfletId: string;
   questionId: string;
   questionText: string;
   questionType: "nps" | "yes_no" | "rating";
+  onComplete?: () => void;
 }
 
-const STORAGE_KEY_PREFIX = "fanflet-survey-";
+export const SURVEY_STORAGE_KEY_PREFIX = "fanflet-survey-";
 
 export function SurveyPrompt({
   fanfletId,
   questionId,
   questionText,
   questionType,
+  onComplete,
 }: SurveyPromptProps) {
   const [visible, setVisible] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -25,20 +27,42 @@ export function SurveyPrompt({
   const [hoveredRating, setHoveredRating] = useState(0);
 
   useEffect(() => {
-    // Skip in preview mode
     if (isPreviewMode()) return;
 
-    // Check localStorage — don't show if already submitted or dismissed
-    const stored = localStorage.getItem(`${STORAGE_KEY_PREFIX}${fanfletId}`);
+    const stored = localStorage.getItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`);
     if (stored === "submitted" || stored === "dismissed") return;
 
-    // Show the modal (defer to satisfy set-state-in-effect rule)
     queueMicrotask(() => setVisible(true));
   }, [fanfletId]);
 
+  useEffect(() => {
+    if (!visible) return;
+
+    const source = getSourceFromRef();
+    const payload = JSON.stringify({
+      fanflet_id: fanfletId,
+      event_type: "survey_shown",
+      source,
+    });
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(
+        "/api/track",
+        new Blob([payload], { type: "application/json" })
+      );
+    } else {
+      fetch("/api/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+      }).catch(() => {});
+    }
+  }, [visible, fanfletId]);
+
   const dismiss = () => {
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${fanfletId}`, "dismissed");
+    localStorage.setItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`, "dismissed");
     setVisible(false);
+    onComplete?.();
   };
 
   const submitResponse = async (value: string) => {
@@ -68,12 +92,14 @@ export function SurveyPrompt({
       // Fail silently
     }
 
-    localStorage.setItem(`${STORAGE_KEY_PREFIX}${fanfletId}`, "submitted");
+    localStorage.setItem(`${SURVEY_STORAGE_KEY_PREFIX}${fanfletId}`, "submitted");
     setSubmitting(false);
     setSubmitted(true);
 
-    // Auto-close after showing thank you
-    setTimeout(() => setVisible(false), 1500);
+    setTimeout(() => {
+      setVisible(false);
+      onComplete?.();
+    }, 1500);
   };
 
   if (!visible) return null;
@@ -85,17 +111,6 @@ export function SurveyPrompt({
 
       {/* Modal card */}
       <div className="relative w-[92%] max-w-md mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-        {/* Dismiss button */}
-        {!submitted && (
-          <button
-            onClick={dismiss}
-            className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors z-10"
-            aria-label="Dismiss survey"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-
         {submitted ? (
           /* Thank-you state */
           <div className="py-12 px-6 text-center">
@@ -111,7 +126,7 @@ export function SurveyPrompt({
             <p className="text-xs font-medium text-[var(--theme-accent)] uppercase tracking-wider mb-2">
               Quick Feedback
             </p>
-            <h2 className="text-lg font-semibold text-slate-900 leading-snug pr-6">
+            <h2 className="text-lg font-semibold text-slate-900 leading-snug">
               {questionText}
             </h2>
 

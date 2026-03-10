@@ -267,8 +267,12 @@ export function NewCommunicationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Track whether we're doing the initial draft load so we don't overwrite saved edits
+  const isInitialDraftLoad = useRef(!!draft);
+
   // If loading an existing draft that has a source_reference matching worklog(s),
-  // populate the structured state so the user can use checkboxes and refresh
+  // populate the structured state so the user can use checkboxes and refresh,
+  // but preserve the draft's saved title, subject, and body.
   useEffect(() => {
     if (draft?.sourceReference && step === "compose") {
       const refs = draft.sourceReference.split("|").map((r) => r.trim()).filter(Boolean);
@@ -280,6 +284,10 @@ export function NewCommunicationForm({
         setSelectedWorklogs(matched);
         setIsWorklogMode(true);
         populateFromWorklogs(matched);
+        // Restore the draft's saved values (populateFromWorklogs just overwrote them)
+        setTitle(draft.title);
+        setSubject(draft.subject);
+        setBody(draft.bodyHtml);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -578,6 +586,11 @@ export function NewCommunicationForm({
 
   useEffect(() => {
     if (generatedHtml !== null) {
+      // Skip the first sync when loading an existing draft so saved edits aren't overwritten
+      if (isInitialDraftLoad.current) {
+        isInitialDraftLoad.current = false;
+        return;
+      }
       setBody(generatedHtml);
     }
   }, [generatedHtml]);

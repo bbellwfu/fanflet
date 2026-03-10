@@ -18,6 +18,8 @@ interface ImpersonateButtonProps {
   targetRole: "speaker" | "sponsor";
   targetName: string;
   targetEmail: string;
+  defaultReason?: string;
+  defaultWriteEnabled?: boolean;
 }
 
 export function ImpersonateButton({
@@ -25,11 +27,13 @@ export function ImpersonateButton({
   targetRole,
   targetName,
   targetEmail,
+  defaultReason = "",
+  defaultWriteEnabled = false,
 }: ImpersonateButtonProps) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
-  const [writeEnabled, setWriteEnabled] = useState(false);
+  const [reason, setReason] = useState(defaultReason);
+  const [writeEnabled, setWriteEnabled] = useState(defaultWriteEnabled);
 
   async function handleImpersonate() {
     setLoading(true);
@@ -55,8 +59,8 @@ export function ImpersonateButton({
 
       window.open(data.redirectUrl, "_blank");
       setOpen(false);
-      setReason("");
-      setWriteEnabled(false);
+      setReason(defaultReason);
+      setWriteEnabled(defaultWriteEnabled);
     } catch {
       toast.error("Failed to start impersonation session");
     } finally {
@@ -129,8 +133,8 @@ export function ImpersonateButton({
               size="sm"
               onClick={() => {
                 setOpen(false);
-                setReason("");
-                setWriteEnabled(false);
+                setReason(defaultReason);
+                setWriteEnabled(defaultWriteEnabled);
               }}
               className="cursor-pointer"
             >

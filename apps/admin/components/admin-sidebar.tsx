@@ -21,6 +21,7 @@ import {
   ShieldIcon,
   ShieldCheckIcon,
   ScrollTextIcon,
+  PlayCircleIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -59,6 +60,12 @@ const navItems: NavItem[] = [
     href: "/fanflets",
     label: "Fanflets",
     icon: <FileTextIcon className="w-[18px] h-[18px]" />,
+  },
+  {
+    id: "demos",
+    href: "/demos",
+    label: "Demos",
+    icon: <PlayCircleIcon className="w-[18px] h-[18px]" />,
   },
   {
     id: "subscribers",

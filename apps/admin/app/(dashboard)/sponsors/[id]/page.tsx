@@ -5,7 +5,7 @@ import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { ArrowLeft, BuildingIcon, GlobeIcon, MailIcon } from "lucide-react";
 import { VerifyButton } from "./verify-button";
-import { ImpersonateButton } from "./impersonate-button";
+import { ImpersonateButton } from "../../accounts/[id]/impersonate-button";
 
 export default async function SponsorDetailPage({
   params,

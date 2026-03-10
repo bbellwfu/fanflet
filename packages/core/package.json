@@ -14,7 +14,10 @@
     "./sponsor-profile": "./src/sponsor-profile.ts",
     "./events": "./src/events.ts",
     "./integrations": "./src/integrations/index.ts",
-    "./email-provider": "./src/email-provider.ts"
+    "./email-provider": "./src/email-provider.ts",
+    "./demo-ai": "./src/demo-ai.ts",
+    "./demo-seeder": "./src/demo-seeder.ts",
+    "./demo-cleanup": "./src/demo-cleanup.ts"
   },
   "scripts": {
     "test": "vitest run",

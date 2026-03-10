@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { getSiteUrl } from "@/lib/config";
 import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
 import { SignInOptionsCard } from "@/components/dashboard/sign-in-options-card";
+import { DeleteAccountCard } from "@/components/dashboard/delete-account-card";
+import { checkDeletionRequestStatus } from "./deletion-actions";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -33,6 +35,8 @@ export default async function SettingsPage() {
   const allowMultipleThemes = entitlements?.features.has("multiple_theme_colors") ?? false;
   const currentPlanDisplayName = entitlements?.planDisplayName ?? "Free";
   const mcpServerUrl = `${getSiteUrl().replace(/\/$/, "")}/api/mcp`;
+
+  const deletionStatus = await checkDeletionRequestStatus();
 
   let platformAnnouncementsOptedIn = false;
   if (speaker) {
@@ -70,18 +74,45 @@ export default async function SettingsPage() {
 
         <Card id="subscription" className="border-[#e2e8f0]">
           <CardHeader>
-            <CardTitle className="text-[#1B365D]">Subscription</CardTitle>
+            <CardTitle className="text-[#1B365D]">Subscription &amp; Account</CardTitle>
             <CardDescription>
-              Manage your plan and unlock more themes, analytics, and features.
+              Manage your plan or close your account.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-[#1B365D] font-medium">
-              Current subscription plan: {currentPlanDisplayName}
-            </p>
-            <Button asChild variant="outline" className="border-[#1B365D] text-[#1B365D] hover:bg-[#1B365D]/5">
-              <Link href="/pricing">View plans and upgrade</Link>
-            </Button>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm text-[#1B365D] font-medium">
+                  Current plan: {currentPlanDisplayName}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  View plan details, compare features, or change your plan.
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="border-[#1B365D] text-[#1B365D] hover:bg-[#1B365D]/5">
+                <Link href="/dashboard/billing">Manage plan</Link>
+              </Button>
+            </div>
+
+            <div className="border-t border-[#e2e8f0] pt-5 space-y-2">
+              <p className="text-sm font-medium text-[#1B365D]">Close account</p>
+              <p className="text-sm text-muted-foreground">
+                If you no longer wish to use Fanflet, you can close your account.
+                Your data will be retained for 90 days in case you change your mind,
+                after which it will be permanently removed. Any active subscription
+                will be cancelled.
+              </p>
+              <Button
+                variant="outline"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
+                disabled
+              >
+                Close Account
+                <span className="ml-2 text-[10px] font-normal uppercase tracking-wider bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">
+                  Coming soon
+                </span>
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -120,6 +151,23 @@ export default async function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <div id="data-privacy" className="space-y-3 pt-4">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground">Data &amp; Privacy</h2>
+            <p className="text-xs text-muted-foreground/70 mt-0.5">
+              Exercise your data rights under GDPR, CCPA, and other privacy regulations.
+            </p>
+          </div>
+          <DeleteAccountCard
+            userEmail={user.email ?? ""}
+            pendingRequest={
+              deletionStatus.status
+                ? { status: deletionStatus.status, createdAt: deletionStatus.createdAt! }
+                : null
+            }
+          />
+        </div>
     </div>
   );
 }

@@ -149,34 +149,49 @@ export type Database = {
       }
       analytics_events: {
         Row: {
+          city: string | null
+          country_code: string | null
           created_at: string
           device_type: string | null
           event_type: string
           fanflet_id: string
           id: string
+          is_bot: boolean
           referrer: string | null
+          referrer_category: string | null
+          region: string | null
           resource_block_id: string | null
           source: string | null
           visitor_hash: string | null
         }
         Insert: {
+          city?: string | null
+          country_code?: string | null
           created_at?: string
           device_type?: string | null
           event_type: string
           fanflet_id: string
           id?: string
+          is_bot?: boolean
           referrer?: string | null
+          referrer_category?: string | null
+          region?: string | null
           resource_block_id?: string | null
           source?: string | null
           visitor_hash?: string | null
         }
         Update: {
+          city?: string | null
+          country_code?: string | null
           created_at?: string
           device_type?: string | null
           event_type?: string
           fanflet_id?: string
           id?: string
+          is_bot?: boolean
           referrer?: string | null
+          referrer_category?: string | null
+          region?: string | null
           resource_block_id?: string | null
           source?: string | null
           visitor_hash?: string | null

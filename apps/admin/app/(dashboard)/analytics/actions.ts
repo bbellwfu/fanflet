@@ -96,6 +96,8 @@ export interface PlatformKPIs {
   prevUniqueVisitors: number;
   prevSubscribers: number;
   prevResourceClicks: number;
+  botEvents: number;
+  totalEvents: number;
 }
 
 export interface EngagementRow {
@@ -109,6 +111,25 @@ export interface EngagementRow {
   subscribers: number;
   conversionRate: number;
   status: string;
+}
+
+export interface GeoBreakdown {
+  countryCode: string;
+  city: string | null;
+  count: number;
+}
+
+export interface BotVsHumanSummary {
+  totalEvents: number;
+  botEvents: number;
+  humanEvents: number;
+  botPercent: number;
+}
+
+export interface ReferrerDetail {
+  domain: string;
+  category: string;
+  count: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,11 +158,33 @@ function classifyReferrer(referrer: string | null): string {
   if (r.includes("google") || r.includes("bing") || r.includes("yahoo") || r.includes("duckduckgo")) return "Search";
   if (r.includes("linkedin") || r.includes("twitter") || r.includes("facebook") || r.includes("instagram") || r.includes("x.com") || r.includes("threads")) return "Social";
   if (r.includes("mail") || r.includes("outlook") || r.includes("gmail")) return "Email";
+  if (r.includes("slack") || r.includes("teams") || r.includes("discord") || r.includes("telegram")) return "Messaging";
   return "Other";
 }
 
+const REFERRER_CATEGORY_LABELS: Record<string, string> = {
+  direct: "Direct",
+  qr_code: "QR Code",
+  portfolio: "Portfolio",
+  share_link: "Share Link",
+  search: "Search",
+  social: "Social",
+  email: "Email",
+  messaging: "Messaging",
+  internal: "Internal",
+  other: "Other",
+};
+
 function toDateKey(dateStr: string): string {
   return new Date(dateStr).toISOString().split("T")[0];
+}
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,17 +204,21 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
     prevViewsResult,
     prevClicksResult,
     prevSubsResult,
+    botCountResult,
+    totalCountResult,
   ] = await Promise.all([
     supabase
       .from("analytics_events")
       .select("visitor_hash")
       .eq("event_type", "page_view")
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
       .eq("event_type", "resource_click")
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -183,18 +230,21 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
       .eq("event_type", "qr_scan")
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("analytics_events")
       .select("visitor_hash")
       .eq("event_type", "page_view")
+      .neq("is_bot", true)
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
       .eq("event_type", "resource_click")
+      .neq("is_bot", true)
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
     supabase
@@ -202,6 +252,17 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("id", { count: "exact", head: true })
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
+    supabase
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("is_bot", true)
+      .gte("created_at", r.from)
+      .lte("created_at", r.to),
+    supabase
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", r.from)
+      .lte("created_at", r.to),
   ]);
 
   const viewData = viewsResult.data ?? [];
@@ -226,6 +287,8 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
     prevUniqueVisitors: prevUniqueHashes.size,
     prevSubscribers: prevSubsResult.count ?? 0,
     prevResourceClicks: prevClicksResult.count ?? 0,
+    botEvents: botCountResult.count ?? 0,
+    totalEvents: totalCountResult.count ?? 0,
   };
 }
 
@@ -242,6 +305,7 @@ export async function getPlatformTimeSeries(range?: DateRange): Promise<TimeSeri
       .from("analytics_events")
       .select("event_type, visitor_hash, created_at")
       .in("event_type", ["page_view", "resource_click"])
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to)
       .order("created_at"),
@@ -305,6 +369,7 @@ export async function getDeviceBreakdown(range?: DateRange): Promise<DeviceBreak
     .from("analytics_events")
     .select("device_type")
     .eq("event_type", "page_view")
+    .neq("is_bot", true)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -329,23 +394,29 @@ export async function getReferrerBreakdown(range?: DateRange): Promise<ReferrerB
 
   const { data } = await supabase
     .from("analytics_events")
-    .select("referrer, source")
+    .select("referrer, source, referrer_category")
     .eq("event_type", "page_view")
+    .neq("is_bot", true)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    const src = (row as { source?: string | null }).source;
+    const rc = (row as { referrer_category?: string | null }).referrer_category;
     let category: string;
-    if (src === "qr") {
-      category = "QR Code";
-    } else if (src === "portfolio") {
-      category = "Portfolio";
-    } else if (src === "share") {
-      category = "Share Link";
+    if (rc) {
+      category = REFERRER_CATEGORY_LABELS[rc] ?? rc;
     } else {
-      category = classifyReferrer(row.referrer);
+      const src = (row as { source?: string | null }).source;
+      if (src === "qr") {
+        category = "QR Code";
+      } else if (src === "portfolio") {
+        category = "Portfolio";
+      } else if (src === "share") {
+        category = "Share Link";
+      } else {
+        category = classifyReferrer(row.referrer);
+      }
     }
     counts[category] = (counts[category] ?? 0) + 1;
   }
@@ -366,6 +437,7 @@ export async function getEventDistribution(range?: DateRange): Promise<EventDist
   const { data } = await supabase
     .from("analytics_events")
     .select("event_type")
+    .neq("is_bot", true)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -402,6 +474,7 @@ export async function getTopFanflets(range?: DateRange, limit = 10): Promise<Top
       .from("analytics_events")
       .select("fanflet_id, event_type, visitor_hash")
       .in("event_type", ["page_view", "resource_click"])
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -472,6 +545,7 @@ export async function getPeakActivityHeatmap(range?: DateRange): Promise<Heatmap
   const { data } = await supabase
     .from("analytics_events")
     .select("created_at")
+    .neq("is_bot", true)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -504,6 +578,7 @@ export async function getEngagementTable(range?: DateRange): Promise<EngagementR
       .from("analytics_events")
       .select("fanflet_id, event_type, visitor_hash")
       .in("event_type", ["page_view", "resource_click"])
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -586,6 +661,7 @@ export async function getResourceClickBreakdown(range?: DateRange): Promise<{
     .from("analytics_events")
     .select("resource_block_id")
     .eq("event_type", "resource_click")
+    .neq("is_bot", true)
     .not("resource_block_id", "is", null)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
@@ -634,6 +710,7 @@ export async function getSpeakerLeaderboard(range?: DateRange): Promise<SpeakerR
       .from("analytics_events")
       .select("fanflet_id, visitor_hash")
       .eq("event_type", "page_view")
+      .neq("is_bot", true)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -729,6 +806,7 @@ export async function getResourceTypePerformance(range?: DateRange): Promise<Res
     .from("analytics_events")
     .select("resource_block_id")
     .eq("event_type", "resource_click")
+    .neq("is_bot", true)
     .not("resource_block_id", "is", null)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
@@ -843,4 +921,101 @@ export async function getActivationRate(): Promise<{ totalSpeakers: number; acti
     activatedSpeakers: activated,
     rate: speakers.length > 0 ? (activated / speakers.length) * 100 : 0,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Geographic Breakdown                                               */
+/* ------------------------------------------------------------------ */
+
+export async function getGeoBreakdown(range?: DateRange): Promise<GeoBreakdown[]> {
+  const supabase = createServiceClient();
+  const r = range ?? defaultRange(30);
+
+  const { data } = await supabase
+    .from("analytics_events")
+    .select("country_code, city")
+    .eq("event_type", "page_view")
+    .neq("is_bot", true)
+    .not("country_code", "is", null)
+    .gte("created_at", r.from)
+    .lte("created_at", r.to);
+
+  const counts: Record<string, { countryCode: string; city: string | null; count: number }> = {};
+  for (const row of data ?? []) {
+    const key = `${row.country_code}|${row.city ?? ""}`;
+    if (!counts[key]) {
+      counts[key] = { countryCode: row.country_code!, city: row.city, count: 0 };
+    }
+    counts[key].count++;
+  }
+
+  return Object.values(counts).sort((a, b) => b.count - a.count);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Bot vs Human Summary                                               */
+/* ------------------------------------------------------------------ */
+
+export async function getBotVsHumanSummary(range?: DateRange): Promise<BotVsHumanSummary> {
+  const supabase = createServiceClient();
+  const r = range ?? defaultRange(30);
+
+  const [totalResult, botResult] = await Promise.all([
+    supabase
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", r.from)
+      .lte("created_at", r.to),
+    supabase
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("is_bot", true)
+      .gte("created_at", r.from)
+      .lte("created_at", r.to),
+  ]);
+
+  const totalEvents = totalResult.count ?? 0;
+  const botEvents = botResult.count ?? 0;
+  const humanEvents = totalEvents - botEvents;
+
+  return {
+    totalEvents,
+    botEvents,
+    humanEvents,
+    botPercent: totalEvents > 0 ? (botEvents / totalEvents) * 100 : 0,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Top Referring Domains                                              */
+/* ------------------------------------------------------------------ */
+
+export async function getTopReferrerDomains(range?: DateRange, limit = 15): Promise<ReferrerDetail[]> {
+  const supabase = createServiceClient();
+  const r = range ?? defaultRange(30);
+
+  const { data } = await supabase
+    .from("analytics_events")
+    .select("referrer, referrer_category")
+    .eq("event_type", "page_view")
+    .neq("is_bot", true)
+    .not("referrer", "is", null)
+    .gte("created_at", r.from)
+    .lte("created_at", r.to);
+
+  const counts: Record<string, { category: string; count: number }> = {};
+  for (const row of data ?? []) {
+    if (!row.referrer) continue;
+    const domain = extractDomain(row.referrer);
+    const cat = row.referrer_category
+      ? (REFERRER_CATEGORY_LABELS[row.referrer_category] ?? row.referrer_category)
+      : classifyReferrer(row.referrer);
+    if (!counts[domain]) counts[domain] = { category: cat, count: 0 };
+    counts[domain].count++;
+  }
+
+  return Object.entries(counts)
+    .map(([domain, { category, count }]) => ({ domain, category, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { subscribeToSpeaker } from "@/app/[speakerSlug]/[fanfletSlug]/actions";
+import { isPreviewMode, getSourceFromRef } from "./analytics-script";
 
 /** SessionStorage key prefix for subscriber_id (suffix = fanfletId). Used by track API for lead attribution. */
 export const SUBSCRIBER_ID_KEY_PREFIX = "fanflet_subscriber_id_";
@@ -54,6 +55,20 @@ export function SubscribeForm({
           );
         } catch {
           // ignore storage errors
+        }
+      }
+
+      if (!isPreviewMode()) {
+        const source = getSourceFromRef();
+        const payload = JSON.stringify({
+          fanflet_id: fanfletId,
+          event_type: "email_signup" as const,
+          source,
+        });
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/track", new Blob([payload], { type: "application/json" }));
+        } else {
+          fetch("/api/track", { method: "POST", headers: { "Content-Type": "application/json" }, body: payload }).catch(() => {});
         }
       }
     } else if (result.error === "already_subscribed") {

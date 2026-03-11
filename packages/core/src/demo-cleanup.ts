@@ -31,8 +31,34 @@ export async function cleanupDemoEnvironment(
   }
 
   const manifest = demo.seed_manifest as SeedManifest | null;
-  const speakerId = demo.speaker_id as string | null;
-  const authUserId = demo.auth_user_id as string | null;
+  let speakerId = demo.speaker_id as string | null;
+  let authUserId = demo.auth_user_id as string | null;
+
+  // If speaker_id/auth_user_id are null (orphan from a failed provision),
+  // try to find them by the synthetic email pattern
+  if (!authUserId && demo.prospect_name) {
+    const slug = (demo.prospect_name as string)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .substring(0, 60);
+    const syntheticEmail = `demo+demo-${slug}@fanflet.com`;
+
+    const { data: listed } = await serviceClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    const orphan = listed?.users?.find((u) => u.email === syntheticEmail);
+    if (orphan) {
+      authUserId = orphan.id;
+      const { data: orphanSpeaker } = await serviceClient
+        .from("speakers")
+        .select("id")
+        .eq("auth_user_id", orphan.id)
+        .maybeSingle();
+      if (orphanSpeaker) speakerId = orphanSpeaker.id;
+    }
+  }
 
   // 1. Sponsor connections (speaker side)
   if (speakerId) {

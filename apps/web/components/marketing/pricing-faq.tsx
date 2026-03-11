@@ -18,7 +18,7 @@ const FAQ_ITEMS = [
   {
     question: "What happens when Early Access ends?",
     answer:
-      "We'll introduce Pro and Enterprise tiers. Early Access users will receive exclusive pricing and plenty of notice before any changes. You'll never lose access to fanflets you've already created.",
+      "We'll introduce paid Pro and custom Enterprise options. Early Access users will receive exclusive pricing and plenty of notice before any changes. You'll never lose access to fanflets you've already created.",
   },
   {
     question: "Can I use Fanflet for multiple talks?",
@@ -28,7 +28,7 @@ const FAQ_ITEMS = [
   {
     question: "How do sponsors work?",
     answer:
-      "On Enterprise plans, you can add sponsor logos, links, and visibility to your fanflets — great for sponsored talks and conference partnerships.",
+      "Speakers on Pro and higher can add sponsor logos, links, and visibility to their fanflets — great for sponsored talks and conference partnerships. If you're a sponsoring company interested in building a presence on Fanflet, use the For Sponsors card on this page to get in touch.",
   },
   {
     question: "Do I need technical skills?",

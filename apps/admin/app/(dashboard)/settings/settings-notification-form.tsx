@@ -11,6 +11,7 @@ interface NotificationToggles {
   sponsor_signup: boolean;
   fanflet_created: boolean;
   onboarding_completed: boolean;
+  sponsor_inquiry: boolean;
 }
 
 interface AdminPreferences extends NotificationToggles {
@@ -22,6 +23,7 @@ const LABELS: Record<keyof NotificationToggles, string> = {
   sponsor_signup: "New sponsor signup",
   fanflet_created: "Speaker creates a Fanflet",
   onboarding_completed: "Speaker completes onboarding checklist",
+  sponsor_inquiry: "Sponsor inquiry from pricing page",
 };
 
 interface SettingsNotificationFormProps {
@@ -75,6 +77,7 @@ export function SettingsNotificationForm({ initial }: SettingsNotificationFormPr
     sponsor_signup: initial.sponsor_signup,
     fanflet_created: initial.fanflet_created,
     onboarding_completed: initial.onboarding_completed,
+    sponsor_inquiry: initial.sponsor_inquiry ?? true,
   });
   const [saving, setSaving] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);

@@ -14,7 +14,7 @@ import { PricingFAQ } from "@/components/marketing/pricing-faq";
 export const metadata: Metadata = {
   title: "Pricing — Fanflet | Pro Free During Early Access",
   description:
-    "Get Pro free during Early Access. Full Pro features — unlimited fanflets, analytics, and more — at no cost. No credit card required. Compare Free, Pro, and Enterprise.",
+    "Get Pro free during Early Access. Full Pro features — unlimited fanflets, analytics, and more — at no cost. No credit card required. Compare Free and Pro.",
   openGraph: {
     title: "Pricing — Fanflet | Pro Free During Early Access",
     description:
@@ -68,20 +68,30 @@ export default async function PricingPage() {
     }
   }
 
+  const freeFeatureSet = new Set(planFeatureMap["free"] ?? []);
+  const proIncrementalFeatures = (planFeatureMap["pro"] ?? []).filter(
+    (f) => !freeFeatureSet.has(f)
+  );
+
   const publicPlans: PublicPlan[] = rawPlans.map((p) => ({
     name: p.name,
-    display_name: p.display_name,
+    display_name: p.name === "enterprise" ? "For Sponsors" : p.display_name,
     description: p.description,
     price_monthly_cents: p.price_monthly_cents,
     limits: p.limits as Record<string, number> | null,
-    features: planFeatureMap[p.name] ?? [],
+    features:
+      p.name === "pro"
+        ? proIncrementalFeatures
+        : (planFeatureMap[p.name] ?? []),
   }));
 
-  const comparisonPlans = publicPlans.map((p) => ({
-    name: p.name,
-    display_name: p.display_name,
-    limits: p.limits ?? {},
-  }));
+  const comparisonPlans = publicPlans
+    .filter((p) => p.name !== "enterprise")
+    .map((p) => ({
+      name: p.name,
+      display_name: p.display_name,
+      limits: p.limits ?? {},
+    }));
 
   return (
     <div className="w-full min-h-screen bg-white">

@@ -19,7 +19,7 @@ export default async function SettingsPage() {
 
   const { data: prefs } = await supabase
     .from("admin_notification_preferences")
-    .select("speaker_signup, sponsor_signup, fanflet_created, onboarding_completed, timezone")
+    .select("speaker_signup, sponsor_signup, fanflet_created, onboarding_completed, sponsor_inquiry, timezone")
     .eq("admin_user_id", user.id)
     .maybeSingle();
 
@@ -28,6 +28,7 @@ export default async function SettingsPage() {
     sponsor_signup: true,
     fanflet_created: true,
     onboarding_completed: true,
+    sponsor_inquiry: true,
     timezone: null as string | null,
   };
 

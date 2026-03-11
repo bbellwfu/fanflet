@@ -10,6 +10,7 @@ import {
   BuildingIcon,
   FileTextIcon,
   MailIcon,
+  MessageSquareIcon,
   MegaphoneIcon,
   ToggleLeftIcon,
   CreditCardIcon,
@@ -90,6 +91,12 @@ const navSections: NavSection[] = [
         href: "/subscribers",
         label: "Subscribers",
         icon: <MailIcon className="w-[18px] h-[18px]" />,
+      },
+      {
+        id: "sponsor-inquiries",
+        href: "/sponsor-inquiries",
+        label: "Sponsor Inquiries",
+        icon: <MessageSquareIcon className="w-[18px] h-[18px]" />,
       },
       {
         id: "analytics",

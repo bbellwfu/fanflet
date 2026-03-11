@@ -33,6 +33,7 @@ export async function GET(request: Request) {
   const errorParam = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
   const ref = searchParams.get('ref')
+  const invitedBy = searchParams.get('invited_by')
   const role = searchParams.get('role')
   const next = searchParams.get('next')
 
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
 
     const metadataUpdates: Record<string, string> = {}
     if (ref) metadataUpdates.referred_by_fanflet_id = ref
+    if (invitedBy) metadataUpdates.invited_by_speaker_slug = invitedBy
     if (role === 'sponsor') metadataUpdates.signup_role = 'sponsor'
     if (role === 'audience') metadataUpdates.signup_role = 'audience'
 

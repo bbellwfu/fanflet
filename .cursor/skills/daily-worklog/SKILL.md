@@ -102,3 +102,4 @@ Example: `worklog/260306 Impersonation Emails Analytics Sponsor Portal.md`
 3. **Bug fixes** describe what was broken in plain language
 4. **Technical details** include everything a developer would need for reference
 5. **Filename summary** should capture the 2-4 major themes of the day's work
+6. **Brand name**: Always capitalize "Fanflet" when referring to the product or platform. Lowercase "fanflet" only when it appears in a URL, slug, code identifier, or package name (e.g., `fanflet.com/dashboard`, `@fanflet/core`)

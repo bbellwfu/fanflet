@@ -19,20 +19,23 @@ import {
   ClockIcon,
   AlertTriangleIcon,
   RefreshCwIcon,
+  SendIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteDemoEnvironment, convertDemo, extendDemoTTL, retryDemoEnvironment } from "../actions";
+import { deleteDemoEnvironment, convertDemo, extendDemoTTL, retryDemoEnvironment, sendDemoMagicLink } from "../actions";
 
 interface DemoActionsProps {
   demoId: string;
   status: string;
+  hasProspectEmail?: boolean;
 }
 
-export function DemoActions({ demoId, status }: DemoActionsProps) {
+export function DemoActions({ demoId, status, hasProspectEmail }: DemoActionsProps) {
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [convertOpen, setConvertOpen] = useState(false);
   const [extendOpen, setExtendOpen] = useState(false);
+  const [magicLinkOpen, setMagicLinkOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [authUserId, setAuthUserId] = useState("");
 
@@ -91,12 +94,35 @@ export function DemoActions({ demoId, status }: DemoActionsProps) {
     }
   };
 
+  const handleSendMagicLink = async () => {
+    setLoading(true);
+    const result = await sendDemoMagicLink(demoId);
+    setLoading(false);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(result.success ?? "Magic link sent");
+      setMagicLinkOpen(false);
+    }
+  };
+
   const isActive = status === "active";
 
   return (
     <>
       {isActive && (
         <>
+          {hasProspectEmail && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMagicLinkOpen(true)}
+              className="gap-1.5"
+            >
+              <SendIcon className="w-3.5 h-3.5" />
+              Magic Link
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -221,6 +247,39 @@ export function DemoActions({ demoId, status }: DemoActionsProps) {
               disabled={loading || !authUserId.trim()}
             >
               {loading ? "Converting..." : "Convert"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Magic Link Dialog */}
+      <Dialog open={magicLinkOpen} onOpenChange={setMagicLinkOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <SendIcon className="w-5 h-5 text-primary" />
+              Send Magic Link
+            </DialogTitle>
+            <DialogDescription>
+              Send a passwordless sign-in link to the prospect&apos;s email.
+              They&apos;ll be able to access the demo environment directly —
+              no password needed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMagicLinkOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSendMagicLink}
+              disabled={loading}
+            >
+              {loading ? "Sending..." : "Send Magic Link"}
             </Button>
           </DialogFooter>
         </DialogContent>

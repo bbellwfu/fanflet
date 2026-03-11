@@ -290,7 +290,7 @@ export default async function AdminOverviewPage() {
               Recently Published
             </h2>
             <Link
-              href="/features"
+              href="/fanflets"
               className="text-[12px] font-medium text-primary-soft hover:text-primary transition-colors flex items-center gap-1"
             >
               View all

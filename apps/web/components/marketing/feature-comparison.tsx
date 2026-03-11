@@ -98,17 +98,17 @@ export function FeatureComparison({
           <table className="w-full" role="table">
             <thead>
               <tr style={{ borderBottom: `1px solid ${COLORS.gray200}` }}>
-                <th className="text-left py-4 px-6 w-2/5">
+                <th className="text-left py-4 px-6 w-1/2">
                   <span className="text-sm font-medium" style={{ color: COLORS.gray400 }}>
                     Features
                   </span>
                 </th>
-                {plans.map((plan, idx) => {
+                {plans.map((plan) => {
                   const isPro = plan.name === "pro";
                   return (
                     <th
                       key={plan.name}
-                      className="text-center py-4 px-4 w-1/5"
+                      className="text-center py-4 px-4 w-1/4"
                       style={isPro ? { background: "rgba(59, 130, 246, 0.05)" } : undefined}
                     >
                       {isPro ? (
@@ -126,13 +126,7 @@ export function FeatureComparison({
                       ) : (
                         <div className="flex items-center justify-center gap-1.5">
                           <AccentDot
-                            color={
-                              plan.name === "free"
-                                ? COLORS.emerald
-                                : plan.name === "enterprise"
-                                  ? COLORS.violet
-                                  : COLORS.gray600
-                            }
+                            color={plan.name === "free" ? COLORS.emerald : COLORS.gray600}
                           />
                           <span className="text-sm font-semibold" style={{ color: COLORS.navy }}>
                             {plan.display_name}
@@ -197,32 +191,21 @@ export function FeatureComparison({
 
         {/* Mobile Cards */}
         <div className="md:hidden space-y-6">
-          {plans.map((plan, planIdx) => {
+          {plans.map((plan) => {
             const isHighlighted = plan.name === "pro";
             const isFree = plan.name === "free";
-            const isEnterprise = plan.name === "enterprise";
             const headerStyle: React.CSSProperties = isFree
               ? {
                   background: COLORS.emerald,
                   color: "white",
                   borderBottom: `1px solid ${COLORS.emerald}`,
                 }
-              : isHighlighted
-                ? {
-                    background: COLORS.blue,
-                    color: "white",
-                    borderBottom: `1px solid ${COLORS.blue}`,
-                  }
-                : {
-                    background: `linear-gradient(135deg, ${COLORS.violet}, ${COLORS.navy})`,
-                    color: "white",
-                    borderBottom: `1px solid ${COLORS.violet}`,
-                  };
-            const borderColor = isFree
-              ? COLORS.emerald
-              : isHighlighted
-                ? COLORS.blue
-                : COLORS.violet;
+              : {
+                  background: COLORS.blue,
+                  color: "white",
+                  borderBottom: `1px solid ${COLORS.blue}`,
+                };
+            const borderColor = isFree ? COLORS.emerald : COLORS.blue;
 
             return (
               <div

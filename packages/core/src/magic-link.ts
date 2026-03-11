@@ -65,11 +65,24 @@ export async function generateMagicLink(
     );
   }
 
+  // Supabase stores magic link tokens for existing confirmed users as
+  // "recovery_token" internally. Parse the actual verification type from
+  // Supabase's generated action_link so verifyOtp matches the stored type.
+  const actionLink = data.properties.action_link ?? "";
+  let verifyType = "magiclink";
+  try {
+    const parsed = new URL(actionLink);
+    const actionType = parsed.searchParams.get("type");
+    if (actionType) verifyType = actionType;
+  } catch {
+    // action_link may be empty or malformed — fall back to "magiclink"
+  }
+
   return {
     verificationUrl: buildVerificationUrl(
       siteUrl,
       data.properties.hashed_token,
-      "magiclink",
+      verifyType,
       ROLE_REDIRECT[role],
     ),
     hashedToken: data.properties.hashed_token,

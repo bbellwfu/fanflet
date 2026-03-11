@@ -21,10 +21,11 @@ interface SponsorWithCounts {
 export default async function SponsorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; demo?: string }>;
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
+  const hideDemo = params.demo !== "all";
 
   const authSupabase = await createClient();
   const { data: { user } } = await authSupabase.auth.getUser();
@@ -39,6 +40,10 @@ export default async function SponsorsPage({
     .from("sponsor_accounts")
     .select("id, company_name, slug, contact_email, industry, logo_url, is_verified, created_at")
     .order("created_at", { ascending: false });
+
+  if (hideDemo) {
+    query = query.neq("is_demo", true);
+  }
 
   if (params.search) {
     query = query.or(
@@ -102,9 +107,10 @@ export default async function SponsorsPage({
 
       <div className="bg-surface rounded-lg border border-border-subtle p-5">
         <SponsorsFilterForm
-          key={`${params.search ?? ""}-${params.status ?? "all"}`}
+          key={`${params.search ?? ""}-${params.status ?? "all"}-${params.demo ?? "exclude"}`}
           defaultSearch={params.search ?? ""}
           defaultStatus={params.status ?? "all"}
+          defaultHideDemo={hideDemo}
         />
       </div>
 

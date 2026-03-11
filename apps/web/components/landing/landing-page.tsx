@@ -51,6 +51,7 @@ type ResourceBlock = {
   section_name: string | null;
   file_size_bytes: number | null;
   file_type: string | null;
+  sponsor_account_id?: string | null;
   metadata: {
     logo_url?: string;
     cta_text?: string;
@@ -278,7 +279,7 @@ export function LandingPage({
               speakerId={speaker.id}
               fanfletId={fanflet.id}
               subscriberCount={subscriberCount}
-              hasSponsorBlocks={sponsorBlocks.length > 0}
+              hasSponsorBlocks={fanflet.resource_blocks.some((b) => b.type === "sponsor" || b.sponsor_account_id)}
             />
           </CardContent>
         </Card>

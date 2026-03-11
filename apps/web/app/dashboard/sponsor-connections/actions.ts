@@ -18,7 +18,7 @@ export async function listAvailableSponsors(): Promise<{
   sponsors: AvailableSponsor[]
   error?: string
 }> {
-  const { speakerId, supabase } = await requireSpeaker()
+  const { speakerId, demoEnvironmentId, supabase } = await requireSpeaker()
 
   try {
     await requireFeature(speakerId, 'sponsor_visibility')
@@ -42,6 +42,12 @@ export async function listAvailableSponsors(): Promise<{
     .eq('is_verified', true)
     .order('company_name')
 
+  if (demoEnvironmentId) {
+    query = query.eq('demo_environment_id', demoEnvironmentId)
+  } else {
+    query = query.neq('is_demo', true)
+  }
+
   if (excludedIds.length > 0) {
     query = query.not('id', 'in', `(${excludedIds.join(',')})`)
   }
@@ -58,7 +64,7 @@ export async function requestSponsorConnection(
   mode: 'id' | 'slug' = 'slug'
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites()
-  const { speakerId, supabase } = await requireSpeaker()
+  const { speakerId, demoEnvironmentId, supabase } = await requireSpeaker()
 
   try {
     await requireFeature(speakerId, 'sponsor_visibility')
@@ -69,18 +75,35 @@ export async function requestSponsorConnection(
   let sponsorId: string
 
   if (mode === 'id') {
-    sponsorId = sponsorIdOrSlug
+    const { data: sponsor } = await supabase
+      .from('sponsor_accounts')
+      .select('id, demo_environment_id, is_demo')
+      .eq('id', sponsorIdOrSlug)
+      .single()
+    if (!sponsor) return { error: 'No sponsor found.' }
+    if (demoEnvironmentId) {
+      if (sponsor.demo_environment_id !== demoEnvironmentId) {
+        return { error: 'No sponsor found with that slug. Ask the sponsor for their Fanflet sponsor link.' }
+      }
+    } else if (sponsor.is_demo) {
+      return { error: 'No sponsor found with that slug. Ask the sponsor for their Fanflet sponsor link.' }
+    }
+    sponsorId = sponsor.id
   } else {
     const slug = sponsorIdOrSlug.trim().toLowerCase()
     if (!slug) return { error: 'Enter a sponsor slug.' }
 
-    const { data: sponsor } = await supabase
+    let slugQuery = supabase
       .from('sponsor_accounts')
-      .select('id')
+      .select('id, is_demo, demo_environment_id')
       .eq('slug', slug)
-      .single()
+    if (demoEnvironmentId) {
+      slugQuery = slugQuery.eq('demo_environment_id', demoEnvironmentId)
+    }
+    const { data: sponsor } = await slugQuery.single()
 
     if (!sponsor) return { error: 'No sponsor found with that slug. Ask the sponsor for their Fanflet sponsor link.' }
+    if (!demoEnvironmentId && sponsor.is_demo) return { error: 'No sponsor found with that slug. Ask the sponsor for their Fanflet sponsor link.' }
     sponsorId = sponsor.id
   }
 

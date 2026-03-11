@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
 
+    if (error) {
+      console.error('[auth/confirm] verifyOtp failed:', error.message, error.status, { type, token_hash_prefix: token_hash.slice(0, 8) })
+    }
+
     if (!error) {
       const { data: { user } } = await supabase.auth.getUser()
 

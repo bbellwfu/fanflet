@@ -12,47 +12,123 @@ export default async function SponsorDashboardPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id")
+    .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
-  const [
-    { count: connectionsCount },
-    { count: leadsCount },
-    { count: pendingCount },
-  ] = await Promise.all([
-    supabase
-      .from("sponsor_connections")
-      .select("*", { count: "exact", head: true })
-      .eq("sponsor_id", sponsor.id)
-      .eq("status", "active"),
-    supabase
-      .from("sponsor_leads")
-      .select("*", { count: "exact", head: true })
-      .eq("sponsor_id", sponsor.id),
-    supabase
-      .from("sponsor_connections")
-      .select("*", { count: "exact", head: true })
-      .eq("sponsor_id", sponsor.id)
-      .eq("status", "pending"),
-  ]);
+  const demoEnvId = sponsor.demo_environment_id ?? null;
 
-  const blockIdsRes = await supabase
-    .from("resource_blocks")
-    .select("id")
-    .eq("sponsor_account_id", sponsor.id);
-
-  const blockIds = (blockIdsRes.data ?? []).map((b) => b.id);
+  let connectionsCount: number | null = null;
+  let leadsCount: number | null = null;
+  let pendingCount: number | null = null;
   let clicksCount = 0;
-  if (blockIds.length > 0) {
-    const { count } = await supabase
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .eq("event_type", "resource_click")
-      .in("resource_block_id", blockIds);
-    clicksCount = count ?? 0;
+
+  if (demoEnvId) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", demoEnvId);
+    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
+
+    if (speakerIds.length === 0) {
+      connectionsCount = 0;
+      leadsCount = 0;
+      pendingCount = 0;
+    } else {
+      const [
+        { count: connCount },
+        { count: pendCount },
+      ] = await Promise.all([
+        supabase
+          .from("sponsor_connections")
+          .select("*", { count: "exact", head: true })
+          .eq("sponsor_id", sponsor.id)
+          .eq("status", "active")
+          .in("speaker_id", speakerIds),
+        supabase
+          .from("sponsor_connections")
+          .select("*", { count: "exact", head: true })
+          .eq("sponsor_id", sponsor.id)
+          .eq("status", "pending")
+          .in("speaker_id", speakerIds),
+      ]);
+      connectionsCount = connCount ?? 0;
+      pendingCount = pendCount ?? 0;
+
+      const { data: fanfletsInDemo } = await supabase
+        .from("fanflets")
+        .select("id")
+        .in("speaker_id", speakerIds);
+      const fanfletIds = (fanfletsInDemo ?? []).map((f) => f.id);
+      if (fanfletIds.length > 0) {
+        const { count: leadCount } = await supabase
+          .from("sponsor_leads")
+          .select("*", { count: "exact", head: true })
+          .eq("sponsor_id", sponsor.id)
+          .in("fanflet_id", fanfletIds);
+        leadsCount = leadCount ?? 0;
+      } else {
+        leadsCount = 0;
+      }
+
+      const blockIdsRes = await supabase
+        .from("resource_blocks")
+        .select("id, fanflet_id")
+        .eq("sponsor_account_id", sponsor.id);
+      const blocks = blockIdsRes.data ?? [];
+      const demoFanfletIds = new Set(fanfletIds);
+      const demoBlockIds = blocks
+        .filter((b) => demoFanfletIds.has(b.fanflet_id))
+        .map((b) => b.id);
+      if (demoBlockIds.length > 0) {
+        const { count } = await supabase
+          .from("analytics_events")
+          .select("*", { count: "exact", head: true })
+          .eq("event_type", "resource_click")
+          .in("resource_block_id", demoBlockIds);
+        clicksCount = count ?? 0;
+      }
+    }
+  } else {
+    const [
+      { count: connCount },
+      { count: leadCount },
+      { count: pendCount },
+    ] = await Promise.all([
+      supabase
+        .from("sponsor_connections")
+        .select("*", { count: "exact", head: true })
+        .eq("sponsor_id", sponsor.id)
+        .eq("status", "active"),
+      supabase
+        .from("sponsor_leads")
+        .select("*", { count: "exact", head: true })
+        .eq("sponsor_id", sponsor.id),
+      supabase
+        .from("sponsor_connections")
+        .select("*", { count: "exact", head: true })
+        .eq("sponsor_id", sponsor.id)
+        .eq("status", "pending"),
+    ]);
+    connectionsCount = connCount ?? 0;
+    leadsCount = leadCount ?? 0;
+    pendingCount = pendCount ?? 0;
+
+    const blockIdsRes = await supabase
+      .from("resource_blocks")
+      .select("id")
+      .eq("sponsor_account_id", sponsor.id);
+    const blockIds = (blockIdsRes.data ?? []).map((b) => b.id);
+    if (blockIds.length > 0) {
+      const { count } = await supabase
+        .from("analytics_events")
+        .select("*", { count: "exact", head: true })
+        .eq("event_type", "resource_click")
+        .in("resource_block_id", blockIds);
+      clicksCount = count ?? 0;
+    }
   }
 
   const pendingRequests = pendingCount ?? 0;

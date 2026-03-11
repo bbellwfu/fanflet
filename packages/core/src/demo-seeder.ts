@@ -200,6 +200,7 @@ export async function seedDemoEnvironment(
         demo_created_by: adminUserId,
         demo_expires_at: addDays(30),
         demo_prospect_email: input.email ?? null,
+        demo_environment_id: demoEnvironmentId,
       })
       .eq("id", speaker.id);
 
@@ -263,20 +264,7 @@ export async function seedDemoEnvironment(
         continue;
       }
 
-      // Check for existing demo sponsor with same name
-      const { data: existingDemo } = await serviceClient
-        .from("sponsor_accounts")
-        .select("id")
-        .ilike("company_name", sponsor.company_name)
-        .eq("is_demo", true)
-        .maybeSingle();
-
-      if (existingDemo) {
-        sponsorIdMap.set(sponsor.company_name, existingDemo.id);
-        manifest.sponsor_account_ids.push(existingDemo.id);
-        continue;
-      }
-
+      // Do not reuse demo sponsors across environments; each demo gets its own sponsors.
       const sponsorSlug = slugify(sponsor.company_name);
       const sponsorEmail = `demo+sponsor+${sponsorSlug}@fanflet.com`;
 
@@ -310,6 +298,7 @@ export async function seedDemoEnvironment(
             is_verified: true,
             is_demo: true,
             demo_created_by: adminUserId,
+            demo_environment_id: demoEnvironmentId,
           })
           .select("id")
           .single();
@@ -397,10 +386,27 @@ export async function seedDemoEnvironment(
         title: talk.title,
       });
 
+      // Identify the primary sponsor for this talk from the sponsor-type block
+      let talkSponsorId: string | null = null;
+      for (const resource of talk.resources) {
+        if (resource.type === "sponsor") {
+          const matchingSponsor = payload.sponsors.find((s) =>
+            resource.title.toLowerCase().includes(s.company_name.toLowerCase()) ||
+            resource.description?.toLowerCase().includes(s.company_name.toLowerCase()),
+          );
+          if (matchingSponsor) {
+            talkSponsorId = sponsorIdMap.get(matchingSponsor.company_name) ?? null;
+          }
+          if (!talkSponsorId && sponsorIdMap.size > 0) {
+            talkSponsorId = [...sponsorIdMap.values()][0] ?? null;
+          }
+          break;
+        }
+      }
+
       for (let i = 0; i < talk.resources.length; i++) {
         const resource = talk.resources[i];
 
-        // Create library item first
         const { data: libItem, error: libError } = await serviceClient
           .from("resource_library")
           .insert({
@@ -424,21 +430,9 @@ export async function seedDemoEnvironment(
 
         manifest.resource_library_ids.push(libItem.id);
 
-        // Find matching sponsor for sponsor-type resources
-        let sponsorAccountId: string | null = null;
-        if (resource.type === "sponsor") {
-          const matchingSponsor = payload.sponsors.find((s) =>
-            resource.title.toLowerCase().includes(s.company_name.toLowerCase()) ||
-            resource.description?.toLowerCase().includes(s.company_name.toLowerCase()),
-          );
-          if (matchingSponsor) {
-            sponsorAccountId = sponsorIdMap.get(matchingSponsor.company_name) ?? null;
-          }
-          if (!sponsorAccountId && sponsorIdMap.size > 0) {
-            const sponsorIds = [...sponsorIdMap.values()];
-            sponsorAccountId = sponsorIds[i % sponsorIds.length] ?? null;
-          }
-        }
+        // Attribute all non-text blocks to the talk's primary sponsor for analytics
+        const sponsorAccountId =
+          resource.type === "text" ? null : talkSponsorId;
 
         const { data: block, error: blockError } = await serviceClient
           .from("resource_blocks")
@@ -594,6 +588,7 @@ export async function seedSponsorDemoEnvironment(
         is_verified: true,
         is_demo: true,
         demo_created_by: adminUserId,
+        demo_environment_id: demoEnvironmentId,
       })
       .select("id")
       .single();
@@ -710,6 +705,7 @@ export async function seedSponsorDemoEnvironment(
           is_demo: true,
           demo_created_by: adminUserId,
           demo_expires_at: addDays(30),
+          demo_environment_id: demoEnvironmentId,
         })
         .eq("id", kolSpeaker.id);
 
@@ -832,8 +828,9 @@ export async function seedSponsorDemoEnvironment(
 
           if (!libItem) continue;
 
+          // Attribute all non-text blocks to the sponsor for analytics flow
           const sponsorAccountId =
-            resource.type === "sponsor" ? sponsorAccount.id : null;
+            resource.type === "text" ? null : sponsorAccount.id;
 
           await serviceClient.from("resource_blocks").insert({
             fanflet_id: fanflet.id,

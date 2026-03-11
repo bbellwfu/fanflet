@@ -58,6 +58,71 @@ function addDays(days: number): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Auth helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Try to create a demo auth user. If the email is already taken (orphan from
+ * a prior failed attempt), delete the orphan and its associated speaker/sponsor
+ * rows, then retry creation once.
+ */
+async function createOrReclaimDemoAuthUser(
+  serviceClient: SupabaseClient,
+  email: string,
+  meta: {
+    full_name: string;
+    is_demo: boolean;
+    demo_prospect_email?: string;
+    signup_role?: string;
+    roles: string[];
+  },
+): Promise<{ id: string }> {
+  const userPayload = {
+    email,
+    password: crypto.randomUUID(),
+    email_confirm: true,
+    user_metadata: {
+      full_name: meta.full_name,
+      is_demo: true,
+      ...(meta.signup_role ? { signup_role: meta.signup_role } : {}),
+    },
+    app_metadata: {
+      is_demo: true,
+      roles: meta.roles,
+      ...(meta.demo_prospect_email
+        ? { demo_prospect_email: meta.demo_prospect_email }
+        : {}),
+    },
+  };
+
+  const { data, error } =
+    await serviceClient.auth.admin.createUser(userPayload);
+
+  if (!error && data.user) return { id: data.user.id };
+
+  if (error?.message?.includes("already been registered")) {
+    const { data: listed } = await serviceClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    const orphanId = listed?.users?.find((u) => u.email === email)?.id;
+
+    if (orphanId) {
+      await serviceClient.from("speakers").delete().eq("auth_user_id", orphanId);
+      await serviceClient.from("sponsor_accounts").delete().eq("auth_user_id", orphanId);
+      await serviceClient.auth.admin.deleteUser(orphanId);
+
+      const { data: retryData, error: retryError } =
+        await serviceClient.auth.admin.createUser(userPayload);
+      if (!retryError && retryData.user) return { id: retryData.user.id };
+      throw new Error(`Auth retry failed after orphan cleanup: ${retryError?.message}`);
+    }
+  }
+
+  throw new Error(`Auth user creation failed: ${error?.message ?? "no user returned"}`);
+}
+
+/* ------------------------------------------------------------------ */
 /*  Seed Engine                                                        */
 /* ------------------------------------------------------------------ */
 
@@ -89,27 +154,13 @@ export async function seedDemoEnvironment(
     const speakerSlug = baseSlug.startsWith("demo-") ? baseSlug : `demo-${baseSlug}`;
     const syntheticEmail = `demo+${speakerSlug}@fanflet.com`;
 
-    const { data: authData, error: authError } =
-      await serviceClient.auth.admin.createUser({
-        email: syntheticEmail,
-        password: crypto.randomUUID(),
-        email_confirm: true,
-        user_metadata: {
-          full_name: input.full_name,
-          is_demo: true,
-        },
-        app_metadata: {
-          is_demo: true,
-          demo_prospect_email: input.email,
-          roles: ["speaker"],
-        },
-      });
-
-    if (authError || !authData.user) {
-      throw new Error(`Auth user creation failed: ${authError?.message ?? "no user returned"}`);
-    }
-
-    manifest.auth_user_id = authData.user.id;
+    const authUser = await createOrReclaimDemoAuthUser(serviceClient, syntheticEmail, {
+      full_name: input.full_name,
+      is_demo: true,
+      demo_prospect_email: input.email,
+      roles: ["speaker"],
+    });
+    manifest.auth_user_id = authUser.id;
 
     // Step 2: Wait for trigger to create speaker row, then update it
     // handle_new_user() trigger fires synchronously on insert
@@ -118,7 +169,7 @@ export async function seedDemoEnvironment(
     const { data: speaker, error: speakerFetchError } = await serviceClient
       .from("speakers")
       .select("id")
-      .eq("auth_user_id", authData.user.id)
+      .eq("auth_user_id", authUser.id)
       .maybeSingle();
 
     if (speakerFetchError || !speaker) {
@@ -224,34 +275,26 @@ export async function seedDemoEnvironment(
       const sponsorSlug = slugify(sponsor.company_name);
       const sponsorEmail = `demo+sponsor+${sponsorSlug}@fanflet.com`;
 
-      const { data: sponsorAuth, error: sponsorAuthError } =
-        await serviceClient.auth.admin.createUser({
-          email: sponsorEmail,
-          password: crypto.randomUUID(),
-          email_confirm: true,
-          user_metadata: {
-            signup_role: "sponsor",
-            is_demo: true,
-            full_name: sponsor.company_name,
-          },
-          app_metadata: {
-            is_demo: true,
-            roles: ["sponsor"],
-          },
+      let sponsorAuthUser: { id: string };
+      try {
+        sponsorAuthUser = await createOrReclaimDemoAuthUser(serviceClient, sponsorEmail, {
+          full_name: sponsor.company_name,
+          is_demo: true,
+          signup_role: "sponsor",
+          roles: ["sponsor"],
         });
-
-      if (sponsorAuthError || !sponsorAuth.user) {
-        console.error(`Sponsor auth creation failed for ${sponsor.company_name}: ${sponsorAuthError?.message}`);
+      } catch (err) {
+        console.error(`Sponsor auth creation failed for ${sponsor.company_name}: ${err instanceof Error ? err.message : err}`);
         continue;
       }
 
-      manifest.sponsor_auth_user_ids.push(sponsorAuth.user.id);
+      manifest.sponsor_auth_user_ids.push(sponsorAuthUser.id);
 
       const { data: sponsorAccount, error: sponsorInsertError } =
         await serviceClient
           .from("sponsor_accounts")
           .insert({
-            auth_user_id: sponsorAuth.user.id,
+            auth_user_id: sponsorAuthUser.id,
             company_name: sponsor.company_name,
             slug: sponsorSlug,
             logo_url: generateAvatarUrl(sponsor.company_name),
@@ -430,7 +473,7 @@ export async function seedDemoEnvironment(
       .from("demo_environments")
       .update({
         speaker_id: speaker.id,
-        auth_user_id: authData.user.id,
+        auth_user_id: authUser.id,
         sponsor_account_ids: manifest.sponsor_account_ids,
         seed_manifest: manifest as unknown as Record<string, unknown>,
         status: "active",

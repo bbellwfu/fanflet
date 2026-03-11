@@ -122,18 +122,6 @@ export async function createDemoEnvironment(
     return { error: `Failed to create demo record: ${insertError?.message}` };
   }
 
-  // Kick off async AI generation + seeding (non-blocking)
-  provisionDemo(
-    supabase,
-    demoRow.id,
-    input,
-    apiKey,
-    admin.user.id,
-    siteUrl,
-  ).catch((err) => {
-    console.error("[demo] Provisioning failed:", err);
-  });
-
   await auditAdminAction({
     adminId: admin.user.id,
     action: "demo.create",
@@ -144,6 +132,11 @@ export async function createDemoEnvironment(
     ipAddress: admin.ipAddress,
     userAgent: admin.userAgent,
   });
+
+  // Run provisioning inline — Vercel kills fire-and-forget promises after
+  // the response is sent, so we must await here. The client polls for status
+  // independently so the UX remains responsive.
+  await provisionDemo(supabase, demoRow.id, input, apiKey, admin.user.id, siteUrl);
 
   return { id: demoRow.id };
 }
@@ -302,13 +295,6 @@ export async function retryDemoEnvironment(
     })
     .eq("id", id);
 
-  // Kick off provisioning again (non-blocking)
-  provisionDemo(supabase, id, input, apiKey, admin.user.id, siteUrl).catch(
-    (err) => {
-      console.error("[demo] Retry provisioning failed:", err);
-    },
-  );
-
   await auditAdminAction({
     adminId: admin.user.id,
     action: "demo.retry",
@@ -318,6 +304,8 @@ export async function retryDemoEnvironment(
     ipAddress: admin.ipAddress,
     userAgent: admin.userAgent,
   });
+
+  await provisionDemo(supabase, id, input, apiKey, admin.user.id, siteUrl);
 
   revalidatePath(`/demos/${id}`);
   revalidatePath("/demos");

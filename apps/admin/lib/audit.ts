@@ -7,6 +7,7 @@ export type AuditCategory =
   | "plan"
   | "feature"
   | "sponsor"
+  | "sponsor_inquiry"
   | "communication"
   | "admin_management"
   | "setting"

@@ -8,7 +8,12 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { GeneratedDemoPayload, DemoProspectInput } from "./demo-ai";
+import type {
+  GeneratedDemoPayload,
+  DemoProspectInput,
+  GeneratedSponsorDemoPayload,
+  SponsorDemoProspectInput,
+} from "./demo-ai";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -501,6 +506,444 @@ export async function seedDemoEnvironment(
     for (const sponsorAuthId of manifest.sponsor_auth_user_ids) {
       await serviceClient.auth.admin
         .deleteUser(sponsorAuthId)
+        .catch(() => {});
+    }
+
+    throw error;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sponsor Demo Seed Engine                                           */
+/* ------------------------------------------------------------------ */
+
+export interface SponsorSeedManifest {
+  sponsor_auth_user_id: string;
+  sponsor_account_id: string;
+  sponsor_slug: string;
+  sponsor_resource_ids: string[];
+  sponsor_subscription_id: string | null;
+  demo_speakers: Array<{
+    auth_user_id: string;
+    speaker_id: string;
+    speaker_name: string;
+    speaker_slug: string;
+    connection_status: "active" | "none" | "pending";
+    connection_id: string | null;
+    fanflet_ids: string[];
+    subscription_id: string | null;
+  }>;
+  lead_ids: string[];
+}
+
+export interface SponsorSeedDemoResult {
+  demoEnvironmentId: string;
+  manifest: SponsorSeedManifest;
+}
+
+export async function seedSponsorDemoEnvironment(
+  serviceClient: SupabaseClient,
+  demoEnvironmentId: string,
+  input: SponsorDemoProspectInput,
+  payload: GeneratedSponsorDemoPayload,
+  adminUserId: string,
+  siteUrl: string,
+): Promise<SponsorSeedDemoResult> {
+  const manifest: SponsorSeedManifest = {
+    sponsor_auth_user_id: "",
+    sponsor_account_id: "",
+    sponsor_slug: "",
+    sponsor_resource_ids: [],
+    sponsor_subscription_id: null,
+    demo_speakers: [],
+    lead_ids: [],
+  };
+
+  try {
+    // ── Step 1: Create sponsor auth user ──
+    const sponsorSlug = payload.slug || slugify(input.company_name);
+    const sponsorEmail = `demo+sponsor+${sponsorSlug}@fanflet.com`;
+
+    const sponsorAuthUser = await createOrReclaimDemoAuthUser(
+      serviceClient,
+      sponsorEmail,
+      {
+        full_name: input.company_name,
+        is_demo: true,
+        demo_prospect_email: input.contact_email,
+        signup_role: "sponsor",
+        roles: ["sponsor"],
+      },
+    );
+    manifest.sponsor_auth_user_id = sponsorAuthUser.id;
+
+    // ── Step 2: Create sponsor_accounts row ──
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const { data: sponsorAccount, error: sponsorError } = await serviceClient
+      .from("sponsor_accounts")
+      .insert({
+        auth_user_id: sponsorAuthUser.id,
+        company_name: input.company_name,
+        slug: sponsorSlug,
+        logo_url: input.logo_url || generateAvatarUrl(input.company_name),
+        website_url: input.website_url || null,
+        description: payload.description || null,
+        industry: payload.industry || input.industry || null,
+        contact_email: input.contact_email || sponsorEmail,
+        is_verified: true,
+        is_demo: true,
+        demo_created_by: adminUserId,
+      })
+      .select("id")
+      .single();
+
+    if (sponsorError || !sponsorAccount) {
+      throw new Error(
+        `Sponsor account creation failed: ${sponsorError?.message ?? "no row"}`,
+      );
+    }
+
+    manifest.sponsor_account_id = sponsorAccount.id;
+    manifest.sponsor_slug = sponsorSlug;
+
+    // ── Step 3: Assign Sponsor Pro plan ──
+    const { data: sponsorProPlan } = await serviceClient
+      .from("sponsor_plans")
+      .select("id, limits")
+      .eq("name", "sponsor_pro")
+      .maybeSingle();
+
+    if (sponsorProPlan) {
+      const { data: sub } = await serviceClient
+        .from("sponsor_subscriptions")
+        .upsert(
+          {
+            sponsor_id: sponsorAccount.id,
+            plan_id: sponsorProPlan.id,
+            status: "active",
+            limits_snapshot: sponsorProPlan.limits,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "sponsor_id" },
+        )
+        .select("id")
+        .single();
+
+      if (sub) manifest.sponsor_subscription_id = sub.id;
+    }
+
+    // ── Step 4: Create sponsor resources ──
+    for (const resource of payload.resources) {
+      const { data: sr, error: srError } = await serviceClient
+        .from("sponsor_resources")
+        .insert({
+          sponsor_id: sponsorAccount.id,
+          title: resource.title,
+          description: resource.description || null,
+          url: resource.url || null,
+          type: resource.type,
+          status: "active",
+        })
+        .select("id")
+        .single();
+
+      if (srError) {
+        console.error(
+          `Sponsor resource creation failed: ${srError.message}`,
+        );
+        continue;
+      }
+      if (sr) manifest.sponsor_resource_ids.push(sr.id);
+    }
+
+    // ── Step 5: Create KOL speaker accounts with fanflets ──
+    const connectedSpeakerIds: string[] = [];
+
+    for (const kol of payload.kol_speakers) {
+      const kolSlug = kol.slug.startsWith("demo-")
+        ? kol.slug
+        : `demo-${kol.slug}`;
+      const kolEmail = `demo+${kolSlug}@fanflet.com`;
+
+      let kolAuthUser: { id: string };
+      try {
+        kolAuthUser = await createOrReclaimDemoAuthUser(
+          serviceClient,
+          kolEmail,
+          {
+            full_name: kol.full_name,
+            is_demo: true,
+            roles: ["speaker"],
+          },
+        );
+      } catch (err) {
+        console.error(
+          `KOL auth creation failed for ${kol.full_name}: ${err instanceof Error ? err.message : err}`,
+        );
+        continue;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const { data: kolSpeaker } = await serviceClient
+        .from("speakers")
+        .select("id")
+        .eq("auth_user_id", kolAuthUser.id)
+        .maybeSingle();
+
+      if (!kolSpeaker) {
+        console.error(`Speaker row not found for KOL ${kol.full_name}`);
+        continue;
+      }
+
+      await serviceClient
+        .from("speakers")
+        .update({
+          name: kol.full_name,
+          bio: kol.bio,
+          slug: kolSlug,
+          photo_url: generateAvatarUrl(kol.full_name),
+          social_links: {
+            default_theme_preset: payload.theme || "navy",
+          },
+          is_demo: true,
+          demo_created_by: adminUserId,
+          demo_expires_at: addDays(30),
+        })
+        .eq("id", kolSpeaker.id);
+
+      // Assign Pro plan to KOL
+      let kolSubId: string | null = null;
+      const { data: proPlan } = await serviceClient
+        .from("plans")
+        .select("id, limits")
+        .or("name.eq.Pro,name.eq.early_access")
+        .limit(1)
+        .maybeSingle();
+
+      if (proPlan) {
+        const { data: featureRows } = await serviceClient
+          .from("plan_features")
+          .select("feature_flags(key)")
+          .eq("plan_id", proPlan.id);
+
+        const featureKeys = (featureRows ?? [])
+          .map((r) => {
+            const flag = r.feature_flags as unknown as { key: string } | null;
+            return flag?.key;
+          })
+          .filter((k): k is string => !!k);
+
+        const { data: sub } = await serviceClient
+          .from("speaker_subscriptions")
+          .upsert(
+            {
+              speaker_id: kolSpeaker.id,
+              plan_id: proPlan.id,
+              status: "active",
+              limits_snapshot: proPlan.limits,
+              features_snapshot: featureKeys,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "speaker_id" },
+          )
+          .select("id")
+          .single();
+
+        if (sub) kolSubId = sub.id;
+      }
+
+      // Create sponsor connection based on status
+      let connectionId: string | null = null;
+      if (kol.connection_status === "active") {
+        const { data: conn } = await serviceClient
+          .from("sponsor_connections")
+          .insert({
+            speaker_id: kolSpeaker.id,
+            sponsor_id: sponsorAccount.id,
+            status: "active",
+            initiated_by: "sponsor",
+            responded_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        if (conn) {
+          connectionId = conn.id;
+          connectedSpeakerIds.push(kolSpeaker.id);
+        }
+      } else if (kol.connection_status === "pending") {
+        const { data: conn } = await serviceClient
+          .from("sponsor_connections")
+          .insert({
+            speaker_id: kolSpeaker.id,
+            sponsor_id: sponsorAccount.id,
+            status: "pending",
+            initiated_by: "sponsor",
+          })
+          .select("id")
+          .single();
+
+        if (conn) connectionId = conn.id;
+      }
+
+      // Create fanflet with resources
+      const fanfletIds: string[] = [];
+      const themeConfig = { preset: payload.theme || "navy" };
+      const fanfletSlug = slugify(kol.fanflet.title);
+
+      const { data: fanflet } = await serviceClient
+        .from("fanflets")
+        .insert({
+          speaker_id: kolSpeaker.id,
+          title: kol.fanflet.title,
+          event_name: kol.fanflet.event_name,
+          event_date: kol.fanflet.event_date || null,
+          slug: fanfletSlug,
+          status: "draft",
+          theme_config: themeConfig,
+          show_event_name: true,
+        })
+        .select("id, slug")
+        .single();
+
+      if (fanflet) {
+        fanfletIds.push(fanflet.id);
+
+        for (let i = 0; i < kol.fanflet.resources.length; i++) {
+          const resource = kol.fanflet.resources[i];
+
+          const { data: libItem } = await serviceClient
+            .from("resource_library")
+            .insert({
+              speaker_id: kolSpeaker.id,
+              type: resource.type,
+              title: resource.title,
+              description: resource.description || null,
+              url: resource.url || null,
+              section_name:
+                resource.type === "sponsor"
+                  ? "Featured Partners"
+                  : "Resources",
+            })
+            .select("id")
+            .single();
+
+          if (!libItem) continue;
+
+          const sponsorAccountId =
+            resource.type === "sponsor" ? sponsorAccount.id : null;
+
+          await serviceClient.from("resource_blocks").insert({
+            fanflet_id: fanflet.id,
+            library_item_id: libItem.id,
+            type: resource.type,
+            title: resource.title,
+            description: resource.description || null,
+            url: resource.url || null,
+            display_order: i,
+            section_name:
+              resource.type === "sponsor"
+                ? "Featured Partners"
+                : "Resources",
+            metadata: {},
+            sponsor_account_id: sponsorAccountId,
+          });
+        }
+      }
+
+      manifest.demo_speakers.push({
+        auth_user_id: kolAuthUser.id,
+        speaker_id: kolSpeaker.id,
+        speaker_name: kol.full_name,
+        speaker_slug: kolSlug,
+        connection_status: kol.connection_status,
+        connection_id: connectionId,
+        fanflet_ids: fanfletIds,
+        subscription_id: kolSubId,
+      });
+    }
+
+    // ── Step 6: Create sample leads ──
+    // sponsor_leads requires subscriber_id (FK), so we create demo subscribers first
+    const connectedKol = manifest.demo_speakers.find(
+      (s) => s.connection_status === "active",
+    );
+    const firstFanfletId = connectedKol?.fanflet_ids[0] ?? null;
+
+    if (connectedKol && firstFanfletId) {
+      for (const lead of payload.sample_leads) {
+        // Create a demo subscriber record for the lead
+        const { data: subscriber, error: subError } = await serviceClient
+          .from("subscribers")
+          .insert({
+            email: lead.email.toLowerCase().trim(),
+            name: lead.name,
+            speaker_id: connectedKol.speaker_id,
+            source_fanflet_id: firstFanfletId,
+          })
+          .select("id")
+          .single();
+
+        if (subError || !subscriber) {
+          console.error(`Demo subscriber creation failed: ${subError?.message}`);
+          continue;
+        }
+
+        const { data: leadRow, error: leadError } = await serviceClient
+          .from("sponsor_leads")
+          .insert({
+            subscriber_id: subscriber.id,
+            sponsor_id: sponsorAccount.id,
+            fanflet_id: firstFanfletId,
+            engagement_type: "resource_click",
+            resource_title: lead.resource_title,
+            created_at: lead.created_at || new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+
+        if (leadError) {
+          console.error(`Lead creation failed: ${leadError.message}`);
+          continue;
+        }
+        if (leadRow) manifest.lead_ids.push(leadRow.id);
+      }
+    }
+
+    // ── Step 7: Update demo_environments row ──
+    await serviceClient
+      .from("demo_environments")
+      .update({
+        sponsor_id: sponsorAccount.id,
+        auth_user_id: sponsorAuthUser.id,
+        sponsor_account_ids: [sponsorAccount.id],
+        seed_manifest: manifest as unknown as Record<string, unknown>,
+        status: "active",
+      })
+      .eq("id", demoEnvironmentId);
+
+    return { demoEnvironmentId, manifest };
+  } catch (error) {
+    await serviceClient
+      .from("demo_environments")
+      .update({
+        status: "failed",
+        error_message:
+          error instanceof Error ? error.message : "Unknown error during sponsor seeding",
+      })
+      .eq("id", demoEnvironmentId);
+
+    // Best-effort cleanup
+    if (manifest.sponsor_auth_user_id) {
+      await serviceClient.auth.admin
+        .deleteUser(manifest.sponsor_auth_user_id)
+        .catch(() => {});
+    }
+    for (const speaker of manifest.demo_speakers) {
+      await serviceClient.auth.admin
+        .deleteUser(speaker.auth_user_id)
         .catch(() => {});
     }
 

@@ -12,6 +12,7 @@ const notificationPreferencesSchema = z.object({
   sponsor_signup: z.boolean().optional(),
   fanflet_created: z.boolean().optional(),
   onboarding_completed: z.boolean().optional(),
+  sponsor_inquiry: z.boolean().optional(),
 });
 const timezoneSchema = z.string().min(1).max(100);
 
@@ -19,13 +20,15 @@ export type NotificationPreferenceKey =
   | "speaker_signup"
   | "sponsor_signup"
   | "fanflet_created"
-  | "onboarding_completed";
+  | "onboarding_completed"
+  | "sponsor_inquiry";
 
 export async function updateNotificationPreferences(updates: {
   speaker_signup?: boolean;
   sponsor_signup?: boolean;
   fanflet_created?: boolean;
   onboarding_completed?: boolean;
+  sponsor_inquiry?: boolean;
 }): Promise<{ error?: string }> {
   const parsed = notificationPreferencesSchema.safeParse(updates);
   if (!parsed.success) return { error: "Invalid input" };

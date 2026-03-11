@@ -11,7 +11,8 @@ export type AdminNotificationEvent =
   | "speaker_signup"
   | "sponsor_signup"
   | "fanflet_created"
-  | "onboarding_completed";
+  | "onboarding_completed"
+  | "sponsor_inquiry";
 
 export interface SpeakerSignupPayload {
   speakerId: string;
@@ -39,22 +40,32 @@ export interface OnboardingCompletedPayload {
   speakerEmail: string;
 }
 
+export interface SponsorInquiryPayload {
+  inquiryId: string;
+  name: string;
+  email: string;
+  details: string;
+}
+
 export type AdminNotificationPayload =
   | SpeakerSignupPayload
   | SponsorSignupPayload
   | FanfletCreatedPayload
-  | OnboardingCompletedPayload;
+  | OnboardingCompletedPayload
+  | SponsorInquiryPayload;
 
 const EVENT_COLUMN: Record<AdminNotificationEvent, keyof {
   speaker_signup: boolean;
   sponsor_signup: boolean;
   fanflet_created: boolean;
   onboarding_completed: boolean;
+  sponsor_inquiry: boolean;
 }> = {
   speaker_signup: "speaker_signup",
   sponsor_signup: "sponsor_signup",
   fanflet_created: "fanflet_created",
   onboarding_completed: "onboarding_completed",
+  sponsor_inquiry: "sponsor_inquiry",
 };
 
 function getResendClient(): Resend | null {
@@ -121,6 +132,14 @@ function buildSubjectAndBody(
       return {
         subject: `Onboarding completed: ${p.speakerName}`,
         html: `<p>A speaker completed their onboarding checklist.</p><ul><li>Name: ${escapeHtml(p.speakerName)}</li><li>Email: ${escapeHtml(p.speakerEmail)}</li></ul><p><a href="${getAdminUrl()}/accounts/${p.speakerId}">View account</a></p>`,
+      };
+    }
+    case "sponsor_inquiry": {
+      const p = payload as SponsorInquiryPayload;
+      const detailsExcerpt = p.details.length > 200 ? escapeHtml(p.details.slice(0, 200)) + "…" : escapeHtml(p.details);
+      return {
+        subject: `New sponsor inquiry: ${p.name}`,
+        html: `<p>A new sponsor inquiry was submitted from the pricing page.</p><ul><li>Name: ${escapeHtml(p.name)}</li><li>Email: ${escapeHtml(p.email)}</li><li>Details: ${detailsExcerpt}</li></ul><p><a href="${getAdminUrl()}/sponsor-inquiries/${p.inquiryId}">View inquiry</a></p>`,
       };
     }
   }

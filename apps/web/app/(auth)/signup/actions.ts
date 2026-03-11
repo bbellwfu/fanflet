@@ -9,6 +9,7 @@ export async function signup(formData: FormData) {
   const supabase = await createClient()
   const siteUrl = getSiteUrl()
   const referredByFanfletId = formData.get('ref') as string | null
+  const invitedBy = formData.get('invited_by') as string | null
   const signupRole = formData.get('role') as string | null
   const next = formData.get('next') as string | null
 
@@ -17,6 +18,9 @@ export async function signup(formData: FormData) {
   }
   if (referredByFanfletId) {
     metadata.referred_by_fanflet_id = referredByFanfletId
+  }
+  if (invitedBy) {
+    metadata.invited_by_speaker_slug = invitedBy
   }
   if (signupRole === 'audience' || signupRole === 'sponsor') {
     metadata.signup_role = signupRole
@@ -50,6 +54,7 @@ export async function signup(formData: FormData) {
 
 interface GoogleSignInOptions {
   referredByFanfletId?: string;
+  invitedBy?: string;
   role?: string;
   next?: string;
 }
@@ -65,6 +70,7 @@ export async function signInWithGoogle(opts?: GoogleSignInOptions | string) {
 
   const params = new URLSearchParams()
   if (options.referredByFanfletId) params.set('ref', options.referredByFanfletId)
+  if (options.invitedBy) params.set('invited_by', options.invitedBy)
   if (options.role) params.set('role', options.role)
   if (options.next) params.set('next', options.next)
 

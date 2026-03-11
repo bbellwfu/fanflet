@@ -299,7 +299,7 @@ export async function sendCommunication(
 
   const { data: speakers } = await supabase
     .from("speakers")
-    .select("id, email, name")
+    .select("id, email, name, slug")
     .in("id", optedInSpeakerIds)
     .not("email", "is", null);
 
@@ -323,7 +323,7 @@ export async function sendCommunication(
   const webUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
   interface Recipient {
-    speaker: { id: string; email: string; name: string | null };
+    speaker: { id: string; email: string; name: string | null; slug: string | null };
     emailHash: string;
   }
 
@@ -353,12 +353,18 @@ export async function sendCommunication(
   const messages = recipients.map((r) => {
     const unsubscribeUrl = `${webUrl}/api/communications/unsubscribe?email=${encodeURIComponent(r.speaker.email)}&comm=${validCommunicationId}`;
     const preferencesUrl = `${webUrl}/dashboard/settings#notifications`;
+    const loginUrl = `${webUrl}/login`;
+    const inviteUrl = r.speaker.slug
+      ? `${webUrl}/signup?invited_by=${encodeURIComponent(r.speaker.slug)}`
+      : `${webUrl}/signup`;
 
     const fullHtml = renderAnnouncementEmail({
       title: comm.title,
       bodyHtml: speakerVariant.body_html,
       unsubscribeUrl,
       preferencesUrl,
+      loginUrl,
+      inviteUrl,
     });
 
     return {
@@ -466,6 +472,8 @@ export async function sendTestEmail(
     bodyHtml: variant.body_html,
     unsubscribeUrl: `${webUrl}/api/communications/unsubscribe?preview=true`,
     preferencesUrl: `${webUrl}/dashboard/settings#notifications`,
+    loginUrl: `${webUrl}/login`,
+    inviteUrl: `${webUrl}/signup`,
   });
 
   const provider = getEmailProvider();
@@ -606,6 +614,8 @@ export async function resendFailedRecipients(
       bodyHtml: variant.body_html,
       unsubscribeUrl,
       preferencesUrl,
+      loginUrl: `${webUrl}/login`,
+      inviteUrl: `${webUrl}/signup`,
     });
     return {
       to: email,

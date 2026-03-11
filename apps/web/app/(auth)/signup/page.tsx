@@ -25,12 +25,14 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [referralId, setReferralId] = useState<string | null>(null)
+  const [invitedBy, setInvitedBy] = useState<string | null>(null)
   const [signupRole, setSignupRole] = useState<string | null>(null)
   const [nextUrl, setNextUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const ref = params.get('ref')
+    const invited = params.get('invited_by')
     const role = params.get('role')
     const next = params.get('next')
 
@@ -42,6 +44,7 @@ export default function SignupPage() {
       if (stored) setReferralId(stored)
     }
 
+    if (invited) setInvitedBy(invited)
     if (role) setSignupRole(role)
     if (next) setNextUrl(next)
   }, [])
@@ -74,6 +77,7 @@ export default function SignupPage() {
     try {
       const result = await signInWithGoogle({
         referredByFanfletId: referralId ?? undefined,
+        invitedBy: invitedBy ?? undefined,
         role: signupRole ?? undefined,
         next: nextUrl ?? undefined,
       })
@@ -194,6 +198,9 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {referralId && (
             <input type="hidden" name="ref" value={referralId} />
+          )}
+          {invitedBy && (
+            <input type="hidden" name="invited_by" value={invitedBy} />
           )}
           {signupRole && (
             <input type="hidden" name="role" value={signupRole} />

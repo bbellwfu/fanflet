@@ -4,13 +4,16 @@ import { createServiceClient } from "@fanflet/db/service";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { auditAdminAction } from "@/lib/audit";
-import { generateDemoContent } from "@fanflet/core/demo-ai";
-import { seedDemoEnvironment } from "@fanflet/core/demo-seeder";
+import { generateDemoContent, generateSponsorDemoContent } from "@fanflet/core/demo-ai";
+import { seedDemoEnvironment, seedSponsorDemoEnvironment } from "@fanflet/core/demo-seeder";
 import { cleanupDemoEnvironment, convertDemoToReal } from "@fanflet/core/demo-cleanup";
-import type { DemoProspectInput } from "@fanflet/core/demo-ai";
+import { generateMagicLink } from "@fanflet/core/magic-link";
+import { buildDemoSignInEmail } from "@fanflet/core/magic-link-email";
+import type { DemoProspectInput, SponsorDemoProspectInput } from "@fanflet/core/demo-ai";
 import { z } from "zod";
 
-const createDemoSchema = z.object({
+const createSpeakerDemoSchema = z.object({
+  demo_type: z.literal("speaker"),
   full_name: z.string().min(1, "Name is required"),
   email: z.string().email().optional().or(z.literal("")),
   specialty: z.string().min(1, "Specialty is required"),
@@ -23,6 +26,22 @@ const createDemoSchema = z.object({
   theme: z.string().optional(),
 });
 
+const createSponsorDemoSchema = z.object({
+  demo_type: z.literal("sponsor"),
+  company_name: z.string().min(1, "Company name is required"),
+  contact_name: z.string().optional(),
+  contact_email: z.string().email().optional().or(z.literal("")),
+  website_url: z.string().url().optional().or(z.literal("")),
+  industry: z.string().optional(),
+  logo_url: z.string().url().optional().or(z.literal("")),
+  notes: z.string().optional(),
+});
+
+const createDemoSchema = z.discriminatedUnion("demo_type", [
+  createSpeakerDemoSchema,
+  createSponsorDemoSchema,
+]);
+
 export async function createDemoEnvironment(
   formData: FormData,
 ): Promise<{ id?: string; error?: string }> {
@@ -34,6 +53,9 @@ export async function createDemoEnvironment(
   }
 
   const raw = Object.fromEntries(formData.entries());
+  const demoType = (raw.demo_type as string) || "speaker";
+  raw.demo_type = demoType;
+
   const parsed = createDemoSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -49,11 +71,14 @@ export async function createDemoEnvironment(
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
+  const prospectName =
+    data.demo_type === "speaker" ? data.full_name : data.company_name;
+
   // Guard: check for duplicate (same name already provisioning or active)
   const { data: existing } = await supabase
     .from("demo_environments")
     .select("id, status")
-    .eq("prospect_name", data.full_name)
+    .eq("prospect_name", prospectName)
     .in("status", ["provisioning", "active"])
     .maybeSingle();
 
@@ -78,42 +103,31 @@ export async function createDemoEnvironment(
     return { error: "Daily demo creation limit reached (20/day)." };
   }
 
-  // Parse sponsor names (comma-separated) into sponsor objects
-  const sponsorList: DemoProspectInput["sponsors"] = data.sponsors
-    ? data.sponsors
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((name) => ({ company_name: name }))
-    : undefined;
+  // Build input based on demo type
+  const researchInput =
+    data.demo_type === "speaker"
+      ? buildSpeakerInput(data)
+      : buildSponsorInput(data);
 
-  const input: DemoProspectInput = {
-    full_name: data.full_name,
-    email: data.email || undefined,
-    specialty: data.specialty,
-    credentials: data.credentials || undefined,
-    website_url: data.website_url || undefined,
-    linkedin_url: data.linkedin_url || undefined,
-    photo_url: data.photo_url || undefined,
-    notes: data.notes || undefined,
-    sponsors: sponsorList,
-    theme: data.theme || undefined,
-  };
+  const prospectEmail =
+    data.demo_type === "speaker" ? data.email : data.contact_email;
 
   // Create the demo_environments row in 'provisioning' state
   const { data: demoRow, error: insertError } = await supabase
     .from("demo_environments")
     .insert({
-      prospect_name: data.full_name,
-      prospect_email: data.email || null,
-      prospect_specialty: data.specialty,
+      prospect_name: prospectName,
+      prospect_email: prospectEmail || null,
+      prospect_specialty:
+        data.demo_type === "speaker" ? data.specialty : data.industry || null,
       prospect_notes: data.notes || null,
+      demo_type: data.demo_type,
       created_by: admin.user.id,
       expires_at: new Date(
         Date.now() + 30 * 24 * 60 * 60 * 1000,
       ).toISOString(),
       status: "provisioning",
-      research_input: input as unknown as Record<string, unknown>,
+      research_input: researchInput as unknown as Record<string, unknown>,
     })
     .select("id")
     .single();
@@ -128,20 +142,81 @@ export async function createDemoEnvironment(
     category: "account",
     targetType: "demo_environment",
     targetId: demoRow.id,
-    details: { prospect_name: data.full_name, specialty: data.specialty },
+    details: {
+      prospect_name: prospectName,
+      demo_type: data.demo_type,
+      ...(data.demo_type === "speaker"
+        ? { specialty: data.specialty }
+        : { industry: data.industry }),
+    },
     ipAddress: admin.ipAddress,
     userAgent: admin.userAgent,
   });
 
-  // Run provisioning inline — Vercel kills fire-and-forget promises after
-  // the response is sent, so we must await here. The client polls for status
-  // independently so the UX remains responsive.
-  await provisionDemo(supabase, demoRow.id, input, apiKey, admin.user.id, siteUrl);
+  // Run provisioning inline — Vercel kills fire-and-forget promises
+  if (data.demo_type === "speaker") {
+    await provisionSpeakerDemo(
+      supabase,
+      demoRow.id,
+      researchInput as DemoProspectInput,
+      apiKey,
+      admin.user.id,
+      siteUrl,
+    );
+  } else {
+    await provisionSponsorDemo(
+      supabase,
+      demoRow.id,
+      researchInput as SponsorDemoProspectInput,
+      apiKey,
+      admin.user.id,
+      siteUrl,
+    );
+  }
 
   return { id: demoRow.id };
 }
 
-async function provisionDemo(
+function buildSpeakerInput(
+  data: z.infer<typeof createSpeakerDemoSchema>,
+): DemoProspectInput {
+  const sponsorList: DemoProspectInput["sponsors"] = data.sponsors
+    ? data.sponsors
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((name) => ({ company_name: name }))
+    : undefined;
+
+  return {
+    full_name: data.full_name,
+    email: data.email || undefined,
+    specialty: data.specialty,
+    credentials: data.credentials || undefined,
+    website_url: data.website_url || undefined,
+    linkedin_url: data.linkedin_url || undefined,
+    photo_url: data.photo_url || undefined,
+    notes: data.notes || undefined,
+    sponsors: sponsorList,
+    theme: data.theme || undefined,
+  };
+}
+
+function buildSponsorInput(
+  data: z.infer<typeof createSponsorDemoSchema>,
+): SponsorDemoProspectInput {
+  return {
+    company_name: data.company_name,
+    contact_name: data.contact_name || undefined,
+    contact_email: data.contact_email || undefined,
+    website_url: data.website_url || undefined,
+    industry: data.industry || undefined,
+    logo_url: data.logo_url || undefined,
+    notes: data.notes || undefined,
+  };
+}
+
+async function provisionSpeakerDemo(
   serviceClient: ReturnType<typeof createServiceClient>,
   demoId: string,
   input: DemoProspectInput,
@@ -170,7 +245,48 @@ async function provisionDemo(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown provisioning error";
-    console.error(`[demo] Provisioning failed for ${demoId}:`, message);
+    console.error(`[demo] Speaker provisioning failed for ${demoId}:`, message);
+
+    await serviceClient
+      .from("demo_environments")
+      .update({
+        status: "failed",
+        error_message: message,
+      })
+      .eq("id", demoId);
+  }
+}
+
+async function provisionSponsorDemo(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  demoId: string,
+  input: SponsorDemoProspectInput,
+  apiKey: string,
+  adminUserId: string,
+  siteUrl: string,
+): Promise<void> {
+  try {
+    const payload = await generateSponsorDemoContent(input, apiKey);
+
+    await serviceClient
+      .from("demo_environments")
+      .update({
+        ai_generated_payload: payload as unknown as Record<string, unknown>,
+      })
+      .eq("id", demoId);
+
+    await seedSponsorDemoEnvironment(
+      serviceClient,
+      demoId,
+      input,
+      payload,
+      adminUserId,
+      siteUrl,
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown provisioning error";
+    console.error(`[demo] Sponsor provisioning failed for ${demoId}:`, message);
 
     await serviceClient
       .from("demo_environments")
@@ -276,8 +392,9 @@ export async function retryDemoEnvironment(
     return { error: `Cannot retry a demo with status "${demo.status}"` };
   }
 
-  const input = demo.research_input as DemoProspectInput | null;
-  if (!input) {
+  const demoType = (demo.demo_type as string) || "speaker";
+  const researchInput = demo.research_input as Record<string, unknown> | null;
+  if (!researchInput) {
     return { error: "No research input stored — cannot retry" };
   }
 
@@ -291,6 +408,7 @@ export async function retryDemoEnvironment(
       seed_manifest: null,
       speaker_id: null,
       auth_user_id: null,
+      sponsor_id: null,
       sponsor_account_ids: [],
     })
     .eq("id", id);
@@ -305,7 +423,25 @@ export async function retryDemoEnvironment(
     userAgent: admin.userAgent,
   });
 
-  await provisionDemo(supabase, id, input, apiKey, admin.user.id, siteUrl);
+  if (demoType === "sponsor") {
+    await provisionSponsorDemo(
+      supabase,
+      id,
+      researchInput as unknown as SponsorDemoProspectInput,
+      apiKey,
+      admin.user.id,
+      siteUrl,
+    );
+  } else {
+    await provisionSpeakerDemo(
+      supabase,
+      id,
+      researchInput as unknown as DemoProspectInput,
+      apiKey,
+      admin.user.id,
+      siteUrl,
+    );
+  }
 
   revalidatePath(`/demos/${id}`);
   revalidatePath("/demos");
@@ -441,4 +577,93 @@ export async function extendDemoTTL(
   revalidatePath(`/demos/${id}`);
   revalidatePath("/demos");
   return {};
+}
+
+export async function sendDemoMagicLink(
+  demoId: string,
+): Promise<{ error?: string; success?: string }> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch {
+    return { error: "Not authorized" };
+  }
+
+  const supabase = createServiceClient();
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const { data: demo } = await supabase
+    .from("demo_environments")
+    .select("prospect_email, prospect_name, demo_type, auth_user_id, status, seed_manifest")
+    .eq("id", demoId)
+    .single();
+
+  if (!demo) return { error: "Demo not found" };
+  if (demo.status !== "active") return { error: "Demo must be active to send a magic link" };
+  if (!demo.prospect_email) return { error: "No prospect email on file" };
+
+  const demoType = (demo.demo_type as string) || "speaker";
+  const portalRole = demoType === "sponsor" ? "sponsor" as const : "speaker" as const;
+
+  // For sponsor demos, find the sponsor auth user; for speaker demos, use the main auth_user_id
+  let authEmail: string | undefined;
+
+  if (demoType === "sponsor") {
+    const manifest = demo.seed_manifest as Record<string, unknown> | null;
+    const sponsorAuthUserId = manifest?.sponsor_auth_user_id as string | null;
+    if (sponsorAuthUserId) {
+      const { data: authData } = await supabase.auth.admin.getUserById(sponsorAuthUserId);
+      authEmail = authData?.user?.email ?? undefined;
+    }
+  } else {
+    const authUserId = demo.auth_user_id as string | null;
+    if (authUserId) {
+      const { data: authData } = await supabase.auth.admin.getUserById(authUserId);
+      authEmail = authData?.user?.email ?? undefined;
+    }
+  }
+
+  if (!authEmail) return { error: "Could not resolve demo auth email" };
+
+  const result = await generateMagicLink(
+    supabase,
+    authEmail,
+    siteUrl,
+    portalRole,
+  );
+
+  const { getEmailProvider } = await import("@/lib/email-provider");
+  const emailHtml = buildDemoSignInEmail(
+    result.verificationUrl,
+    portalRole,
+    demo.prospect_name as string,
+  );
+
+  const provider = getEmailProvider();
+  const [sendResult] = await provider.send([
+    {
+      to: demo.prospect_email as string,
+      subject: `Your Fanflet ${demoType === "sponsor" ? "Sponsor Portal" : "Speaker Dashboard"} demo is ready`,
+      bodyHtml: emailHtml,
+      replyTo: "support@fanflet.com",
+    },
+  ]);
+
+  if (!sendResult.success) {
+    return { error: "Failed to send magic link email" };
+  }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "demo.send_magic_link",
+    category: "account",
+    targetType: "demo_environment",
+    targetId: demoId,
+    details: { prospect_email: demo.prospect_email, portal_role: portalRole },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  return { success: `Magic link sent to ${demo.prospect_email}` };
 }

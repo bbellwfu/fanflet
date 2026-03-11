@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Check, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SponsorInquiryModal } from "@/components/marketing/sponsor-inquiry-modal";
 
 const COLORS = {
   navy: "#1B2A4A",
@@ -55,8 +57,8 @@ const PLAN_STYLE_MAP: Record<string, PlanStyleConfig> = {
     checkColor: COLORS.violet,
     topBorderColor: COLORS.violet,
     ctaStyle: "secondary",
-    ctaText: "Coming Soon!\nJoin the Waitlist",
-    badge: "Custom Pricing",
+    ctaText: "Get in Touch",
+    badge: "For Sponsors",
   },
 };
 
@@ -84,6 +86,7 @@ interface PricingTiersProps {
 interface PricingCardProps {
   plan: PublicPlan;
   style: PlanStyleConfig;
+  onEnterpriseContactClick?: () => void;
 }
 
 function formatPrice(plan: PublicPlan): {
@@ -100,7 +103,7 @@ function formatPrice(plan: PublicPlan): {
     };
   }
   if (plan.name === "enterprise") {
-    return { price: "Custom" };
+    return { price: "Contact us" };
   }
   if (!plan.price_monthly_cents) {
     return { price: "$0", priceSuffix: "/month" };
@@ -111,7 +114,7 @@ function formatPrice(plan: PublicPlan): {
   };
 }
 
-function PricingCard({ plan, style }: PricingCardProps) {
+function PricingCard({ plan, style, onEnterpriseContactClick }: PricingCardProps) {
   const { price, priceSuffix, originalPrice, priceNote } = formatPrice(plan);
 
   const ctaStyles = {
@@ -226,62 +229,97 @@ function PricingCard({ plan, style }: PricingCardProps) {
           {plan.description}
         </p>
 
-        <ul className="space-y-3 mb-8 flex-1" role="list">
-          {plan.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-3">
-              <Check
-                className="w-4.5 h-4.5 mt-0.5 flex-shrink-0"
-                style={{ color: style.checkColor }}
-                aria-hidden
-              />
-              <span
-                className="text-sm leading-snug"
-                style={{ color: COLORS.gray600 }}
+        {plan.name === "enterprise" ? (
+          <ul className="space-y-3 mb-8 flex-1" role="list" style={{ color: COLORS.gray600 }}>
+            <li className="text-sm leading-snug">Branded placement alongside speaker content</li>
+            <li className="text-sm leading-snug">Lead capture and engagement analytics</li>
+            <li className="text-sm leading-snug">Measurable ROI for sponsorship spend</li>
+            <li className="text-sm leading-snug">Direct connections with educators and KOLs</li>
+          </ul>
+        ) : (
+          <>
+            {plan.name === "pro" && (
+              <p
+                className="text-sm font-medium mb-3"
+                style={{ color: COLORS.gray600, fontWeight: "bold", fontSizeAdjust: ".6" }}
               >
-                {feature}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <Link
-          href="/signup"
-          className={cn(
-            "inline-flex items-center justify-center gap-2 w-full px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200",
-            cta.className
-          )}
-          style={cta.style}
-        >
-          {style.ctaText.includes("\n") ? (
-            <span className="flex flex-col items-center leading-tight">
-              {style.ctaText.split("\n").map((line, i) => (
+                Everything in Free, plus:
+              </p>
+            )}
+            <ul className="space-y-3 mb-8 flex-1" role="list">
+            {plan.features.map((feature) => (
+              <li key={feature} className="flex items-start gap-3">
+                <Check
+                  className="w-4.5 h-4.5 mt-0.5 flex-shrink-0"
+                  style={{ color: style.checkColor }}
+                  aria-hidden
+                />
                 <span
-                  key={i}
-                  className={
-                    i === 0
-                      ? "text-xs font-bold opacity-80"
-                      : "text-sm font-semibold"
-                  }
+                  className="text-sm leading-snug"
+                  style={{ color: COLORS.gray600 }}
                 >
-                  {line}
+                  {feature}
                 </span>
-              ))}
-            </span>
-          ) : (
-            <>
-              {style.ctaText}
-              {style.ctaStyle === "primary" && (
-                <ArrowRight className="w-4 h-4" />
-              )}
-            </>
-          )}
-        </Link>
+              </li>
+            ))}
+            </ul>
+          </>
+        )}
+
+        {plan.name === "enterprise" ? (
+          <button
+            type="button"
+            onClick={onEnterpriseContactClick}
+            className={cn(
+              "inline-flex items-center justify-center gap-2 w-full px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200",
+              cta.className
+            )}
+            style={cta.style}
+          >
+            {style.ctaText}
+          </button>
+        ) : (
+          <Link
+            href="/signup"
+            className={cn(
+              "inline-flex items-center justify-center gap-2 w-full px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200",
+              cta.className
+            )}
+            style={cta.style}
+          >
+            {style.ctaText.includes("\n") ? (
+              <span className="flex flex-col items-center leading-tight">
+                {style.ctaText.split("\n").map((line, i) => (
+                  <span
+                    key={i}
+                    className={
+                      i === 0
+                        ? "text-xs font-bold opacity-80"
+                        : "text-sm font-semibold"
+                    }
+                  >
+                    {line}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <>
+                {style.ctaText}
+                {style.ctaStyle === "primary" && (
+                  <ArrowRight className="w-4 h-4" />
+                )}
+              </>
+            )}
+          </Link>
+        )}
       </div>
     </div>
   );
 }
 
 export function PricingTiers({ plans }: PricingTiersProps) {
+  const [enterpriseModalOpen, setEnterpriseModalOpen] = useState(false);
+
   return (
     <section className="w-full py-20 sm:py-24 px-4 sm:px-6 bg-white">
       <div className="max-w-6xl mx-auto">
@@ -291,10 +329,19 @@ export function PricingTiers({ plans }: PricingTiersProps) {
               key={plan.name}
               plan={plan}
               style={PLAN_STYLE_MAP[plan.name] ?? DEFAULT_STYLE}
+              onEnterpriseContactClick={
+                plan.name === "enterprise"
+                  ? () => setEnterpriseModalOpen(true)
+                  : undefined
+              }
             />
           ))}
         </div>
       </div>
+      <SponsorInquiryModal
+        open={enterpriseModalOpen}
+        onOpenChange={setEnterpriseModalOpen}
+      />
     </section>
   );
 }

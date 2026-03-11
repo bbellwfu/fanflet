@@ -3,6 +3,8 @@ interface AnnouncementEmailParams {
   bodyHtml: string;
   unsubscribeUrl: string;
   preferencesUrl: string;
+  loginUrl?: string;
+  inviteUrl?: string;
 }
 
 export function renderAnnouncementEmail({
@@ -10,7 +12,26 @@ export function renderAnnouncementEmail({
   bodyHtml,
   unsubscribeUrl,
   preferencesUrl,
+  loginUrl,
+  inviteUrl,
 }: AnnouncementEmailParams): string {
+  const ctaSection =
+    loginUrl || inviteUrl
+      ? `
+        <div style="margin: 32px 0 0; padding: 28px 0 0; border-top: 1px solid #e2e8f0; text-align: center;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto;">
+            <tr>
+              ${loginUrl ? `<td style="padding: 0 6px;">
+                <a href="${escapeHtml(loginUrl)}" style="display: inline-block; background: #1B365D; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; letter-spacing: -0.1px;">Go to Your Dashboard</a>
+              </td>` : ""}
+              ${inviteUrl ? `<td style="padding: 0 6px;">
+                <a href="${escapeHtml(inviteUrl)}" style="display: inline-block; background: #ffffff; color: #1B365D; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600; letter-spacing: -0.1px; border: 1.5px solid #1B365D;">Invite a Colleague</a>
+              </td>` : ""}
+            </tr>
+          </table>
+        </div>`
+      : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,6 +73,7 @@ export function renderAnnouncementEmail({
       </div>
       <div class="body">
         ${bodyHtml}
+        ${ctaSection}
         <div class="feedback">
           <p>Have ideas or suggestions? Just reply to this email &mdash; we read every response.</p>
         </div>

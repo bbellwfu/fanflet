@@ -173,12 +173,19 @@ export default async function DemosPage({
                   className="hover:bg-surface-elevated/50 transition-colors"
                 >
                   <td className="px-5 py-3.5">
-                    <Link
-                      href={`/demos/${demo.id}`}
-                      className="font-medium text-fg hover:text-primary transition-colors"
-                    >
-                      {demo.prospect_name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/demos/${demo.id}`}
+                        className="font-medium text-fg hover:text-primary transition-colors"
+                      >
+                        {demo.prospect_name}
+                      </Link>
+                      {demo.demo_type === "sponsor" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300">
+                          SPONSOR
+                        </span>
+                      )}
+                    </div>
                     {demo.prospect_email && (
                       <p className="text-[12px] text-fg-muted mt-0.5">
                         {demo.prospect_email}
@@ -186,7 +193,7 @@ export default async function DemosPage({
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-fg-secondary">
-                    {demo.prospect_specialty}
+                    {demo.prospect_specialty || "—"}
                   </td>
                   <td className="px-5 py-3.5">
                     <StatusBadge status={demo.status} />

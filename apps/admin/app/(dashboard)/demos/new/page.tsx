@@ -85,10 +85,12 @@ export default function NewDemoPage() {
   const [state, setState] = useState<FormState>({ phase: "idle" });
   const [formError, setFormError] = useState<string | null>(null);
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     setFormError(null);
     setState({ phase: "submitting" });
 
+    const formData = new FormData(e.currentTarget);
     const result = await createDemoEnvironment(formData);
 
     if (result.error) {
@@ -192,7 +194,7 @@ export default function NewDemoPage() {
 
 interface DemoFormProps {
   isWorking: boolean;
-  handleSubmit: (formData: FormData) => Promise<void>;
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => Promise<void>;
 }
 
 function DemoForm({ isWorking, handleSubmit }: DemoFormProps) {
@@ -210,7 +212,7 @@ function DemoForm({ isWorking, handleSubmit }: DemoFormProps) {
   }
 
   return (
-    <form action={handleSubmit}>
+    <form onSubmit={handleSubmit}>
       <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
         <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <h2 className="text-sm font-semibold text-fg">

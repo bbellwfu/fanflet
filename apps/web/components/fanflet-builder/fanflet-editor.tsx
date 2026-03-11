@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -325,7 +325,7 @@ export function FanfletEditor({
     }
   };
 
-  const performSave = async () => {
+  const performSave = useCallback(async (options?: { silent?: boolean }) => {
     setSaving(true);
     const formData = new FormData();
     formData.set("title", title);
@@ -357,13 +357,25 @@ export function FanfletEditor({
       toast.error(result.error);
       return;
     }
-    if (slugChanged) {
+    if (options?.silent) {
+      toast.success("Settings saved", { position: "top-right", duration: 2000 });
+    } else if (slugChanged) {
       toast.success("Slug updated — a new QR code has been generated");
     } else {
       toast.success("Details saved");
     }
     router.refresh();
-  };
+  }, [title, description, eventName, showEventName, eventDate, slug, surveyQuestionIds, selectedThemeId, expirationPreset, expirationCustomDate, showExpirationNotice, fanflet.id, slugChanged, router]);
+
+  // Auto-save when survey questions are added or removed
+  const surveyIdsRef = useRef(surveyQuestionIds);
+  useEffect(() => {
+    const prev = surveyIdsRef.current;
+    surveyIdsRef.current = surveyQuestionIds;
+    if (prev.length !== surveyQuestionIds.length) {
+      performSave({ silent: true });
+    }
+  }, [surveyQuestionIds, performSave]);
 
   const handlePublish = async () => {
     if (!hasSpeakerSlug) {
@@ -829,7 +841,7 @@ export function FanfletEditor({
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      onClick={performSave}
+                      onClick={() => performSave()}
                       className="bg-red-600 hover:bg-red-700 text-white"
                     >
                       Yes, Update Slug

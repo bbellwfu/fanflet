@@ -13,12 +13,14 @@ interface AuthUser {
 export interface SpeakerContext {
   user: AuthUser;
   speakerId: string;
+  demoEnvironmentId: string | null;
   supabase: SupabaseClient;
 }
 
 export interface SponsorContext {
   user: AuthUser;
   sponsorId: string;
+  demoEnvironmentId: string | null;
   supabase: SupabaseClient;
 }
 
@@ -47,7 +49,7 @@ export const requireSpeaker = cache(async (): Promise<SpeakerContext> => {
 
   const { data: speaker } = await supabase
     .from("speakers")
-    .select("id")
+    .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
     .single();
 
@@ -55,7 +57,12 @@ export const requireSpeaker = cache(async (): Promise<SpeakerContext> => {
     redirect("/login");
   }
 
-  return { user, speakerId: speaker.id, supabase };
+  return {
+    user,
+    speakerId: speaker.id,
+    demoEnvironmentId: speaker.demo_environment_id ?? null,
+    supabase,
+  };
 });
 
 /**
@@ -73,7 +80,7 @@ export const requireSponsor = cache(async (): Promise<SponsorContext> => {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id")
+    .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
     .single();
 
@@ -81,7 +88,12 @@ export const requireSponsor = cache(async (): Promise<SponsorContext> => {
     redirect("/sponsor/onboarding");
   }
 
-  return { user, sponsorId: sponsor.id, supabase };
+  return {
+    user,
+    sponsorId: sponsor.id,
+    demoEnvironmentId: sponsor.demo_environment_id ?? null,
+    supabase,
+  };
 });
 
 /**

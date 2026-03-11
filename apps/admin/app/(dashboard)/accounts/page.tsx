@@ -20,10 +20,11 @@ interface SpeakerWithCounts {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; status?: string; created_since?: string }>;
+  searchParams: Promise<{ search?: string; status?: string; created_since?: string; demo?: string }>;
 }) {
   const params = await searchParams;
   const supabase = createServiceClient();
+  const hideDemo = params.demo !== "all";
 
   const authSupabase = await createClient();
   const { data: { user } } = await authSupabase.auth.getUser();
@@ -46,6 +47,10 @@ export default async function AccountsPage({
     .from("speakers")
     .select("id, name, email, slug, status, created_at, auth_user_id")
     .order("created_at", { ascending: false });
+
+  if (hideDemo) {
+    query = query.neq("is_demo", true);
+  }
 
   if (params.search) {
     query = query.or(
@@ -122,10 +127,11 @@ export default async function AccountsPage({
       {/* Search & Filter */}
       <div className="bg-surface rounded-lg border border-border-subtle p-5">
         <AccountsFilterForm
-          key={`${params.search ?? ""}-${params.status ?? "all"}-${params.created_since ?? ""}`}
+          key={`${params.search ?? ""}-${params.status ?? "all"}-${params.created_since ?? ""}-${params.demo ?? "exclude"}`}
           defaultSearch={params.search ?? ""}
           defaultStatus={params.status ?? "all"}
           defaultCreatedSince={params.created_since ?? ""}
+          defaultHideDemo={hideDemo}
         />
       </div>
 

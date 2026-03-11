@@ -11,13 +11,13 @@ export default async function SponsorConnectionsPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id")
+    .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
-  const { data: connections } = await supabase
+  let connectionsQuery = supabase
     .from("sponsor_connections")
     .select(`
       id, status, initiated_by, message, created_at, responded_at, ended_at,
@@ -26,6 +26,21 @@ export default async function SponsorConnectionsPage() {
     .eq("sponsor_id", sponsor.id)
     .or("hidden_by_sponsor.is.null,hidden_by_sponsor.eq.false")
     .order("created_at", { ascending: false });
+
+  if (sponsor.demo_environment_id) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", sponsor.demo_environment_id);
+    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
+    if (speakerIds.length > 0) {
+      connectionsQuery = connectionsQuery.in("speaker_id", speakerIds);
+    } else {
+      connectionsQuery = connectionsQuery.eq("speaker_id", "00000000-0000-0000-0000-000000000000");
+    }
+  }
+
+  const { data: connections } = await connectionsQuery;
 
   const list = (connections ?? []).map((c) => {
     const row = c as Record<string, unknown>;

@@ -169,7 +169,7 @@ export async function seedDemoEnvironment(
     const { data: speaker, error: speakerFetchError } = await serviceClient
       .from("speakers")
       .select("id")
-      .eq("auth_user_id", authData.user.id)
+      .eq("auth_user_id", authUser.id)
       .maybeSingle();
 
     if (speakerFetchError || !speaker) {
@@ -473,7 +473,7 @@ export async function seedDemoEnvironment(
       .from("demo_environments")
       .update({
         speaker_id: speaker.id,
-        auth_user_id: authData.user.id,
+        auth_user_id: authUser.id,
         sponsor_account_ids: manifest.sponsor_account_ids,
         seed_manifest: manifest as unknown as Record<string, unknown>,
         status: "active",

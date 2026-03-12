@@ -23,6 +23,7 @@ import {
   CheckIcon,
   XIcon,
   PlusIcon,
+  ArchiveIcon,
 } from "lucide-react";
 import {
   createCommunication,
@@ -30,6 +31,7 @@ import {
   sendCommunication,
   sendTestEmail,
   deleteDraft,
+  archiveWorklog,
 } from "../actions";
 import Link from "next/link";
 import type { WorklogEntry } from "@/lib/worklog-types";
@@ -1033,24 +1035,56 @@ export function NewCommunicationForm({
                 .filter((w) => !selectedWorklogs.some((s) => s.filename === w.filename))
                 .slice(0, 8)
                 .map((w) => (
-                  <button
+                  <div
                     key={w.filename}
-                    type="button"
-                    onClick={() => handleAddWorklog(w)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left hover:bg-surface transition-colors border-b border-border-subtle last:border-b-0"
+                    className="flex w-full items-center justify-between gap-3 px-4 py-2.5 border-b border-border-subtle last:border-b-0"
                   >
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-fg truncate">
-                        {w.dateLabel} — {w.titleSummary}
-                      </p>
-                      <p className="text-[11px] text-fg-muted">
-                        {w.features.length} feature{w.features.length !== 1 ? "s" : ""}
-                        {w.bugFixes.length > 0 &&
-                          ` · ${w.bugFixes.length} fix${w.bugFixes.length !== 1 ? "es" : ""}`}
-                      </p>
+                    <button
+                      type="button"
+                      onClick={() => handleAddWorklog(w)}
+                      className="flex-1 min-w-0 text-left hover:bg-surface transition-colors rounded -mx-1 px-1 py-0.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium text-fg truncate">
+                          {w.dateLabel} — {w.titleSummary}
+                        </p>
+                        <p className="text-[11px] text-fg-muted">
+                          {w.features.length} feature{w.features.length !== 1 ? "s" : ""}
+                          {w.bugFixes.length > 0 &&
+                            ` · ${w.bugFixes.length} fix${w.bugFixes.length !== 1 ? "es" : ""}`}
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[11px] text-primary"
+                        onClick={() => handleAddWorklog(w)}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-fg-muted hover:text-fg"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const { error } = await archiveWorklog(w.filename);
+                          if (error) toast.error(error);
+                          else {
+                            toast.success("Worklog archived");
+                            router.refresh();
+                          }
+                        }}
+                        aria-label={`Archive ${w.filename}`}
+                      >
+                        <ArchiveIcon className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
-                    <span className="text-[11px] text-primary shrink-0">Add</span>
-                  </button>
+                  </div>
                 ))}
               {worklogs.filter((w) => !selectedWorklogs.some((s) => s.filename === w.filename)).length === 0 && (
                 <p className="px-4 py-3 text-[12px] text-fg-muted">All worklogs are already included.</p>

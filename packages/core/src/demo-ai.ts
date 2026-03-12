@@ -90,7 +90,7 @@ export interface GeneratedSponsorDemoPayload {
     url?: string;
     type: "link" | "file" | "text" | "promo";
   }>;
-  kol_speakers: Array<{
+  demo_speakers: Array<{
     full_name: string;
     specialty: string;
     credentials: string;
@@ -114,6 +114,13 @@ export interface GeneratedSponsorDemoPayload {
     email: string;
     resource_title: string;
     created_at: string;
+  }>;
+  /** 1–2 campaigns for Enterprise demo (name, description, dates). */
+  campaigns?: Array<{
+    name: string;
+    description?: string;
+    start_date: string;
+    end_date?: string;
   }>;
   theme: string;
 }
@@ -276,7 +283,7 @@ function buildSponsorPrompt(input: SponsorDemoProspectInput): string {
     ? `Additional context: ${input.notes}`
     : "";
 
-  return `You are generating realistic demo content for a SPONSOR PORTAL on a speaker platform called Fanflet. Sponsors connect with Key Opinion Leaders (KOLs/speakers) to distribute resources and track engagement.
+  return `You are generating realistic demo content for a SPONSOR PORTAL on a speaker platform called Fanflet. Sponsors connect with speakers to distribute resources and track engagement.
 
 The prospect sponsor company is:
 
@@ -299,7 +306,7 @@ Generate a complete demo environment as JSON with this exact structure:
       "type": "link"
     }
   ],
-  "kol_speakers": [
+  "demo_speakers": [
     {
       "full_name": "Realistic dental professional name",
       "specialty": "Their dental specialty",
@@ -327,16 +334,25 @@ Generate a complete demo environment as JSON with this exact structure:
       "created_at": "ISO date within last 30 days"
     }
   ],
+  "campaigns": [
+    {
+      "name": "Campaign or initiative name",
+      "description": "Short description of the campaign",
+      "start_date": "YYYY-MM-DD (within next 3 months)",
+      "end_date": "YYYY-MM-DD (optional, after start_date)"
+    }
+  ],
   "theme": "navy"
 }
 
 Rules:
-- Generate 3-5 sponsor resources (mix of types: "link" for URLs/product pages, "file" for documents, "promo" for promotional materials, "text" for text-based resources).
-- Generate exactly 3 KOL speakers:
-  - KOL #1: connection_status "active" — an established relationship. Include a "sponsor" type resource in their fanflet referencing ${input.company_name}.
-  - KOL #2: connection_status "none" — a discoverable speaker NOT yet connected. No sponsor resource for ${input.company_name} in their fanflet.
-  - KOL #3: connection_status "pending" — a pending connection request. No sponsor resource for ${input.company_name} yet.
-- Each KOL should have a realistic specialty, 3-5 resources in their fanflet.
+- Generate 3-5 sponsor resources for the sponsor's Library (mix of types: "link" for URLs/product pages, "file" for documents, "promo" for promotional materials, "text" for text-based resources). These appear in the sponsor's Library tab and can be placed on speaker fanflets.
+- Generate exactly 2 campaigns: realistic initiative or product launch names with start_date within the next 3 months and optional end_date. These showcase the Campaigns tab (Enterprise).
+- Generate exactly 3 demo speakers:
+  - Speaker #1: connection_status "active" — an established relationship. Include a "sponsor" type resource in their fanflet referencing ${input.company_name}.
+  - Speaker #2: connection_status "none" — a discoverable speaker NOT yet connected. No sponsor resource for ${input.company_name} in their fanflet.
+  - Speaker #3: connection_status "pending" — a pending connection request. No sponsor resource for ${input.company_name} yet.
+- Each speaker should have a realistic specialty, 3-5 resources in their fanflet.
 - Generate 5-8 sample leads with realistic names, emails, and dates spread over the last 30 days.
 - Use REAL company names and URLs when referencing the sponsor.
 - The theme should be one of: navy, crimson, forest, sunset, royal, slate, midnight, terracotta.

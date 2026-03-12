@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export function SponsorConnectionsRequest() {
+  const router = useRouter();
   const [slug, setSlug] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,7 +28,7 @@ export function SponsorConnectionsRequest() {
         toast.success("Connection request sent.");
         setSlug("");
         setMessage("");
-        window.location.reload();
+        router.refresh();
       }
     } finally {
       setLoading(false);

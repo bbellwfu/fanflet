@@ -1,6 +1,7 @@
 import { createServiceClient } from "@fanflet/db/service";
 import { NewCommunicationForm } from "./new-communication-form";
 import type { WorklogEntry } from "@/lib/worklog-types";
+import { getArchivedWorklogFilenames } from "../actions";
 
 let worklogIndex: WorklogEntry[] = [];
 try {
@@ -69,13 +70,16 @@ export default async function NewCommunicationPage({
     }
   }
 
-  const worklogsWithStatus = worklogIndex.map((w) => {
-    const ref = `worklog/${w.filename}`;
-    const commStatus = commsByRef.get(ref) ?? null;
-    return { ...w, commStatus };
-  });
+  const archivedFilenames = new Set(await getArchivedWorklogFilenames());
+  const worklogsWithStatus = worklogIndex
+    .filter((w) => !archivedFilenames.has(w.filename))
+    .map((w) => {
+      const ref = `worklog/${w.filename}`;
+      const commStatus = commsByRef.get(ref) ?? null;
+      return { ...w, commStatus };
+    });
 
-  // Archive sent worklogs: only show worklogs that are unused or have a draft (not already sent)
+  // Only show worklogs that are unused or have a draft (not already sent)
   const worklogsForPicker = worklogsWithStatus.filter((w) => w.commStatus !== "sent");
 
   // Get opted-in speaker count

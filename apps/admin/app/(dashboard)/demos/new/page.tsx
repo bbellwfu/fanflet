@@ -193,7 +193,7 @@ export default function NewDemoPage() {
             </p>
             <p className="text-[13px] text-fg-secondary mt-0.5">
               {demoType === "sponsor"
-                ? "AI is creating sponsor resources, KOL speaker accounts, and connections. This usually takes 30-60 seconds."
+                ? "AI is creating sponsor resources, speaker accounts, and connections. This usually takes 30-60 seconds."
                 : "AI is creating talks, resources, and sponsor content tailored to their specialty. This usually takes 15-30 seconds."}
             </p>
           </div>
@@ -423,12 +423,12 @@ function SponsorDemoForm({ isWorking, handleSubmit }: DemoFormProps) {
           <div className="space-y-1.5">
             <Label htmlFor="notes">Notes / Context</Label>
             <Textarea id="notes" name="notes" rows={3} placeholder="Products, target audience, any specific demo scenarios..." disabled={isWorking} />
-            <p className="text-[12px] text-fg-muted">Optional. Helps AI generate more relevant KOL connections and resources.</p>
+            <p className="text-[12px] text-fg-muted">Optional. Helps AI generate more relevant speaker connections and resources.</p>
           </div>
 
           <div className="bg-muted/50 rounded-lg p-4">
             <p className="text-[13px] text-fg-secondary">
-              <strong>What gets created:</strong> A sponsor account with resources, plus 2-3 demo KOL speaker accounts — one with an active connection, one discoverable, and one with a pending request. This lets you demo the full sponsor-speaker interaction from both sides.
+              <strong>What gets created:</strong> A sponsor account on the Enterprise plan (Library and Campaigns unlocked), with Library content and 1–2 campaigns. Plus 2–3 demo speaker accounts — one with an active connection (and sponsor content placed on their fanflet), one discoverable, and one with a pending request. Sample leads are attached so you can demo the full sponsor portal: connections, Library, Campaigns, and content performance.
             </p>
           </div>
         </div>

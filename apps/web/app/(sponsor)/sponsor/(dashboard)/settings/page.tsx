@@ -15,13 +15,27 @@ export default async function SponsorSettingsPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id, company_name, slug, description, logo_url, website_url, contact_email, industry, timezone")
+    .select("id, company_name, slug, description, logo_url, website_url, contact_email, industry, timezone, speaker_label")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!sponsor) {
     redirect("/sponsor/onboarding");
   }
+
+  const speakerLabel = (sponsor as { speaker_label?: string }).speaker_label ?? "speaker";
+
+  const { data: subscription } = await supabase
+    .from("sponsor_subscriptions")
+    .select("id, status, sponsor_plans(display_name, name)")
+    .eq("sponsor_id", sponsor.id)
+    .eq("status", "active")
+    .maybeSingle();
+
+  const planDisplayName =
+    subscription?.sponsor_plans && !Array.isArray(subscription.sponsor_plans)
+      ? (subscription.sponsor_plans as { display_name: string; name: string }).display_name
+      : null;
 
   const mcpServerUrl = `${getSiteUrl().replace(/\/$/, "")}/api/mcp`;
 
@@ -32,11 +46,28 @@ export default async function SponsorSettingsPage() {
           Company Settings
         </h1>
         <p className="text-muted-foreground mt-1">
-          Update your sponsor profile. Speakers see this when reviewing connection requests.
+          Update your sponsor profile. {speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s see this when reviewing connection requests.
         </p>
       </div>
 
       <SponsorSettingsForm sponsor={sponsor} authUserId={user.id} userEmail={user.email ?? ""} />
+
+      <Card id="subscription" className="border-zinc-200">
+        <CardHeader>
+          <CardTitle className="text-zinc-900">Plan</CardTitle>
+          <CardDescription>
+            Your current sponsor plan determines feature access and limits. To change your plan, contact the Fanflet team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm font-medium text-zinc-900">
+            {planDisplayName ?? "Sponsor Free"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Plan changes are applied by the Fanflet team. Reach out to your account contact or support to upgrade or modify your subscription.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card id="ai-assistant" className="border-zinc-200">
         <CardHeader>
@@ -68,7 +99,7 @@ export default async function SponsorSettingsPage() {
           </div>
           <div className="rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
             Once connected, try asking &ldquo;show my sponsor resources,&rdquo;
-            &ldquo;list my speaker connections,&rdquo; or &ldquo;how are my resources performing?&rdquo;
+            &ldquo;list my {speakerLabel} connections,&rdquo; or &ldquo;how are my resources performing?&rdquo;
           </div>
         </CardContent>
       </Card>

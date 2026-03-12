@@ -5,6 +5,8 @@ import { SponsorSidebar } from "@/components/sponsor/sponsor-sidebar";
 import { TimezoneProvider } from "@/lib/timezone-context";
 import { SessionMonitor } from "@/components/auth/session-monitor";
 
+export const dynamic = "force-dynamic";
+
 export default async function SponsorDashboardLayout({
   children,
 }: {
@@ -19,7 +21,7 @@ export default async function SponsorDashboardLayout({
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id, company_name, slug, logo_url, is_verified, contact_email, timezone")
+    .select("id, company_name, slug, logo_url, is_verified, contact_email, timezone, speaker_label")
     .eq("auth_user_id", user.id)
     .single();
 

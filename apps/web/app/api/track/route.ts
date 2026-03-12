@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { isbot } from 'isbot'
+import { generateVisitorHash, getClientIp } from '@/lib/visitor-hash'
 
 const VALID_EVENT_TYPES = [
   'page_view', 'resource_click', 'email_signup',
@@ -56,16 +57,9 @@ export async function POST(request: NextRequest) {
 
     const { fanflet_id, event_type, resource_block_id, subscriber_id: rawSubscriberId, referrer: bodyReferrer, source } = parsed.data
 
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getClientIp(request.headers)
     const ua = request.headers.get('user-agent') || 'unknown'
-    const dateStr = new Date().toISOString().split('T')[0]
-    const hashInput = `${ip}-${ua}-${dateStr}`
-
-    const encoder = new TextEncoder()
-    const data = encoder.encode(hashInput)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const visitor_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    const visitor_hash = await generateVisitorHash(ip, ua)
 
     const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua)
     const isTablet = /iPad|Tablet/i.test(ua)
@@ -82,7 +76,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient()
 
-    await supabase.from('analytics_events').insert({
+    const { error: insertError } = await supabase.from('analytics_events').insert({
       fanflet_id,
       event_type,
       resource_block_id: resource_block_id ?? null,
@@ -97,21 +91,30 @@ export async function POST(request: NextRequest) {
       referrer_category,
     })
 
+    if (insertError) {
+      console.error('[track] analytics insert failed:', insertError.code, insertError.message)
+      return new NextResponse(null, { status: 500 })
+    }
+
     const subscriberId = rawSubscriberId ?? null
     if (
       subscriberId &&
       (event_type === 'resource_click' || event_type === 'resource_download') &&
       resource_block_id
     ) {
-      void supabase.rpc('record_sponsor_lead', {
+      const { error: rpcError } = await supabase.rpc('record_sponsor_lead', {
         p_subscriber_id: subscriberId,
         p_resource_block_id: resource_block_id,
         p_engagement_type: event_type,
       })
+      if (rpcError) {
+        console.error('[track] record_sponsor_lead failed:', rpcError.code, rpcError.message)
+      }
     }
 
     return new NextResponse(null, { status: 204 })
-  } catch {
-    return new NextResponse(null, { status: 204 })
+  } catch (err) {
+    console.error('[track] unexpected error:', err)
+    return new NextResponse(null, { status: 500 })
   }
 }

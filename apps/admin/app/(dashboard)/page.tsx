@@ -1,6 +1,7 @@
 import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
 import { formatDate } from "@fanflet/db/timezone";
+import { getNonDemoScope } from "./analytics/actions";
 import {
   UsersIcon,
   FileTextIcon,
@@ -128,6 +129,7 @@ function PublishedRow({ title, date }: { title: string; date: string }) {
 
 export default async function AdminOverviewPage() {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
 
   const authSupabase = await createClient();
   const { data: { user } } = await authSupabase.auth.getUser();
@@ -146,16 +148,18 @@ export default async function AdminOverviewPage() {
     recentSignupsResult,
     activeFanfletsResult,
   ] = await Promise.all([
-    supabase.from("speakers").select("id", { count: "exact", head: true }),
-    supabase.from("fanflets").select("id, status", { count: "exact" }),
-    supabase.from("subscribers").select("id", { count: "exact", head: true }),
+    supabase.from("speakers").select("id", { count: "exact", head: true }).in("id", speakerIds),
+    supabase.from("fanflets").select("id, status", { count: "exact" }).in("id", fanfletIds),
+    supabase.from("subscribers").select("id", { count: "exact", head: true }).in("speaker_id", speakerIds),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "page_view"),
+      .eq("event_type", "page_view")
+      .in("fanflet_id", fanfletIds),
     supabase
       .from("speakers")
       .select("id", { count: "exact", head: true })
+      .in("id", speakerIds)
       .gte(
         "created_at",
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -163,6 +167,7 @@ export default async function AdminOverviewPage() {
     supabase
       .from("analytics_events")
       .select("fanflet_id", { count: "exact", head: true })
+      .in("fanflet_id", fanfletIds)
       .gte(
         "created_at",
         new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -183,6 +188,7 @@ export default async function AdminOverviewPage() {
   const { data: recentSpeakers } = await supabase
     .from("speakers")
     .select("id, name, email, created_at")
+    .in("id", speakerIds)
     .order("created_at", { ascending: false })
     .limit(5);
 
@@ -190,6 +196,7 @@ export default async function AdminOverviewPage() {
     .from("fanflets")
     .select("id, title, status, published_at, speaker_id")
     .eq("status", "published")
+    .in("id", fanfletIds)
     .order("published_at", { ascending: false })
     .limit(5);
 

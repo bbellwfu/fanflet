@@ -12,37 +12,12 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       admin_audit_log: {
         Row: {
           action: string
-          admin_id: string
+          admin_id: string | null
           category: string
           created_at: string
           details: Json | null
@@ -54,7 +29,7 @@ export type Database = {
         }
         Insert: {
           action: string
-          admin_id: string
+          admin_id?: string | null
           category: string
           created_at?: string
           details?: Json | null
@@ -66,7 +41,7 @@ export type Database = {
         }
         Update: {
           action?: string
-          admin_id?: string
+          admin_id?: string | null
           category?: string
           created_at?: string
           details?: Json | null
@@ -85,7 +60,7 @@ export type Database = {
           email: string
           expires_at: string
           id: string
-          invited_by: string
+          invited_by: string | null
           role: string
           token_hash: string
         }
@@ -95,7 +70,7 @@ export type Database = {
           email: string
           expires_at: string
           id?: string
-          invited_by: string
+          invited_by?: string | null
           role?: string
           token_hash: string
         }
@@ -105,7 +80,7 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
-          invited_by?: string
+          invited_by?: string | null
           role?: string
           token_hash?: string
         }
@@ -119,6 +94,7 @@ export type Database = {
           id: string
           onboarding_completed: boolean
           speaker_signup: boolean
+          sponsor_inquiry: boolean
           sponsor_signup: boolean
           timezone: string | null
           updated_at: string
@@ -130,6 +106,7 @@ export type Database = {
           id?: string
           onboarding_completed?: boolean
           speaker_signup?: boolean
+          sponsor_inquiry?: boolean
           sponsor_signup?: boolean
           timezone?: string | null
           updated_at?: string
@@ -141,6 +118,7 @@ export type Database = {
           id?: string
           onboarding_completed?: boolean
           speaker_signup?: boolean
+          sponsor_inquiry?: boolean
           sponsor_signup?: boolean
           timezone?: string | null
           updated_at?: string
@@ -156,7 +134,7 @@ export type Database = {
           event_type: string
           fanflet_id: string
           id: string
-          is_bot: boolean
+          is_bot: boolean | null
           referrer: string | null
           referrer_category: string | null
           region: string | null
@@ -172,7 +150,7 @@ export type Database = {
           event_type: string
           fanflet_id: string
           id?: string
-          is_bot?: boolean
+          is_bot?: boolean | null
           referrer?: string | null
           referrer_category?: string | null
           region?: string | null
@@ -188,7 +166,7 @@ export type Database = {
           event_type?: string
           fanflet_id?: string
           id?: string
-          is_bot?: boolean
+          is_bot?: boolean | null
           referrer?: string | null
           referrer_category?: string | null
           region?: string | null
@@ -347,6 +325,234 @@ export type Database = {
           },
         ]
       }
+      data_subject_request_steps: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          details: Json | null
+          error_message: string | null
+          id: string
+          request_id: string
+          status: string
+          step_category: string
+          step_name: string
+          step_order: number
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          request_id: string
+          status?: string
+          step_category: string
+          step_name: string
+          step_order: number
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          details?: Json | null
+          error_message?: string | null
+          id?: string
+          request_id?: string
+          status?: string
+          step_category?: string
+          step_name?: string
+          step_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_subject_request_steps_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "data_subject_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_subject_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          data_snapshot_path: string | null
+          hold_reason: string | null
+          id: string
+          notification_email: string | null
+          notification_method: string | null
+          notification_sent_at: string | null
+          processing_started_at: string | null
+          regulation: string | null
+          regulatory_deadline: string | null
+          request_type: string
+          source: string
+          source_reference: string | null
+          status: string
+          subject_auth_user_id: string | null
+          subject_email: string
+          subject_name: string | null
+          subject_type: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_snapshot_path?: string | null
+          hold_reason?: string | null
+          id?: string
+          notification_email?: string | null
+          notification_method?: string | null
+          notification_sent_at?: string | null
+          processing_started_at?: string | null
+          regulation?: string | null
+          regulatory_deadline?: string | null
+          request_type: string
+          source: string
+          source_reference?: string | null
+          status?: string
+          subject_auth_user_id?: string | null
+          subject_email: string
+          subject_name?: string | null
+          subject_type: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_snapshot_path?: string | null
+          hold_reason?: string | null
+          id?: string
+          notification_email?: string | null
+          notification_method?: string | null
+          notification_sent_at?: string | null
+          processing_started_at?: string | null
+          regulation?: string | null
+          regulatory_deadline?: string | null
+          request_type?: string
+          source?: string
+          source_reference?: string | null
+          status?: string
+          subject_auth_user_id?: string | null
+          subject_email?: string
+          subject_name?: string | null
+          subject_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      demo_environments: {
+        Row: {
+          ai_generated_payload: Json | null
+          auth_user_id: string | null
+          converted_at: string | null
+          converted_to_speaker_id: string | null
+          created_at: string | null
+          created_by: string
+          demo_type: string
+          error_message: string | null
+          expires_at: string
+          id: string
+          notes: string | null
+          prospect_email: string | null
+          prospect_name: string
+          prospect_notes: string | null
+          prospect_specialty: string | null
+          research_input: Json | null
+          seed_manifest: Json | null
+          speaker_id: string | null
+          sponsor_account_ids: string[] | null
+          sponsor_id: string | null
+          status: string
+        }
+        Insert: {
+          ai_generated_payload?: Json | null
+          auth_user_id?: string | null
+          converted_at?: string | null
+          converted_to_speaker_id?: string | null
+          created_at?: string | null
+          created_by: string
+          demo_type?: string
+          error_message?: string | null
+          expires_at: string
+          id?: string
+          notes?: string | null
+          prospect_email?: string | null
+          prospect_name: string
+          prospect_notes?: string | null
+          prospect_specialty?: string | null
+          research_input?: Json | null
+          seed_manifest?: Json | null
+          speaker_id?: string | null
+          sponsor_account_ids?: string[] | null
+          sponsor_id?: string | null
+          status?: string
+        }
+        Update: {
+          ai_generated_payload?: Json | null
+          auth_user_id?: string | null
+          converted_at?: string | null
+          converted_to_speaker_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          demo_type?: string
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          notes?: string | null
+          prospect_email?: string | null
+          prospect_name?: string
+          prospect_notes?: string | null
+          prospect_specialty?: string | null
+          research_input?: Json | null
+          seed_manifest?: Json | null
+          speaker_id?: string | null
+          sponsor_account_ids?: string[] | null
+          sponsor_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_environments_converted_to_speaker_id_fkey"
+            columns: ["converted_to_speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_environments_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_environments_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fanflets: {
         Row: {
           confirmation_email_config: Json | null
@@ -364,7 +570,7 @@ export type Database = {
           speaker_id: string
           status: string
           survey_question_id: string | null
-          survey_question_ids: string[]
+          survey_question_ids: string[] | null
           theme_config: Json | null
           title: string
           updated_at: string
@@ -385,7 +591,7 @@ export type Database = {
           speaker_id: string
           status?: string
           survey_question_id?: string | null
-          survey_question_ids?: string[]
+          survey_question_ids?: string[] | null
           theme_config?: Json | null
           title: string
           updated_at?: string
@@ -406,7 +612,7 @@ export type Database = {
           speaker_id?: string
           status?: string
           survey_question_id?: string | null
-          survey_question_ids?: string[]
+          survey_question_ids?: string[] | null
           theme_config?: Json | null
           title?: string
           updated_at?: string
@@ -495,7 +701,7 @@ export type Database = {
       }
       impersonation_sessions: {
         Row: {
-          admin_id: string
+          admin_id: string | null
           created_at: string
           ended_at: string | null
           expires_at: string
@@ -505,12 +711,12 @@ export type Database = {
           saved_auth_cookies: Json | null
           started_at: string | null
           target_role: string
-          target_user_id: string
+          target_user_id: string | null
           user_agent: string | null
           write_enabled: boolean
         }
         Insert: {
-          admin_id: string
+          admin_id?: string | null
           created_at?: string
           ended_at?: string | null
           expires_at: string
@@ -520,12 +726,12 @@ export type Database = {
           saved_auth_cookies?: Json | null
           started_at?: string | null
           target_role: string
-          target_user_id: string
+          target_user_id?: string | null
           user_agent?: string | null
           write_enabled?: boolean
         }
         Update: {
-          admin_id?: string
+          admin_id?: string | null
           created_at?: string
           ended_at?: string | null
           expires_at?: string
@@ -535,7 +741,7 @@ export type Database = {
           saved_auth_cookies?: Json | null
           started_at?: string | null
           target_role?: string
-          target_user_id?: string
+          target_user_id?: string | null
           user_agent?: string | null
           write_enabled?: boolean
         }
@@ -1176,7 +1382,7 @@ export type Database = {
       platform_communications: {
         Row: {
           created_at: string
-          created_by_admin_id: string
+          created_by_admin_id: string | null
           id: string
           scheduled_at: string | null
           sent_at: string | null
@@ -1188,7 +1394,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by_admin_id: string
+          created_by_admin_id?: string | null
           id?: string
           scheduled_at?: string | null
           sent_at?: string | null
@@ -1200,7 +1406,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by_admin_id?: string
+          created_by_admin_id?: string | null
           id?: string
           scheduled_at?: string | null
           sent_at?: string | null
@@ -1225,6 +1431,7 @@ export type Database = {
           metadata: Json | null
           section_name: string | null
           sponsor_account_id: string | null
+          sponsor_library_item_id: string | null
           sponsor_resource_id: string | null
           title: string
           type: string
@@ -1243,6 +1450,7 @@ export type Database = {
           metadata?: Json | null
           section_name?: string | null
           sponsor_account_id?: string | null
+          sponsor_library_item_id?: string | null
           sponsor_resource_id?: string | null
           title?: string
           type: string
@@ -1261,6 +1469,7 @@ export type Database = {
           metadata?: Json | null
           section_name?: string | null
           sponsor_account_id?: string | null
+          sponsor_library_item_id?: string | null
           sponsor_resource_id?: string | null
           title?: string
           type?: string
@@ -1287,6 +1496,13 @@ export type Database = {
             columns: ["sponsor_account_id"]
             isOneToOne: false
             referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_blocks_sponsor_library_item_id_fkey"
+            columns: ["sponsor_library_item_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_resource_library"
             referencedColumns: ["id"]
           },
           {
@@ -1509,8 +1725,16 @@ export type Database = {
           auth_user_id: string
           bio: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          demo_converted_at: string | null
+          demo_created_by: string | null
+          demo_environment_id: string | null
+          demo_expires_at: string | null
+          demo_prospect_email: string | null
           email: string
           id: string
+          is_demo: boolean | null
           name: string
           photo_url: string | null
           slug: string | null
@@ -1526,8 +1750,16 @@ export type Database = {
           auth_user_id: string
           bio?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          demo_converted_at?: string | null
+          demo_created_by?: string | null
+          demo_environment_id?: string | null
+          demo_expires_at?: string | null
+          demo_prospect_email?: string | null
           email: string
           id?: string
+          is_demo?: boolean | null
           name?: string
           photo_url?: string | null
           slug?: string | null
@@ -1543,8 +1775,16 @@ export type Database = {
           auth_user_id?: string
           bio?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          demo_converted_at?: string | null
+          demo_created_by?: string | null
+          demo_environment_id?: string | null
+          demo_expires_at?: string | null
+          demo_prospect_email?: string | null
           email?: string
           id?: string
+          is_demo?: boolean | null
           name?: string
           photo_url?: string | null
           slug?: string | null
@@ -1556,7 +1796,15 @@ export type Database = {
           timezone?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "speakers_demo_environment_id_fkey"
+            columns: ["demo_environment_id"]
+            isOneToOne: false
+            referencedRelation: "demo_environments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sponsor_accounts: {
         Row: {
@@ -1564,13 +1812,19 @@ export type Database = {
           company_name: string
           contact_email: string
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          demo_created_by: string | null
+          demo_environment_id: string | null
           description: string | null
           id: string
           industry: string | null
+          is_demo: boolean | null
           is_verified: boolean | null
           logo_url: string | null
           slug: string
           social_links: Json | null
+          speaker_label: string
           timezone: string | null
           updated_at: string
           website_url: string | null
@@ -1580,13 +1834,19 @@ export type Database = {
           company_name: string
           contact_email: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          demo_created_by?: string | null
+          demo_environment_id?: string | null
           description?: string | null
           id?: string
           industry?: string | null
+          is_demo?: boolean | null
           is_verified?: boolean | null
           logo_url?: string | null
           slug: string
           social_links?: Json | null
+          speaker_label?: string
           timezone?: string | null
           updated_at?: string
           website_url?: string | null
@@ -1596,18 +1856,112 @@ export type Database = {
           company_name?: string
           contact_email?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          demo_created_by?: string | null
+          demo_environment_id?: string | null
           description?: string | null
           id?: string
           industry?: string | null
+          is_demo?: boolean | null
           is_verified?: boolean | null
           logo_url?: string | null
           slug?: string
           social_links?: Json | null
+          speaker_label?: string
           timezone?: string | null
           updated_at?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_accounts_demo_environment_id_fkey"
+            columns: ["demo_environment_id"]
+            isOneToOne: false
+            referencedRelation: "demo_environments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_campaign_kols: {
+        Row: {
+          added_at: string
+          campaign_id: string
+          speaker_id: string
+        }
+        Insert: {
+          added_at?: string
+          campaign_id: string
+          speaker_id: string
+        }
+        Update: {
+          added_at?: string
+          campaign_id?: string
+          speaker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_campaign_kols_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_campaign_kols_speaker_id_fkey"
+            columns: ["speaker_id"]
+            isOneToOne: false
+            referencedRelation: "speakers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_campaigns: {
+        Row: {
+          created_at: string
+          crm_reference: Json | null
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          sponsor_id: string
+          start_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          crm_reference?: Json | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          sponsor_id: string
+          start_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          crm_reference?: Json | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          sponsor_id?: string
+          start_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_campaigns_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sponsor_connections: {
         Row: {
@@ -1668,6 +2022,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sponsor_inquiries: {
+        Row: {
+          created_at: string
+          details: string
+          email: string
+          id: string
+          name: string
+          notes: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details: string
+          email: string
+          id?: string
+          name: string
+          notes?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string
+          email?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       sponsor_leads: {
         Row: {
@@ -1858,6 +2242,126 @@ export type Database = {
           },
           {
             foreignKeyName: "sponsor_report_tokens_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_resource_events: {
+        Row: {
+          actor_id: string
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          sponsor_id: string
+          sponsor_resource_id: string
+        }
+        Insert: {
+          actor_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          sponsor_id: string
+          sponsor_resource_id: string
+        }
+        Update: {
+          actor_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          sponsor_id?: string
+          sponsor_resource_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_resource_events_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_resource_events_sponsor_resource_id_fkey"
+            columns: ["sponsor_resource_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_resource_library"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_resource_library: {
+        Row: {
+          availability: string
+          available_to: string[] | null
+          campaign_id: string | null
+          created_at: string
+          description: string | null
+          file_path: string | null
+          file_size_bytes: number | null
+          file_type: string | null
+          id: string
+          image_url: string | null
+          media_metadata: Json | null
+          sponsor_id: string
+          status: string
+          title: string
+          type: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          availability?: string
+          available_to?: string[] | null
+          campaign_id?: string | null
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          image_url?: string | null
+          media_metadata?: Json | null
+          sponsor_id: string
+          status?: string
+          title: string
+          type: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          availability?: string
+          available_to?: string[] | null
+          campaign_id?: string | null
+          created_at?: string
+          description?: string | null
+          file_path?: string | null
+          file_size_bytes?: number | null
+          file_type?: string | null
+          id?: string
+          image_url?: string | null
+          media_metadata?: Json | null
+          sponsor_id?: string
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_resource_library_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_resource_library_sponsor_id_fkey"
             columns: ["sponsor_id"]
             isOneToOne: false
             referencedRelation: "sponsor_accounts"
@@ -2139,6 +2643,27 @@ export type Database = {
         }
         Relationships: []
       }
+      worklog_archives: {
+        Row: {
+          archived_at: string
+          archived_by_admin_id: string
+          id: string
+          worklog_filename: string
+        }
+        Insert: {
+          archived_at?: string
+          archived_by_admin_id: string
+          id?: string
+          worklog_filename: string
+        }
+        Update: {
+          archived_at?: string
+          archived_by_admin_id?: string
+          id?: string
+          worklog_filename?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2159,6 +2684,10 @@ export type Database = {
       }
       speaker_storage_used_bytes: {
         Args: { p_speaker_id: string }
+        Returns: number
+      }
+      sponsor_storage_used_bytes: {
+        Args: { p_sponsor_id: string }
         Returns: number
       }
     }
@@ -2289,10 +2818,8 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
 } as const
+

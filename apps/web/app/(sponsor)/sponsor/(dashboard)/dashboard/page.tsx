@@ -1,8 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { loadSponsorEntitlements } from "@fanflet/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Users, MousePointerClick, Link2, Bell } from "lucide-react";
+import { ContentPerformanceSection } from "./content-performance-section";
+import type { ContentPerformanceRow, CrossSpeakerRow } from "./content-performance-section";
 
 export default async function SponsorDashboardPage() {
   const supabase = await createClient();
@@ -12,13 +15,14 @@ export default async function SponsorDashboardPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id, demo_environment_id")
+    .select("id, demo_environment_id, speaker_label")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
   const demoEnvId = sponsor.demo_environment_id ?? null;
+  const speakerLabel = (sponsor as { speaker_label?: string }).speaker_label ?? "speaker";
 
   let connectionsCount: number | null = null;
   let leadsCount: number | null = null;
@@ -133,6 +137,143 @@ export default async function SponsorDashboardPage() {
 
   const pendingRequests = pendingCount ?? 0;
 
+  // Content Performance: fanflet IDs in scope (demo or all)
+  let fanfletIdsInScope: string[] = [];
+  if (demoEnvId) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", demoEnvId);
+    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
+    if (speakerIds.length > 0) {
+      const { data: fanfletsInDemo } = await supabase
+        .from("fanflets")
+        .select("id")
+        .in("speaker_id", speakerIds);
+      fanfletIdsInScope = (fanfletsInDemo ?? []).map((f) => f.id);
+    }
+  } else {
+    const { data: blocksForScope } = await supabase
+      .from("resource_blocks")
+      .select("fanflet_id")
+      .eq("sponsor_account_id", sponsor.id);
+    fanfletIdsInScope = [...new Set((blocksForScope ?? []).map((b) => b.fanflet_id))];
+  }
+
+  let contentPerformanceRows: ContentPerformanceRow[] = [];
+  let crossSpeakerRows: CrossSpeakerRow[] = [];
+  let placementCount = 0;
+
+  if (fanfletIdsInScope.length > 0) {
+    const { data: blocks } = await supabase
+      .from("resource_blocks")
+      .select("id, fanflet_id, title, block_type")
+      .eq("sponsor_account_id", sponsor.id)
+      .in("fanflet_id", fanfletIdsInScope);
+    const blockList = blocks ?? [];
+    placementCount = blockList.length;
+
+    if (blockList.length > 0) {
+      const fanfletIdsSet = new Set(fanfletIdsInScope);
+      const blockIds = blockList.map((b) => b.id);
+
+      const [{ data: fanfletsData }, { data: impressionsData }, { data: clicksData }, { data: leadsData }] = await Promise.all([
+        supabase.from("fanflets").select("id, title, speaker_id").in("id", fanfletIdsInScope),
+        supabase
+          .from("analytics_events")
+          .select("fanflet_id")
+          .eq("event_type", "page_view")
+          .in("fanflet_id", fanfletIdsInScope)
+          .or("source.is.null,source.neq.portfolio"),
+        supabase
+          .from("analytics_events")
+          .select("resource_block_id")
+          .eq("event_type", "resource_click")
+          .in("resource_block_id", blockIds),
+        supabase
+          .from("sponsor_leads")
+          .select("resource_block_id")
+          .eq("sponsor_id", sponsor.id)
+          .in("fanflet_id", fanfletIdsInScope),
+      ]);
+
+      const fanflets = fanfletsData ?? [];
+      const speakerIds = [...new Set(fanflets.map((f) => f.speaker_id))];
+      const { data: speakersData } = await supabase
+        .from("speakers")
+        .select("id, name")
+        .in("id", speakerIds);
+      const speakers = speakersData ?? [];
+      const speakerMap = new Map(speakers.map((s) => [s.id, s]));
+      const fanfletMap = new Map(fanflets.map((f) => [f.id, f]));
+
+      const impressionsByFanflet: Record<string, number> = {};
+      for (const e of impressionsData ?? []) {
+        const fid = (e as { fanflet_id: string }).fanflet_id;
+        if (fanfletIdsSet.has(fid)) impressionsByFanflet[fid] = (impressionsByFanflet[fid] ?? 0) + 1;
+      }
+      const clicksByBlock: Record<string, number> = {};
+      for (const e of clicksData ?? []) {
+        const bid = (e as { resource_block_id: string }).resource_block_id;
+        clicksByBlock[bid] = (clicksByBlock[bid] ?? 0) + 1;
+      }
+      const leadsByBlock: Record<string, number> = {};
+      for (const r of leadsData ?? []) {
+        const bid = (r as { resource_block_id: string | null }).resource_block_id;
+        if (bid) leadsByBlock[bid] = (leadsByBlock[bid] ?? 0) + 1;
+      }
+
+      contentPerformanceRows = blockList.map((b) => {
+        const fanflet = fanfletMap.get(b.fanflet_id);
+        const speaker = fanflet ? speakerMap.get(fanflet.speaker_id) : null;
+        const impressions = impressionsByFanflet[b.fanflet_id] ?? 0;
+        const clicks = clicksByBlock[b.id] ?? 0;
+        const leads = leadsByBlock[b.id] ?? 0;
+        const engagementRate = impressions > 0 ? clicks / impressions : 0;
+        return {
+          resource_block_id: b.id,
+          resource_title: b.title ?? "",
+          block_type: b.block_type ?? "link",
+          fanflet_id: b.fanflet_id,
+          fanflet_title: fanflet?.title ?? "",
+          speaker_id: fanflet?.speaker_id ?? "",
+          speaker_name: speaker?.name ?? "",
+          impressions,
+          clicks,
+          engagement_rate: engagementRate,
+          leads,
+        };
+      });
+
+      // Cross-speaker rollup
+      const rowsBySpeaker = new Map<string, ContentPerformanceRow[]>();
+      for (const r of contentPerformanceRows) {
+        if (!r.speaker_id) continue;
+        if (!rowsBySpeaker.has(r.speaker_id)) rowsBySpeaker.set(r.speaker_id, []);
+        rowsBySpeaker.get(r.speaker_id)!.push(r);
+      }
+      crossSpeakerRows = Array.from(rowsBySpeaker.entries()).map(([speakerId, speakerRows]) => {
+        const fanfletIdsForSpeaker = new Set(speakerRows.map((row) => row.fanflet_id));
+        const totalImpressions = speakerRows.reduce((sum, row) => sum + row.impressions, 0);
+        const totalClicks = speakerRows.reduce((sum, row) => sum + row.clicks, 0);
+        const totalLeads = speakerRows.reduce((sum, row) => sum + row.leads, 0);
+        const rates = speakerRows.filter((r) => r.impressions > 0).map((r) => r.engagement_rate);
+        const avgEngagement = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+        return {
+          speaker_id: speakerId,
+          speaker_name: speakerRows[0]?.speaker_name ?? "",
+          fanflet_count: fanfletIdsForSpeaker.size,
+          total_impressions: totalImpressions,
+          total_clicks: totalClicks,
+          avg_engagement_rate: avgEngagement,
+          total_leads: totalLeads,
+        };
+      });
+    }
+  }
+
+  const entitlements = await loadSponsorEntitlements(supabase, sponsor.id);
+
   return (
     <div className="space-y-8">
       <div>
@@ -150,7 +291,7 @@ export default async function SponsorDashboardPage() {
               {pendingRequests} connection request{pendingRequests !== 1 ? "s" : ""} waiting for your review
             </p>
             <p className="text-xs text-amber-800 mt-0.5">
-              Accept or decline speaker requests to control who can feature your content.
+              Accept or decline {speakerLabel} requests to control who can feature your content.
             </p>
           </div>
           <Link
@@ -170,7 +311,7 @@ export default async function SponsorDashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">{connectionsCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Speakers you&apos;re connected with</p>
+            <p className="text-xs text-muted-foreground">{speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s you&apos;re connected with</p>
           </CardContent>
         </Card>
         <Card>
@@ -198,7 +339,7 @@ export default async function SponsorDashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Quick links</CardTitle>
-          <CardDescription>View and export leads, or manage speaker connections.</CardDescription>
+          <CardDescription>View and export leads, or manage {speakerLabel} connections.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Link
@@ -215,6 +356,14 @@ export default async function SponsorDashboardPage() {
           </Link>
         </CardContent>
       </Card>
+
+      <ContentPerformanceSection
+        rows={contentPerformanceRows}
+        crossSpeakerRows={crossSpeakerRows}
+        placementCount={placementCount}
+        entitlements={entitlements}
+        speakerLabel={speakerLabel}
+      />
     </div>
   );
 }

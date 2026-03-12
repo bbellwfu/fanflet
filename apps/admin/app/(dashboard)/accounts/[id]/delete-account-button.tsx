@@ -30,8 +30,9 @@ export function DeleteAccountButton({
   const [typedEmail, setTypedEmail] = useState("");
 
   const displayName = speakerName ?? speakerEmail;
+  const normalizedSpeakerEmail = (speakerEmail || "").trim().toLowerCase();
   const emailMatches =
-    typedEmail.trim().toLowerCase() === speakerEmail.trim().toLowerCase();
+    typedEmail.trim().toLowerCase() === normalizedSpeakerEmail;
 
   function handleCreate() {
     if (!emailMatches) return;
@@ -104,14 +105,14 @@ export function DeleteAccountButton({
                 htmlFor="delete-confirm-email"
                 className="text-[13px] font-medium text-fg-muted block mb-1.5"
               >
-                Type the account email to confirm
+                Type the account email to confirm: <span className="text-fg font-mono bg-surface px-1.5 py-0.5 rounded">{normalizedSpeakerEmail}</span>
               </label>
               <input
                 id="delete-confirm-email"
                 type="email"
                 value={typedEmail}
                 onChange={(e) => setTypedEmail(e.target.value)}
-                placeholder={speakerEmail}
+                placeholder={normalizedSpeakerEmail}
                 className="h-9 w-full rounded-lg border border-border-subtle bg-page px-3 text-[13px] text-fg outline-none placeholder:text-fg-muted focus-visible:border-error focus-visible:ring-error/40 focus-visible:ring-[3px]"
                 autoFocus
               />

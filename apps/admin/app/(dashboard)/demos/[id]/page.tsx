@@ -268,7 +268,7 @@ async function SponsorDemoDetail({
     sponsorAuthUserId = sponsor?.auth_user_id as string ?? sponsorAuthUserId;
   }
 
-  // Fetch speaker info for each demo KOL
+  // Fetch speaker info for each demo speaker
   const demoSpeakers = manifest?.demo_speakers ?? [];
   const speakerDetails: Array<{
     auth_user_id: string;
@@ -280,21 +280,21 @@ async function SponsorDemoDetail({
     fanflet_count: number;
   }> = [];
 
-  for (const kol of demoSpeakers) {
+  for (const ds of demoSpeakers) {
     const { data: speaker } = await supabase
       .from("speakers")
       .select("name, email, slug")
-      .eq("id", kol.speaker_id)
+      .eq("id", ds.speaker_id)
       .single();
 
     speakerDetails.push({
-      auth_user_id: kol.auth_user_id,
-      speaker_id: kol.speaker_id,
-      speaker_name: speaker?.name ?? kol.speaker_name,
-      speaker_slug: speaker?.slug ?? kol.speaker_slug,
-      connection_status: kol.connection_status,
+      auth_user_id: ds.auth_user_id,
+      speaker_id: ds.speaker_id,
+      speaker_name: speaker?.name ?? ds.speaker_name,
+      speaker_slug: speaker?.slug ?? ds.speaker_slug,
+      connection_status: ds.connection_status,
       email: speaker?.email ?? null,
-      fanflet_count: kol.fanflet_ids?.length ?? 0,
+      fanflet_count: ds.fanflet_ids?.length ?? 0,
     });
   }
 
@@ -349,7 +349,7 @@ async function SponsorDemoDetail({
       {/* Stats */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         <StatCard label="Resources" value={manifest?.sponsor_resource_ids?.length ?? 0} />
-        <StatCard label="KOL Speakers" value={demoSpeakers.length} />
+        <StatCard label="Speakers" value={demoSpeakers.length} />
         <StatCard label="Leads" value={manifest?.lead_ids?.length ?? 0} />
         <div className="bg-surface rounded-lg border border-border-subtle p-5">
           <p className="text-[12px] font-medium uppercase tracking-wider text-fg-muted mb-2">Status</p>
@@ -357,36 +357,36 @@ async function SponsorDemoDetail({
         </div>
       </div>
 
-      {/* KOL Accounts — the key part of the control center */}
+      {/* Speaker Accounts — the key part of the control center */}
       {speakerDetails.length > 0 && demo.status === "active" && (
         <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
           <div className="px-5 py-4 border-b border-border-subtle flex items-center gap-2.5">
             <UsersIcon className="w-4 h-4 text-primary-soft" />
             <h2 className="text-sm font-semibold text-fg">
-              KOL Speaker Accounts
+              Speaker Accounts
             </h2>
             <span className="text-[12px] text-fg-muted ml-auto">
               Quick-switch between perspectives during a demo
             </span>
           </div>
           <div className="divide-y divide-border-subtle">
-            {speakerDetails.map((kol) => (
-              <div key={kol.speaker_id} className="px-5 py-4 flex items-center gap-4">
+            {speakerDetails.map((s) => (
+              <div key={s.speaker_id} className="px-5 py-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <p className="text-[13px] font-medium text-fg truncate">
-                      {kol.speaker_name}
+                      {s.speaker_name}
                     </p>
-                    <ConnectionBadge status={kol.connection_status} />
+                    <ConnectionBadge status={s.connection_status} />
                   </div>
                   <p className="text-[12px] text-fg-muted">
-                    /{kol.speaker_slug}
-                    {kol.fanflet_count > 0 && ` · ${kol.fanflet_count} fanflet${kol.fanflet_count !== 1 ? "s" : ""}`}
+                    /{s.speaker_slug}
+                    {s.fanflet_count > 0 && ` · ${s.fanflet_count} fanflet${s.fanflet_count !== 1 ? "s" : ""}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href={`${webUrl}/${kol.speaker_slug}`}
+                    href={`${webUrl}/${s.speaker_slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-fg-muted hover:text-primary"
@@ -395,10 +395,10 @@ async function SponsorDemoDetail({
                     <ExternalLinkIcon className="w-3.5 h-3.5" />
                   </a>
                   <ImpersonateButton
-                    targetUserId={kol.auth_user_id}
+                    targetUserId={s.auth_user_id}
                     targetRole="speaker"
-                    targetName={kol.speaker_name}
-                    targetEmail={kol.email ?? `demo+${kol.speaker_slug}@fanflet.com`}
+                    targetName={s.speaker_name}
+                    targetEmail={s.email ?? `demo+${s.speaker_slug}@fanflet.com`}
                     defaultReason="For Demo Purposes"
                     defaultWriteEnabled
                   />

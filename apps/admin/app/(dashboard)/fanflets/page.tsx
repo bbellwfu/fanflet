@@ -3,6 +3,7 @@ import { createServiceClient } from "@fanflet/db/service";
 import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { ExternalLink, FileTextIcon } from "lucide-react";
+import { getNonDemoScope } from "../analytics/actions";
 
 type SpeakerEmbed = { name: string | null; email: string; slug: string | null };
 
@@ -43,9 +44,12 @@ export default async function FanfletsPage({
     .maybeSingle();
   const adminTimezone = adminPrefs?.timezone ?? null;
 
+  const { speakerIds } = await getNonDemoScope(supabase);
+
   let query = supabase
     .from("fanflets")
     .select("id, title, slug, status, published_at, created_at, speaker_id, speakers(name, email, slug)")
+    .in("speaker_id", speakerIds)
     .order("created_at", { ascending: false });
 
   if (params.status && params.status !== "all") {

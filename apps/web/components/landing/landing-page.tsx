@@ -52,6 +52,7 @@ type ResourceBlock = {
   file_size_bytes: number | null;
   file_type: string | null;
   sponsor_account_id?: string | null;
+  sponsor_library_item_id?: string | null;
   metadata: {
     logo_url?: string;
     cta_text?: string;
@@ -84,6 +85,9 @@ type LandingPageProps = {
 function getDownloadUrl(block: ResourceBlock, fanfletId: string): string {
   if (!block.file_path) return "#";
   if (block.file_path.startsWith("http")) return block.file_path;
+  if (block.sponsor_library_item_id) {
+    return `/api/download/sponsor/${fanfletId}/${block.id}`;
+  }
   return `/api/download/${fanfletId}/${block.id}`;
 }
 

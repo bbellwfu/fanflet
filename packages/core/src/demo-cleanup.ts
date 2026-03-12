@@ -6,7 +6,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { SeedManifest } from "./demo-seeder";
+import type { SeedManifest, SponsorSeedManifest } from "./demo-seeder";
 
 /* ------------------------------------------------------------------ */
 /*  Cleanup                                                            */
@@ -30,9 +30,42 @@ export async function cleanupDemoEnvironment(
     return { success: true };
   }
 
-  const manifest = demo.seed_manifest as SeedManifest | null;
+  const manifest = demo.seed_manifest as SeedManifest | SponsorSeedManifest | null;
+  const isSponsorDemo = demo.demo_type === "sponsor";
   let speakerId = demo.speaker_id as string | null;
   let authUserId = demo.auth_user_id as string | null;
+
+  // Sponsor demo: tear down demo speakers first, then sponsor (CASCADE removes library, campaigns, etc.)
+  if (isSponsorDemo && manifest && "sponsor_account_id" in manifest) {
+    const sponsorManifest = manifest as SponsorSeedManifest;
+    for (const s of sponsorManifest.demo_speakers ?? []) {
+      if (s.speaker_id) {
+        await serviceClient.from("sponsor_connections").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("fanflets").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("subscribers").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("survey_questions").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("resource_library").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("speaker_feature_overrides").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("speaker_subscriptions").delete().eq("speaker_id", s.speaker_id);
+        await serviceClient.from("speakers").delete().eq("id", s.speaker_id);
+      }
+      if (s.auth_user_id) {
+        await serviceClient.auth.admin.deleteUser(s.auth_user_id).catch(() => {});
+      }
+    }
+    if (sponsorManifest.sponsor_account_id) {
+      await serviceClient
+        .from("sponsor_accounts")
+        .delete()
+        .eq("id", sponsorManifest.sponsor_account_id)
+        .eq("is_demo", true);
+    }
+    if (sponsorManifest.sponsor_auth_user_id) {
+      await serviceClient.auth.admin.deleteUser(sponsorManifest.sponsor_auth_user_id).catch(() => {});
+    }
+    await serviceClient.from("demo_environments").update({ status: "deleted" }).eq("id", demoEnvironmentId);
+    return { success: true };
+  }
 
   // If speaker_id/auth_user_id are null (orphan from a failed provision),
   // try to find them by the synthetic email pattern
@@ -124,9 +157,10 @@ export async function cleanupDemoEnvironment(
       .eq("id", speakerId);
   }
 
-  // 9. Delete demo sponsor accounts (only those we created)
-  if (manifest?.sponsor_account_ids?.length) {
-    for (const sponsorId of manifest.sponsor_account_ids) {
+  // 9. Delete demo sponsor accounts (speaker demo only; sponsor demo already handled above)
+  const speakerManifest = manifest as SeedManifest | null;
+  if (speakerManifest?.sponsor_account_ids?.length) {
+    for (const sponsorId of speakerManifest.sponsor_account_ids) {
       await serviceClient
         .from("sponsor_accounts")
         .delete()
@@ -135,9 +169,9 @@ export async function cleanupDemoEnvironment(
     }
   }
 
-  // 10. Delete auth users
-  if (manifest?.sponsor_auth_user_ids?.length) {
-    for (const uid of manifest.sponsor_auth_user_ids) {
+  // 10. Delete auth users (speaker demo only)
+  if (speakerManifest?.sponsor_auth_user_ids?.length) {
+    for (const uid of speakerManifest.sponsor_auth_user_ids) {
       await serviceClient.auth.admin.deleteUser(uid).catch(() => {});
     }
   }

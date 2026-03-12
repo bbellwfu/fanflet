@@ -11,11 +11,13 @@ export default async function SponsorConnectionsPage() {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id, demo_environment_id")
+    .select("id, demo_environment_id, speaker_label")
     .eq("auth_user_id", user.id)
     .single();
 
   if (!sponsor) redirect("/sponsor/onboarding");
+
+  const speakerLabel = sponsor.speaker_label ?? "speaker";
 
   let connectionsQuery = supabase
     .from("sponsor_connections")
@@ -54,7 +56,7 @@ export default async function SponsorConnectionsPage() {
       createdAt: row.created_at as string,
       respondedAt: (row.responded_at as string | null) ?? null,
       endedAt: (row.ended_at as string | null) ?? null,
-      speakerName: speaker?.name ?? "Speaker",
+      speakerName: speaker?.name ?? (speakerLabel[0].toUpperCase() + speakerLabel.slice(1)),
       speakerSlug: speaker?.slug ?? null,
     };
   });
@@ -64,7 +66,7 @@ export default async function SponsorConnectionsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Connections</h1>
         <p className="text-muted-foreground">
-          Speaker connection requests. Accept to allow them to link your company to their fanflets.
+          {speakerLabel[0].toUpperCase() + speakerLabel.slice(1)} connection requests. Accept to allow them to link your company to their fanflets.
         </p>
       </div>
       <Card>
@@ -73,7 +75,7 @@ export default async function SponsorConnectionsPage() {
           <CardDescription>Pending requests need your response.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ConnectionsList connections={list} />
+          <ConnectionsList connections={list} speakerLabel={speakerLabel} />
         </CardContent>
       </Card>
     </div>

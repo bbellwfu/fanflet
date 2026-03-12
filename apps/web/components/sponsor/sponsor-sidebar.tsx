@@ -3,13 +3,15 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock, Library, Megaphone } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 
 const sponsorNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/sponsor/dashboard" },
+  { icon: Library, label: "Library", href: "/sponsor/library" },
+  { icon: Megaphone, label: "Campaigns", href: "/sponsor/campaigns" },
   { icon: Users, label: "Leads", href: "/sponsor/leads" },
   { icon: Link2, label: "Connections", href: "/sponsor/connections" },
   { icon: Plug, label: "Integrations", href: "/sponsor/integrations" },
@@ -134,6 +136,7 @@ interface SponsorSidebarProps {
     logo_url: string | null;
     is_verified: boolean;
     contact_email: string;
+    speaker_label?: string | null;
   };
   activeRole: string;
   children: React.ReactNode;
@@ -194,7 +197,7 @@ export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorS
                 <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                 <p className="text-sm text-amber-800">
                   <span className="font-medium">Account pending verification.</span>{" "}
-                  Your profile is under review by the Fanflet team. Once verified, speakers will be able to discover and connect with you.
+                  Your profile is under review by the Fanflet team. Once verified, {sponsor.speaker_label ?? "speaker"}s will be able to discover and connect with you.
                 </p>
               </div>
             )}

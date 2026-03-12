@@ -516,6 +516,8 @@ export interface SponsorSeedManifest {
   sponsor_account_id: string;
   sponsor_slug: string;
   sponsor_resource_ids: string[];
+  sponsor_resource_library_ids: string[];
+  sponsor_campaign_ids: string[];
   sponsor_subscription_id: string | null;
   demo_speakers: Array<{
     auth_user_id: string;
@@ -548,6 +550,8 @@ export async function seedSponsorDemoEnvironment(
     sponsor_account_id: "",
     sponsor_slug: "",
     sponsor_resource_ids: [],
+    sponsor_resource_library_ids: [],
+    sponsor_campaign_ids: [],
     sponsor_subscription_id: null,
     demo_speakers: [],
     lead_ids: [],
@@ -602,22 +606,22 @@ export async function seedSponsorDemoEnvironment(
     manifest.sponsor_account_id = sponsorAccount.id;
     manifest.sponsor_slug = sponsorSlug;
 
-    // ── Step 3: Assign Sponsor Pro plan ──
-    const { data: sponsorProPlan } = await serviceClient
+    // ── Step 3: Assign Sponsor Enterprise plan (Library + Campaigns unlocked) ──
+    const { data: sponsorEnterprisePlan } = await serviceClient
       .from("sponsor_plans")
       .select("id, limits")
-      .eq("name", "sponsor_pro")
+      .eq("name", "sponsor_enterprise")
       .maybeSingle();
 
-    if (sponsorProPlan) {
+    if (sponsorEnterprisePlan) {
       const { data: sub } = await serviceClient
         .from("sponsor_subscriptions")
         .upsert(
           {
             sponsor_id: sponsorAccount.id,
-            plan_id: sponsorProPlan.id,
+            plan_id: sponsorEnterprisePlan.id,
             status: "active",
-            limits_snapshot: sponsorProPlan.limits,
+            limits_snapshot: sponsorEnterprisePlan.limits,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "sponsor_id" },
@@ -628,7 +632,38 @@ export async function seedSponsorDemoEnvironment(
       if (sub) manifest.sponsor_subscription_id = sub.id;
     }
 
-    // ── Step 4: Create sponsor resources ──
+    // ── Step 4: Create sponsor resource library (Library tab) ──
+    const payloadLibraryType = (t: string): "file" | "link" | "video" | "sponsor_block" => {
+      if (t === "link" || t === "file") return t;
+      if (t === "text" || t === "promo") return "sponsor_block";
+      return "link"; // fallback
+    };
+    for (const resource of payload.resources) {
+      const libType = payloadLibraryType(resource.type);
+      const { data: libRow, error: libError } = await serviceClient
+        .from("sponsor_resource_library")
+        .insert({
+          sponsor_id: sponsorAccount.id,
+          type: libType,
+          title: resource.title,
+          description: resource.description || null,
+          url: resource.url || null,
+          status: "available",
+          availability: "all",
+        })
+        .select("id")
+        .single();
+
+      if (libError) {
+        console.error(
+          `Sponsor resource library creation failed: ${libError.message}`,
+        );
+        continue;
+      }
+      if (libRow) manifest.sponsor_resource_library_ids.push(libRow.id);
+    }
+
+    // ── Step 5: Create sponsor resources (legacy; keep for MCP/backward compat) ──
     for (const resource of payload.resources) {
       const { data: sr, error: srError } = await serviceClient
         .from("sponsor_resources")
@@ -652,53 +687,88 @@ export async function seedSponsorDemoEnvironment(
       if (sr) manifest.sponsor_resource_ids.push(sr.id);
     }
 
-    // ── Step 5: Create KOL speaker accounts with fanflets ──
+    // ── Step 5b: Create campaigns and link library items (Enterprise) ──
+    const campaigns = payload.campaigns ?? [];
+    let firstCampaignId: string | null = null;
+    for (const camp of campaigns) {
+      const startDate = camp.start_date || new Date().toISOString().slice(0, 10);
+      const { data: campaignRow, error: campError } = await serviceClient
+        .from("sponsor_campaigns")
+        .insert({
+          sponsor_id: sponsorAccount.id,
+          name: camp.name,
+          description: camp.description || null,
+          start_date: startDate,
+          end_date: camp.end_date || null,
+          status: "active",
+        })
+        .select("id")
+        .single();
+
+      if (campError) {
+        console.error(`Sponsor campaign creation failed: ${campError.message}`);
+        continue;
+      }
+      if (campaignRow) {
+        manifest.sponsor_campaign_ids.push(campaignRow.id);
+        if (!firstCampaignId) firstCampaignId = campaignRow.id;
+      }
+    }
+    if (firstCampaignId && manifest.sponsor_resource_library_ids.length > 0) {
+      const idsToLink = manifest.sponsor_resource_library_ids.slice(0, 2);
+      await serviceClient
+        .from("sponsor_resource_library")
+        .update({ campaign_id: firstCampaignId })
+        .in("id", idsToLink);
+    }
+
+    // ── Step 6: Create demo speaker accounts with fanflets ──
     const connectedSpeakerIds: string[] = [];
 
-    for (const kol of payload.kol_speakers) {
-      const kolSlug = kol.slug.startsWith("demo-")
-        ? kol.slug
-        : `demo-${kol.slug}`;
-      const kolEmail = `demo+${kolSlug}@fanflet.com`;
+    for (const demoSpeaker of payload.demo_speakers) {
+      const speakerSlug = demoSpeaker.slug.startsWith("demo-")
+        ? demoSpeaker.slug
+        : `demo-${demoSpeaker.slug}`;
+      const speakerEmail = `demo+${speakerSlug}@fanflet.com`;
 
-      let kolAuthUser: { id: string };
+      let demoSpeakerAuth: { id: string };
       try {
-        kolAuthUser = await createOrReclaimDemoAuthUser(
+        demoSpeakerAuth = await createOrReclaimDemoAuthUser(
           serviceClient,
-          kolEmail,
+          speakerEmail,
           {
-            full_name: kol.full_name,
+            full_name: demoSpeaker.full_name,
             is_demo: true,
             roles: ["speaker"],
           },
         );
       } catch (err) {
         console.error(
-          `KOL auth creation failed for ${kol.full_name}: ${err instanceof Error ? err.message : err}`,
+          `Speaker auth creation failed for ${demoSpeaker.full_name}: ${err instanceof Error ? err.message : err}`,
         );
         continue;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const { data: kolSpeaker } = await serviceClient
+      const { data: speakerRow } = await serviceClient
         .from("speakers")
         .select("id")
-        .eq("auth_user_id", kolAuthUser.id)
+        .eq("auth_user_id", demoSpeakerAuth.id)
         .maybeSingle();
 
-      if (!kolSpeaker) {
-        console.error(`Speaker row not found for KOL ${kol.full_name}`);
+      if (!speakerRow) {
+        console.error(`Speaker row not found for ${demoSpeaker.full_name}`);
         continue;
       }
 
       await serviceClient
         .from("speakers")
         .update({
-          name: kol.full_name,
-          bio: kol.bio,
-          slug: kolSlug,
-          photo_url: generateAvatarUrl(kol.full_name),
+          name: demoSpeaker.full_name,
+          bio: demoSpeaker.bio,
+          slug: speakerSlug,
+          photo_url: generateAvatarUrl(demoSpeaker.full_name),
           social_links: {
             default_theme_preset: payload.theme || "navy",
           },
@@ -707,10 +777,10 @@ export async function seedSponsorDemoEnvironment(
           demo_expires_at: addDays(30),
           demo_environment_id: demoEnvironmentId,
         })
-        .eq("id", kolSpeaker.id);
+        .eq("id", speakerRow.id);
 
-      // Assign Pro plan to KOL
-      let kolSubId: string | null = null;
+      // Assign Pro plan to demo speaker
+      let speakerSubId: string | null = null;
       const { data: proPlan } = await serviceClient
         .from("plans")
         .select("id, limits")
@@ -735,7 +805,7 @@ export async function seedSponsorDemoEnvironment(
           .from("speaker_subscriptions")
           .upsert(
             {
-              speaker_id: kolSpeaker.id,
+              speaker_id: speakerRow.id,
               plan_id: proPlan.id,
               status: "active",
               limits_snapshot: proPlan.limits,
@@ -747,16 +817,16 @@ export async function seedSponsorDemoEnvironment(
           .select("id")
           .single();
 
-        if (sub) kolSubId = sub.id;
+        if (sub) speakerSubId = sub.id;
       }
 
       // Create sponsor connection based on status
       let connectionId: string | null = null;
-      if (kol.connection_status === "active") {
+      if (demoSpeaker.connection_status === "active") {
         const { data: conn } = await serviceClient
           .from("sponsor_connections")
           .insert({
-            speaker_id: kolSpeaker.id,
+            speaker_id: speakerRow.id,
             sponsor_id: sponsorAccount.id,
             status: "active",
             initiated_by: "sponsor",
@@ -767,13 +837,13 @@ export async function seedSponsorDemoEnvironment(
 
         if (conn) {
           connectionId = conn.id;
-          connectedSpeakerIds.push(kolSpeaker.id);
+          connectedSpeakerIds.push(speakerRow.id);
         }
-      } else if (kol.connection_status === "pending") {
+      } else if (demoSpeaker.connection_status === "pending") {
         const { data: conn } = await serviceClient
           .from("sponsor_connections")
           .insert({
-            speaker_id: kolSpeaker.id,
+            speaker_id: speakerRow.id,
             sponsor_id: sponsorAccount.id,
             status: "pending",
             initiated_by: "sponsor",
@@ -787,15 +857,15 @@ export async function seedSponsorDemoEnvironment(
       // Create fanflet with resources
       const fanfletIds: string[] = [];
       const themeConfig = { preset: payload.theme || "navy" };
-      const fanfletSlug = slugify(kol.fanflet.title);
+      const fanfletSlug = slugify(demoSpeaker.fanflet.title);
 
       const { data: fanflet } = await serviceClient
         .from("fanflets")
         .insert({
-          speaker_id: kolSpeaker.id,
-          title: kol.fanflet.title,
-          event_name: kol.fanflet.event_name,
-          event_date: kol.fanflet.event_date || null,
+          speaker_id: speakerRow.id,
+          title: demoSpeaker.fanflet.title,
+          event_name: demoSpeaker.fanflet.event_name,
+          event_date: demoSpeaker.fanflet.event_date || null,
           slug: fanfletSlug,
           status: "draft",
           theme_config: themeConfig,
@@ -807,13 +877,13 @@ export async function seedSponsorDemoEnvironment(
       if (fanflet) {
         fanfletIds.push(fanflet.id);
 
-        for (let i = 0; i < kol.fanflet.resources.length; i++) {
-          const resource = kol.fanflet.resources[i];
+        for (let i = 0; i < demoSpeaker.fanflet.resources.length; i++) {
+          const resource = demoSpeaker.fanflet.resources[i];
 
           const { data: libItem } = await serviceClient
             .from("resource_library")
             .insert({
-              speaker_id: kolSpeaker.id,
+              speaker_id: speakerRow.id,
               type: resource.type,
               title: resource.title,
               description: resource.description || null,
@@ -831,6 +901,10 @@ export async function seedSponsorDemoEnvironment(
           // Attribute all non-text blocks to the sponsor for analytics flow
           const sponsorAccountId =
             resource.type === "text" ? null : sponsorAccount.id;
+          const sponsorLibraryItemId =
+            resource.type === "sponsor" && manifest.sponsor_resource_library_ids.length > 0
+              ? manifest.sponsor_resource_library_ids[0]
+              : null;
 
           await serviceClient.from("resource_blocks").insert({
             fanflet_id: fanflet.id,
@@ -846,30 +920,31 @@ export async function seedSponsorDemoEnvironment(
                 : "Resources",
             metadata: {},
             sponsor_account_id: sponsorAccountId,
+            sponsor_library_item_id: sponsorLibraryItemId,
           });
         }
       }
 
       manifest.demo_speakers.push({
-        auth_user_id: kolAuthUser.id,
-        speaker_id: kolSpeaker.id,
-        speaker_name: kol.full_name,
-        speaker_slug: kolSlug,
-        connection_status: kol.connection_status,
+        auth_user_id: demoSpeakerAuth.id,
+        speaker_id: speakerRow.id,
+        speaker_name: demoSpeaker.full_name,
+        speaker_slug: speakerSlug,
+        connection_status: demoSpeaker.connection_status,
         connection_id: connectionId,
         fanflet_ids: fanfletIds,
-        subscription_id: kolSubId,
+        subscription_id: speakerSubId,
       });
     }
 
-    // ── Step 6: Create sample leads ──
+    // ── Step 7: Create sample leads ──
     // sponsor_leads requires subscriber_id (FK), so we create demo subscribers first
-    const connectedKol = manifest.demo_speakers.find(
+    const connectedSpeaker = manifest.demo_speakers.find(
       (s) => s.connection_status === "active",
     );
-    const firstFanfletId = connectedKol?.fanflet_ids[0] ?? null;
+    const firstFanfletId = connectedSpeaker?.fanflet_ids[0] ?? null;
 
-    if (connectedKol && firstFanfletId) {
+    if (connectedSpeaker && firstFanfletId) {
       for (const lead of payload.sample_leads) {
         // Create a demo subscriber record for the lead
         const { data: subscriber, error: subError } = await serviceClient
@@ -877,7 +952,7 @@ export async function seedSponsorDemoEnvironment(
           .insert({
             email: lead.email.toLowerCase().trim(),
             name: lead.name,
-            speaker_id: connectedKol.speaker_id,
+            speaker_id: connectedSpeaker.speaker_id,
             source_fanflet_id: firstFanfletId,
           })
           .select("id")
@@ -909,7 +984,7 @@ export async function seedSponsorDemoEnvironment(
       }
     }
 
-    // ── Step 7: Update demo_environments row ──
+    // ── Step 8: Update demo_environments row ──
     await serviceClient
       .from("demo_environments")
       .update({

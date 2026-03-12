@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { loadSponsorEntitlements } from "@fanflet/db";
+import Link from "next/link";
 import { listSponsorCampaigns } from "./actions";
 import { CampaignsClient } from "./campaigns-client";
 
@@ -54,12 +55,12 @@ export default async function SponsorCampaignsPage() {
           <p className="text-sm text-amber-800 mt-1">
             Campaigns are available on Sponsor Enterprise. Upgrade to organize activity by initiative and sync with your CRM.
           </p>
-          <a
+          <Link
             href="/sponsor/settings"
             className="mt-4 inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
           >
             View plans
-          </a>
+          </Link>
         </div>
       </div>
     );

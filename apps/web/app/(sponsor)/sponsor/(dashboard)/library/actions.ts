@@ -69,7 +69,7 @@ export async function listSponsorLibraryResources(): Promise<{
   if (error) return { error: error.message };
 
   const ids = (items ?? []).map((r) => r.id);
-  let placementCounts: Record<string, number> = {};
+  const placementCounts: Record<string, number> = {};
   if (ids.length > 0) {
     const { data: blocks } = await supabase
       .from("resource_blocks")

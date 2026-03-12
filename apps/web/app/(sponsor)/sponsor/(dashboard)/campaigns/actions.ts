@@ -34,8 +34,8 @@ export async function listSponsorCampaigns(): Promise<{
   if (error) return { error: error.message };
 
   const ids = (campaigns ?? []).map((c) => c.id);
-  let speakerCounts: Record<string, number> = {};
-  let resourceCounts: Record<string, number> = {};
+  const speakerCounts: Record<string, number> = {};
+  const resourceCounts: Record<string, number> = {};
   if (ids.length > 0) {
     const [speakersRes, libRes] = await Promise.all([
       supabase.from("sponsor_campaign_speakers").select("campaign_id").in("campaign_id", ids),

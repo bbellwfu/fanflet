@@ -130,7 +130,7 @@ export default async function AudienceLandingPage({ params }: Props) {
   const sponsorLibraryIds = (rawBlocks ?? [])
     .map((b) => (b as { sponsor_library_item_id?: string | null }).sponsor_library_item_id)
     .filter((id): id is string => !!id);
-  let sponsorLibraryMap: Map<string, { title?: string; description?: string | null; url?: string | null; file_path?: string | null; image_url?: string | null; file_size_bytes?: number | null; file_type?: string | null; type?: string }> = new Map();
+  const sponsorLibraryMap: Map<string, { title?: string; description?: string | null; url?: string | null; file_path?: string | null; image_url?: string | null; file_size_bytes?: number | null; file_type?: string | null; type?: string }> = new Map();
   if (sponsorLibraryIds.length > 0) {
     const { data: sponsorLibRows } = await supabase
       .from("sponsor_resource_library")

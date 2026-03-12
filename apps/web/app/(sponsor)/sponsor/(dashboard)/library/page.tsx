@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { loadSponsorEntitlements } from "@fanflet/db";
 import { getStorageQuota } from "@fanflet/db/storage";
+import Link from "next/link";
 import {
   listSponsorLibraryResources,
   getSponsorStorageUsage,
@@ -53,12 +54,12 @@ export default async function SponsorLibraryPage() {
           <p className="text-sm text-amber-800 mt-1">
             The Library lets you upload files and links that connected {speakerLabel}s can add to their fanflets. Upgrade your plan to unlock it.
           </p>
-          <a
+          <Link
             href="/sponsor/settings"
             className="mt-4 inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
           >
             View plans
-          </a>
+          </Link>
         </div>
       </div>
     );

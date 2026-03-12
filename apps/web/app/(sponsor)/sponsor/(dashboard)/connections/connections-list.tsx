@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,17 +29,19 @@ type Connection = {
   speakerSlug: string | null;
 };
 
-function displayStatus(status: string, endedAt: string | null): string {
-  if (status === "revoked") return "Canceled by Speaker";
+function displayStatus(status: string, endedAt: string | null, label: string): string {
+  if (status === "revoked") return `Canceled by ${label[0].toUpperCase() + label.slice(1)}`;
   if (status === "active" && endedAt) return "Ended";
   return status;
 }
 
 interface ConnectionsListProps {
   connections: Connection[];
+  speakerLabel?: string;
 }
 
-export function ConnectionsList({ connections }: ConnectionsListProps) {
+export function ConnectionsList({ connections, speakerLabel = "speaker" }: ConnectionsListProps) {
+  const router = useRouter();
   const timezone = useTimezone();
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [endingId, setEndingId] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
         toast.error(result.error);
       } else {
         toast.success(accept ? "Connection accepted." : "Connection declined.");
-        window.location.reload();
+        router.refresh();
       }
     } finally {
       setRespondingId(null);
@@ -71,8 +74,8 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Connection ended. You will no longer receive new lead data from this speaker; historical data remains visible.");
-        window.location.reload();
+        toast.success(`Connection ended. You will no longer receive new lead data from this ${speakerLabel}; historical data remains visible.`);
+        router.refresh();
       }
     } finally {
       setEndingId(null);
@@ -90,7 +93,7 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
         toast.error(result.error);
       } else {
         toast.success("Connection hidden from your list. Data is retained for reporting.");
-        window.location.reload();
+        router.refresh();
       }
     } finally {
       setHideId(null);
@@ -100,7 +103,7 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
   if (connections.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-6 text-center">
-        No connection requests yet. When speakers send you a request, it will appear here.
+        No connection requests yet. When {speakerLabel}s send you a request, it will appear here.
       </p>
     );
   }
@@ -109,10 +112,10 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
     <>
     <ul className="divide-y divide-slate-100 space-y-0">
       {connections.map((conn) => {
-        const statusLabel = displayStatus(conn.status, conn.endedAt);
+        const statusLabel = displayStatus(conn.status, conn.endedAt, speakerLabel);
         const subtitle = conn.endedAt
           ? `${statusLabel} · Ended ${formatDate(conn.endedAt, timezone)}`
-          : `Requested ${conn.initiatedBy === "speaker" ? "by speaker" : "by you"} · ${formatDate(conn.createdAt, timezone)}`;
+          : `Requested ${conn.initiatedBy === "speaker" ? `by ${speakerLabel}` : "by you"} · ${formatDate(conn.createdAt, timezone)}`;
         const canEndConnection = conn.status === "active" && !conn.endedAt;
         const canHideFromView =
           conn.status === "revoked" ||
@@ -218,7 +221,7 @@ export function ConnectionsList({ connections }: ConnectionsListProps) {
             End connection with {endConfirmConn?.speakerName}?
           </DialogTitle>
           <DialogDescription>
-            You will no longer receive new lead data from this speaker as of now. Historical data will remain visible to both of you for reporting.
+            You will no longer receive new lead data from this {speakerLabel} as of now. Historical data will remain visible to both of you for reporting.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

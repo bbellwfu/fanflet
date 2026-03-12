@@ -10,7 +10,7 @@
 - Consider using `createUserScopedClient()` from `@fanflet/db/user-client` for speaker/sponsor MCP tools instead of service client (true RLS enforcement vs. current service-client-with-role-check approach)
 
 ## 2026-03-10
-- Cross-KOL comparison view for sponsors: let sponsors compare engagement metrics across their KOLs (Ryan Walsh interview line 95-101)
+- Cross-speaker comparison view for sponsors: let sponsors compare engagement metrics across their speakers (Ryan Walsh interview line 95-101)
 - Integration exports: connect sponsor lead data to HubSpot, Salesforce, or Google Sheets (Ryan Walsh interview line 151)
 - Per-resource-type breakdown in sponsor reports: show clicks vs. downloads vs. views broken out by type (PDF, link, video)
 - Separate download vs. click lead counts in sponsor_leads (currently only resource_click creates leads; download route skips it to avoid double-counting)

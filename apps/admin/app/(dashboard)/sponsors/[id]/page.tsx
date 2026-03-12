@@ -3,9 +3,11 @@ import { createClient } from "@fanflet/db/server";
 import { createServiceClient } from "@fanflet/db/service";
 import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
-import { ArrowLeft, BuildingIcon, GlobeIcon, MailIcon } from "lucide-react";
+import { ArrowLeft, BuildingIcon } from "lucide-react";
 import { VerifyButton } from "./verify-button";
 import { ImpersonateButton } from "../../accounts/[id]/impersonate-button";
+import { SponsorPlanForm } from "./sponsor-plan-form";
+import { SponsorProfileForm } from "./sponsor-profile-form";
 
 export default async function SponsorDetailPage({
   params,
@@ -34,7 +36,7 @@ export default async function SponsorDetailPage({
     notFound();
   }
 
-  const [connectionResult, leadResult, activeConnectionResult] =
+  const [connectionResult, leadResult, activeConnectionResult, subscriptionResult, plansResult] =
     await Promise.all([
       supabase
         .from("sponsor_connections")
@@ -49,11 +51,26 @@ export default async function SponsorDetailPage({
         .select("id", { count: "exact", head: true })
         .eq("sponsor_id", id)
         .eq("status", "active"),
+      supabase
+        .from("sponsor_subscriptions")
+        .select("plan_id, status, sponsor_plans(id, name, display_name)")
+        .eq("sponsor_id", id)
+        .maybeSingle(),
+      supabase
+        .from("sponsor_plans")
+        .select("id, name, display_name")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true }),
     ]);
 
   const totalConnections = connectionResult.count ?? 0;
   const activeConnections = activeConnectionResult.count ?? 0;
   const totalLeads = leadResult.count ?? 0;
+  const subscription = subscriptionResult.data;
+  const currentPlan = subscription?.sponsor_plans
+    ? (Array.isArray(subscription.sponsor_plans) ? subscription.sponsor_plans[0] : subscription.sponsor_plans)
+    : null;
+  const plans = plansResult.data ?? [];
 
   const statItems = [
     { label: "Total Connections", value: totalConnections },
@@ -132,58 +149,37 @@ export default async function SponsorDetailPage({
 
       <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
         <div className="px-5 py-4 border-b border-border-subtle">
+          <h2 className="text-sm font-semibold text-fg">Subscription</h2>
+        </div>
+        <div className="px-5 py-4">
+          <SponsorPlanForm
+            sponsorId={id}
+            currentPlanId={currentPlan?.id ?? null}
+            currentPlanDisplayName={currentPlan?.display_name ?? currentPlan?.name ?? "—"}
+            plans={plans.map((p) => ({ id: p.id, name: p.display_name ?? p.name }))}
+          />
+        </div>
+      </div>
+
+      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle">
           <h2 className="text-sm font-semibold text-fg">Company Details</h2>
         </div>
         <div className="px-5 py-4">
-          <dl className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[13px]">
-            <div>
-              <dt className="text-fg-muted mb-0.5">Company Name</dt>
-              <dd className="font-medium text-fg">{sponsor.company_name}</dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted mb-0.5">Contact Email</dt>
-              <dd className="font-medium text-fg flex items-center gap-1.5">
-                <MailIcon className="w-3.5 h-3.5 text-fg-muted" />
-                {sponsor.contact_email}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted mb-0.5">Slug</dt>
-              <dd className="font-mono text-fg">{sponsor.slug}</dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted mb-0.5">Industry</dt>
-              <dd className="text-fg">{sponsor.industry ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted mb-0.5">Website</dt>
-              <dd className="text-fg">
-                {sponsor.website_url ? (
-                  <a
-                    href={sponsor.website_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary-soft hover:text-primary flex items-center gap-1"
-                  >
-                    <GlobeIcon className="w-3.5 h-3.5" />
-                    {sponsor.website_url}
-                  </a>
-                ) : (
-                  "—"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-fg-muted mb-0.5">Joined</dt>
-              <dd className="text-fg">
-                {formatDate(sponsor.created_at, adminTimezone)}
-              </dd>
-            </div>
-            <div className="md:col-span-2">
-              <dt className="text-fg-muted mb-0.5">Description</dt>
-              <dd className="text-fg">{sponsor.description ?? "—"}</dd>
-            </div>
-          </dl>
+          <SponsorProfileForm
+            sponsorId={id}
+            initialData={{
+              company_name: sponsor.company_name,
+              slug: sponsor.slug,
+              contact_email: sponsor.contact_email,
+              industry: sponsor.industry,
+              website_url: sponsor.website_url,
+              description: sponsor.description,
+              logo_url: sponsor.logo_url,
+              speaker_label: sponsor.speaker_label ?? "speaker",
+            }}
+            joinedDate={formatDate(sponsor.created_at, adminTimezone)}
+          />
         </div>
       </div>
     </div>

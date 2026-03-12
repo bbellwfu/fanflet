@@ -54,10 +54,79 @@ export default async function SponsorConnectionsPage() {
   ]);
 
   const connections = connectionsResult.data;
+
+  // Collect active (non-ended) sponsor IDs so we can fetch their catalog items
+  const activeSponsorIds = (connections ?? [])
+    .filter((c) => c.status === "active" && !c.ended_at)
+    .map((c) => {
+      const acc = c.sponsor_accounts as { id: string } | { id: string }[] | null;
+      return Array.isArray(acc) ? acc[0]?.id : acc?.id;
+    })
+    .filter(Boolean) as string[];
+
+  // Fetch sponsor catalog items for all active connections in one query
+  const rawCatalogItems = activeSponsorIds.length > 0
+    ? (await supabase
+        .from("sponsor_resource_library")
+        .select("id, sponsor_id, type, title, description, url, file_path, file_type, image_url")
+        .in("sponsor_id", activeSponsorIds)
+        .eq("status", "published")
+        .order("created_at", { ascending: false })).data ?? []
+    : [];
+
+  const catalogItemIds = rawCatalogItems.map(r => r.id);
+
+  // Fetch explicitly assigned campaigns
+  const explicitCampaignIds = activeSponsorIds.length > 0
+    ? ((await supabase
+        .from("sponsor_campaign_speakers")
+        .select("campaign_id")
+        .eq("speaker_id", speaker.id)).data ?? []).map((r) => r.campaign_id)
+    : [];
+
+  // Fetch campaign mappings (either explicit or globally assigned)
+  const rawCampaigns = activeSponsorIds.length > 0
+    ? (await supabase
+        .from("sponsor_campaigns")
+        .select("id, name")
+        .in("sponsor_id", activeSponsorIds)
+        .eq("status", "active")
+        .or(`all_speakers_assigned.eq.true${explicitCampaignIds.length ? `,id.in.(${explicitCampaignIds.join(",")})` : ""}`)).data ?? []
+    : [];
+  const campaignNameMap: Record<string, string> = {};
+  for (const c of rawCampaigns) campaignNameMap[c.id] = c.name;
+
+  const rawJunctions = catalogItemIds.length > 0
+    ? (await supabase
+        .from("sponsor_resource_campaigns")
+        .select("resource_id, campaign_id")
+        .in("resource_id", catalogItemIds)).data ?? []
+    : [];
+  const itemCampaignMap: Record<string, string> = {};
+  for (const j of rawJunctions) {
+    if (!itemCampaignMap[j.resource_id] && campaignNameMap[j.campaign_id]) {
+      itemCampaignMap[j.resource_id] = campaignNameMap[j.campaign_id];
+    }
+  }
+
+  const catalogItems = rawCatalogItems.map(r => ({
+    ...r,
+    campaign_name: itemCampaignMap[r.id] ?? null,
+  }));
+
+  // Index catalog items by sponsor_id for O(1) lookup per row
+  const catalogBySponsor = new Map<string, typeof catalogItems>(
+    activeSponsorIds.map((sid) => [
+      sid,
+      catalogItems.filter((item) => item.sponsor_id === sid),
+    ])
+  );
+
   const list = (connections ?? []).map((c) => {
     const row = c as Record<string, unknown>;
-    const acc = row.sponsor_accounts as { company_name?: string; slug?: string } | { company_name?: string; slug?: string }[] | null;
+    const acc = row.sponsor_accounts as { id?: string; company_name?: string; slug?: string } | { id?: string; company_name?: string; slug?: string }[] | null;
     const sponsorAccount = Array.isArray(acc) ? acc[0] : acc;
+    const sponsorId = sponsorAccount?.id ?? null;
     return {
       id: row.id as string,
       status: row.status as string,
@@ -67,6 +136,8 @@ export default async function SponsorConnectionsPage() {
       endedAt: (row.ended_at as string | null) ?? null,
       companyName: sponsorAccount?.company_name ?? "—",
       sponsorSlug: sponsorAccount?.slug ?? null,
+      sponsorId: sponsorId,
+      sponsorCatalogItems: sponsorId ? (catalogBySponsor.get(sponsorId) ?? []) : [],
     };
   });
 
@@ -117,6 +188,8 @@ export default async function SponsorConnectionsPage() {
                   initiatedBy={conn.initiatedBy}
                   createdAt={conn.createdAt}
                   endedAt={conn.endedAt}
+                  sponsorId={conn.sponsorId}
+                  sponsorCatalogItems={conn.sponsorCatalogItems}
                 />
               ))}
             </ul>
@@ -126,3 +199,4 @@ export default async function SponsorConnectionsPage() {
     </div>
   );
 }
+

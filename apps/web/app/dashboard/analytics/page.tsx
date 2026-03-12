@@ -15,8 +15,6 @@ import {
   getSpeakerDeviceBreakdown,
   getSpeakerReferrerBreakdown,
   getSpeakerResourceTypePerformance,
-  getSpeakerActivityHeatmap,
-  getSpeakerConversionFunnel,
 } from "@fanflet/core";
 import type { DateRange } from "@fanflet/core";
 import { ResourceClickBreakdown } from "@/components/analytics/resource-click-breakdown";
@@ -25,9 +23,6 @@ import { LockedFeatureCard } from "@/components/analytics/locked-feature-card";
 import { DateRangeSelector } from "@/components/analytics/date-range-selector";
 import { DeviceChart } from "@/components/analytics/device-chart";
 import { ReferrerChart } from "@/components/analytics/referrer-chart";
-import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
-import { FunnelChart } from "@/components/analytics/funnel-chart";
-import { CSVExportButton } from "@/components/analytics/csv-export-button";
 
 export const metadata = {
   title: "Analytics",
@@ -106,7 +101,6 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
   const entitlements = await getSpeakerEntitlements(speaker.id);
   const hasBasicStats = entitlements.features.has("basic_engagement_stats");
   const hasClickAnalytics = entitlements.features.has("click_through_analytics");
-  const hasAdvancedReporting = entitlements.features.has("advanced_reporting");
   const canSeeAnalytics = hasBasicStats || hasClickAnalytics;
 
   if (!canSeeAnalytics) {
@@ -210,16 +204,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     : null;
   const resourceTypeData = resourceTypeResult?.data ?? [];
 
-  // Enterprise-tier data
-  const heatmapResult = hasAdvancedReporting
-    ? await getSpeakerActivityHeatmap(supabase, speaker.id, entitlements, range)
-    : null;
-  const heatmapData = heatmapResult?.data ?? [];
 
-  const funnelResult = hasAdvancedReporting
-    ? await getSpeakerConversionFunnel(supabase, speaker.id, entitlements, range)
-    : null;
-  const funnelData = funnelResult?.data ?? [];
 
   // Resource click breakdown (Pro)
   type ResourceClickStat = {
@@ -346,9 +331,6 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <p className="text-muted-foreground">Track engagement across all your Fanflets.</p>
         </div>
         <div className="flex items-center gap-3">
-          {hasAdvancedReporting && (
-            <CSVExportButton speakerId={speaker.id} rangeDays={rangeDays} />
-          )}
           {hasClickAnalytics && (
             <Suspense>
               <DateRangeSelector />
@@ -595,61 +577,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         />
       )}
 
-      {/* ================================================================ */}
-      {/* Enterprise-Tier: Activity Heatmap & Conversion Funnel            */}
-      {/* ================================================================ */}
-      {hasAdvancedReporting ? (
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Activity Heatmap</CardTitle>
-              <CardDescription>When your audience is most active ({rangeLabel}).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ActivityHeatmap data={heatmapData} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Conversion Funnel</CardTitle>
-              <CardDescription>Drop-off from scan to signup ({rangeLabel}).</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FunnelChart data={funnelData} />
-            </CardContent>
-          </Card>
-        </div>
-      ) : hasClickAnalytics ? (
-        <div className="grid gap-6 md:grid-cols-2">
-          <LockedFeatureCard
-            title="Activity Heatmap"
-            description="Discover the best times to share your fanflets — see when your audience is most active."
-            planRequired="Enterprise"
-          >
-            <div className="px-6 py-4">
-              <ActivityHeatmap data={Array.from({ length: 7 * 24 }, (_, i) => ({
-                dayOfWeek: Math.floor(i / 24),
-                hour: i % 24,
-                count: ((i * 7 + 3) % 11),
-              }))} />
-            </div>
-          </LockedFeatureCard>
-          <LockedFeatureCard
-            title="Conversion Funnel"
-            description="Track your audience journey from QR scan to email signup and see where drop-offs happen."
-            planRequired="Enterprise"
-          >
-            <div className="px-6 py-4">
-              <FunnelChart data={[
-                { step: "QR Scans", count: 100, dropOffPercent: 0 },
-                { step: "Page Views", count: 85, dropOffPercent: 15 },
-                { step: "Resource Clicks", count: 40, dropOffPercent: 52.9 },
-                { step: "Email Signups", count: 12, dropOffPercent: 70 },
-              ]} />
-            </div>
-          </LockedFeatureCard>
-        </div>
-      ) : null}
+
     </div>
   );
 }

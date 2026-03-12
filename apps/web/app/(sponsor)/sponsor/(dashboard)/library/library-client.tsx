@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,14 +16,12 @@ import {
   FileDown,
   Video,
   Building2,
-  MoreVertical,
+  Search,
+  X,
+  Megaphone,
+  Archive,
+  Globe,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,13 +67,13 @@ const typeLabels: Record<string, string> = {
   link: "Link",
   file: "File",
   video: "Video",
-  sponsor_block: "Sponsor block",
+  sponsor_block: "Sponsor Block",
 };
 
 const statusBadge: Record<string, string> = {
   draft: "Draft",
-  available: "Available",
-  unpublished: "Unpublished",
+  published: "Published",
+  archived: "Archived",
   removed: "Removed",
 };
 
@@ -102,6 +100,7 @@ export function SponsorLibraryClient({
   speakerLabel = "speaker",
 }: SponsorLibraryClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [addOpen, setAddOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
@@ -113,8 +112,14 @@ export function SponsorLibraryClient({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editUrl, setEditUrl] = useState("");
-  const [editAvailability, setEditAvailability] = useState<"all" | "specific" | "draft">("draft");
-  const [editCampaignId, setEditCampaignId] = useState<string | null>(null);
+  const [editStatus, setEditStatus] = useState<"draft" | "published" | "archived">("draft");
+  const [editCampaignIds, setEditCampaignIds] = useState<Set<string>>(new Set());
+  const [campaignSearch, setCampaignSearch] = useState("");
+
+  // Filters
+  const [filterKeyword, setFilterKeyword] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterCampaignId, setFilterCampaignId] = useState<string | null>(searchParams.get("campaign"));
 
   const storageLimitBytes = storageLimitMb * 1024 * 1024;
   const storagePct = storageLimitBytes > 0 ? Math.min(100, (storageUsedBytes / storageLimitBytes) * 100) : 0;
@@ -195,8 +200,8 @@ export function SponsorLibraryClient({
       title: editTitle.trim(),
       description: editDescription.trim() || undefined,
       url: editUrl.trim() || undefined,
-      availability: editAvailability,
-      campaign_id: editCampaignId ?? undefined,
+      status: editStatus,
+      campaign_ids: Array.from(editCampaignIds),
     });
     if (err.error) {
       toast.error(err.error);
@@ -207,13 +212,13 @@ export function SponsorLibraryClient({
     router.refresh();
   };
 
-  const handleSetStatus = async (id: string, status: "available" | "unpublished") => {
+  const handleSetStatus = async (id: string, status: "published" | "archived") => {
     const err = await setSponsorLibraryStatus(id, status);
     if (err.error) {
       toast.error(err.error);
       return;
     }
-    toast.success(status === "available" ? "Resource is now available to speakers." : "Resource unpublished.");
+    toast.success(status === "published" ? "Resource published." : "Resource archived.");
     router.refresh();
   };
 
@@ -238,11 +243,61 @@ export function SponsorLibraryClient({
     setEditTitle(r.title);
     setEditDescription(r.description ?? "");
     setEditUrl(r.url ?? "");
-    setEditAvailability(r.availability as "all" | "specific" | "draft");
-    setEditCampaignId(r.campaign_id ?? null);
+    setEditStatus((r.status as "draft" | "published" | "archived") ?? "draft");
+    setEditCampaignIds(new Set(r.campaign_ids ?? []));
+    setCampaignSearch("");
   };
 
-  const filteredResources = resources.filter((r) => r.status !== "removed");
+  const toggleEditCampaign = (id: string) => {
+    setEditCampaignIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const campaignMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of campaigns) map.set(c.id, c.name);
+    return map;
+  }, [campaigns]);
+
+  // Campaigns that are actually used by at least one resource (or actively filtered)
+  const usedCampaignIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (filterCampaignId) ids.add(filterCampaignId);
+    for (const r of resources) {
+      for (const cid of r.campaign_ids ?? []) ids.add(cid);
+    }
+    return ids;
+  }, [resources, filterCampaignId]);
+
+  const filterableCampaigns = useMemo(
+    () => campaigns.filter((c) => usedCampaignIds.has(c.id)),
+    [campaigns, usedCampaignIds]
+  );
+
+  const filteredResources = useMemo(() => {
+    let result = resources.filter((r) => r.status !== "removed");
+    if (filterKeyword) {
+      const kw = filterKeyword.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.title.toLowerCase().includes(kw) ||
+          (r.description ?? "").toLowerCase().includes(kw)
+      );
+    }
+    if (filterStatus) {
+      result = result.filter((r) => r.status === filterStatus);
+    }
+    if (filterCampaignId) {
+      result = result.filter((r) => (r.campaign_ids ?? []).includes(filterCampaignId));
+    }
+    return result;
+  }, [resources, filterKeyword, filterStatus, filterCampaignId]);
+
+  const hasActiveFilters = !!filterKeyword || !!filterStatus || !!filterCampaignId;
 
   return (
     <div className="space-y-6">
@@ -264,78 +319,213 @@ export function SponsorLibraryClient({
         </Button>
       </div>
 
+      {/* Filters */}
+      {resources.filter((r) => r.status !== "removed").length > 0 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search resources…"
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Status group */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Status:</span>
+              {(["draft", "published", "archived"] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setFilterStatus(filterStatus === s ? null : s)}
+                  className={`inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    filterStatus === s
+                      ? "border-teal-500 bg-teal-50 text-teal-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  {statusBadge[s]}
+                </button>
+              ))}
+            </div>
+
+            {/* Campaign group */}
+            {filterableCampaigns.length > 0 && (
+              <>
+                <div className="h-5 border-l border-slate-200" />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {filterableCampaigns.length > 5 ? "Campaign:" : "Campaigns:"}
+                  </span>
+                  {filterableCampaigns.length <= 5 ? (
+                    filterableCampaigns.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setFilterCampaignId(filterCampaignId === c.id ? null : c.id)}
+                        className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          filterCampaignId === c.id
+                            ? "border-violet-500 bg-violet-50 text-violet-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Megaphone className="h-3 w-3" />
+                        {c.name}
+                      </button>
+                    ))
+                  ) : (
+                    <select
+                      value={filterCampaignId ?? ""}
+                      onChange={(e) => setFilterCampaignId(e.target.value || null)}
+                      className="h-7 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1"
+                    >
+                      <option value="">All campaigns</option>
+                      {filterableCampaigns.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Clear button */}
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterKeyword("");
+                  setFilterStatus(null);
+                  setFilterCampaignId(null);
+                }}
+                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        <span className="font-medium">Draft</span> — only visible to you.{" "}
+        <span className="font-medium">Published</span> — available for {speakerLabel}s to add to their fanflets.{" "}
+        <span className="font-medium">Archived</span> — hidden from new {speakerLabel}s, but still visible on fanflets where it was already placed.
+      </p>
+
       {filteredResources.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <p>No resources yet. Add a link or upload a file to make it available to your connected {speakerLabel}s.</p>
+            {hasActiveFilters ? (
+              <p>No resources match your filters.</p>
+            ) : (
+              <p>No resources yet. Add a link or upload a file to make it available to your connected {speakerLabel}s.</p>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredResources.map((r) => {
             const Icon = typeIcons[r.type] ?? Link2;
+            const resourceCampaigns = (r.campaign_ids ?? [])
+              .map((cid) => ({ id: cid, name: campaignMap.get(cid) }))
+              .filter((c): c is { id: string; name: string } => !!c.name);
             return (
-              <Card key={r.id} className="flex flex-col">
-                <CardContent className="p-4 flex flex-col flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="shrink-0 w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
-                        <Icon className="h-4 w-4 text-slate-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{r.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {typeLabels[r.type] ?? r.type}
-                          {r.file_size_bytes != null && ` · ${formatFileSize(r.file_size_bytes)}`}
-                        </p>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(r)}>Edit</DropdownMenuItem>
-                        {r.status === "draft" || r.status === "unpublished" ? (
-                          <DropdownMenuItem onClick={() => handleSetStatus(r.id, "available")}>
-                            Make available
-                          </DropdownMenuItem>
-                        ) : r.status === "available" ? (
-                          <DropdownMenuItem onClick={() => handleSetStatus(r.id, "unpublished")}>
-                            Unpublish
-                          </DropdownMenuItem>
-                        ) : null}
-                        <DropdownMenuItem
-                          className="text-red-600"
-                          onClick={() => setRemoveId(r.id)}
-                        >
-                          Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
-                        r.status === "available"
-                          ? "bg-green-100 text-green-800"
-                          : r.status === "unpublished"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {statusBadge[r.status] ?? r.status}
+              <div
+                key={r.id}
+                className="rounded-xl shadow-sm border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 border-l-[#20ACE4] flex flex-col"
+              >
+                {/* Tinted header row */}
+                <div className="bg-sky-50/70 border-b border-gray-100 flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4 text-[#104160]" />
+                    <span className="text-xs font-medium text-[#104160]">
+                      {typeLabels[r.type] ?? r.type}
                     </span>
-                    {r.placement_count != null && r.placement_count > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        On {r.placement_count} fanflet{r.placement_count !== 1 ? "s" : ""}
-                      </span>
-                    )}
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex items-center gap-1">
+                    <button
+                      aria-label="Edit resource"
+                      onClick={() => openEdit(r)}
+                      title="Edit"
+                      className="p-1.5 rounded-md hover:bg-[#20ACE4]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20ACE4] transition-colors"
+                    >
+                      <Pencil className="w-4 h-4 text-[#104160]" />
+                    </button>
+                    {(r.status === "draft" || r.status === "archived") && (
+                      <button
+                        aria-label="Publish resource"
+                        onClick={() => handleSetStatus(r.id, "published")}
+                        title="Publish"
+                        className="p-1.5 rounded-md hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 transition-colors"
+                      >
+                        <Globe className="w-4 h-4 text-emerald-600" />
+                      </button>
+                    )}
+                    {r.status === "published" && (
+                      <button
+                        aria-label="Archive resource"
+                        onClick={() => handleSetStatus(r.id, "archived")}
+                        title="Archive"
+                        className="p-1.5 rounded-md hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition-colors"
+                      >
+                        <Archive className="w-4 h-4 text-amber-600" />
+                      </button>
+                    )}
+                    <button
+                      aria-label="Delete resource"
+                      onClick={() => setRemoveId(r.id)}
+                      title="Remove"
+                      className="p-1.5 rounded-md hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 flex-1 flex flex-col">
+                  <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
+                    {r.title}
+                  </h3>
+                  
+                  {r.file_size_bytes != null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatFileSize(r.file_size_bytes)}
+                    </p>
+                  )}
+
+                  <div className="mt-auto">
+                    <div className="flex items-center gap-2 mt-4 flex-wrap">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${
+                        r.status === "published"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : r.status === "archived"
+                            ? "bg-amber-50 text-amber-700 border-amber-200"
+                            : "bg-slate-50 text-slate-700 border-slate-200"
+                      }`}>
+                        {statusBadge[r.status] ?? r.status}
+                      </span>
+
+                      {resourceCampaigns.map((c) => (
+                        <span key={c.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-white text-gray-600 border border-gray-200 max-w-[150px] truncate">
+                          <span className="text-[#20ACE4] shrink-0">⟐</span>
+                          <span className="truncate">{c.name}</span>
+                        </span>
+                      ))}
+
+                      {r.placement_count != null && r.placement_count > 0 && (
+                        <span className="text-[11px] text-muted-foreground ml-auto">
+                          On {r.placement_count} fanflet{r.placement_count !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -426,7 +616,7 @@ export function SponsorLibraryClient({
       <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit resource</DialogTitle>
+            <DialogTitle>Edit Resource</DialogTitle>
           </DialogHeader>
           <div className="space-y-5 py-4">
             <div>
@@ -456,38 +646,54 @@ export function SponsorLibraryClient({
               />
             </div>
             <div>
-              <Label className="block mb-1.5">Availability</Label>
-              <div className="flex gap-2 mt-1">
-                {(["all", "specific", "draft"] as const).map((a) => (
-                  <Button
-                    key={a}
-                    type="button"
-                    variant={editAvailability === a ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setEditAvailability(a)}
-                  >
-                    {a === "all" ? "All connected" : a === "specific" ? `Specific ${speakerLabel}s` : "Draft"}
-                  </Button>
-                ))}
-              </div>
+              <Label htmlFor="edit-status" className="block mb-1.5">Status</Label>
+              <select
+                id="edit-status"
+                value={editStatus}
+                onChange={(e) => setEditStatus(e.target.value as "draft" | "published" | "archived")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </select>
             </div>
-            {campaigns.length > 0 && (
-              <div>
-                <Label className="block mb-1.5">Campaign (optional)</Label>
-                <select
-                  value={editCampaignId ?? ""}
-                  onChange={(e) => setEditCampaignId(e.target.value || null)}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="">None</option>
-                  {campaigns.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {campaigns.length > 0 && (() => {
+              const filtered = campaignSearch
+                ? campaigns.filter((c) => c.name.toLowerCase().includes(campaignSearch.toLowerCase()))
+                : campaigns;
+              return (
+                <div>
+                  <Label className="block mb-1.5">Campaigns (optional)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">Assign this resource to one or more campaigns.</p>
+                  {campaigns.length > 10 && (
+                    <Input
+                      placeholder="Search campaigns…"
+                      value={campaignSearch}
+                      onChange={(e) => setCampaignSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  )}
+                  <div className="border rounded-md p-3 max-h-60 overflow-y-auto space-y-2">
+                    {filtered.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No campaigns match your search.</p>
+                    ) : (
+                      filtered.map((c) => (
+                        <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={editCampaignIds.has(c.id)}
+                            onChange={() => toggleEditCampaign(c.id)}
+                            className="rounded border-slate-300"
+                          />
+                          <span className="text-sm">{c.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditId(null)}>

@@ -9,59 +9,61 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@fanflet/ui/select";
-import { FREE_PLAN_NAME } from "@fanflet/db/constants";
-import { changeSpeakerPlan } from "./actions";
+import { updateSponsorPlan } from "./actions";
 import { toast } from "sonner";
 
-/** Only used when the free plan is not in the active plans list (e.g. deactivated). Radix Select disallows empty string. */
-const NO_SUBSCRIPTION_VALUE = "__no_sub__";
-
-export interface PlanOption {
+export interface SponsorPlanOption {
   id: string;
   name: string;
-  display_name: string;
+  display_name: string | null;
 }
 
-interface PlanSelectorProps {
-  speakerId: string;
+interface SponsorPlanSelectorProps {
+  sponsorId: string;
   currentPlanId: string | null;
   currentPlanName: string;
-  plans: PlanOption[];
+  plans: SponsorPlanOption[];
 }
 
-export function PlanSelector({
-  speakerId,
+export function SponsorPlanSelector({
+  sponsorId,
   currentPlanId,
   currentPlanName,
   plans,
-}: PlanSelectorProps) {
+}: SponsorPlanSelectorProps) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const freePlan = plans.find((p) => p.name === FREE_PLAN_NAME);
-  const value = currentPlanId ?? freePlan?.id ?? NO_SUBSCRIPTION_VALUE;
+  const value = currentPlanId ?? plans[0]?.id ?? "";
 
   useEffect(() => setMounted(true), []);
 
   async function handleChange(newValue: string) {
-    const planId = newValue === NO_SUBSCRIPTION_VALUE ? null : newValue;
-    if (planId === currentPlanId) return;
+    if (!newValue || newValue === currentPlanId) return;
     setLoading(true);
-    const result = await changeSpeakerPlan(speakerId, planId);
+    const result = await updateSponsorPlan(sponsorId, newValue);
     setLoading(false);
     if (result.error) {
       toast.error(result.error);
     } else {
       router.refresh();
       const displayName =
-        planId === null
-          ? (freePlan?.display_name ?? "No subscription")
-          : (plans.find((p) => p.id === planId)?.display_name ?? "selected plan");
+        plans.find((p) => p.id === newValue)?.display_name ??
+        plans.find((p) => p.id === newValue)?.name ??
+        "Plan";
       toast.success(`Plan set to ${displayName}`);
     }
   }
 
   if (!mounted) {
+    return (
+      <p className="text-base font-medium text-fg">
+        {currentPlanName}
+      </p>
+    );
+  }
+
+  if (plans.length === 0) {
     return (
       <p className="text-base font-medium text-fg">
         {currentPlanName}
@@ -82,14 +84,9 @@ export function PlanSelector({
         <SelectValue placeholder="—" />
       </SelectTrigger>
       <SelectContent position="popper" align="start" sideOffset={4}>
-        {!freePlan && (
-          <SelectItem value={NO_SUBSCRIPTION_VALUE}>
-            No subscription
-          </SelectItem>
-        )}
         {plans.map((p) => (
           <SelectItem key={p.id} value={p.id}>
-            {p.display_name}
+            {p.display_name ?? p.name}
           </SelectItem>
         ))}
       </SelectContent>

@@ -10,7 +10,7 @@ import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 
 const sponsorNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/sponsor/dashboard" },
-  { icon: Library, label: "Library", href: "/sponsor/library" },
+  { icon: Library, label: "Resource Library", href: "/sponsor/library" },
   { icon: Megaphone, label: "Campaigns", href: "/sponsor/campaigns" },
   { icon: Users, label: "Leads", href: "/sponsor/leads" },
   { icon: Link2, label: "Connections", href: "/sponsor/connections" },

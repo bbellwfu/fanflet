@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +16,6 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { formatDate } from "@fanflet/db/timezone";
 import { useTimezone } from "@/lib/timezone-context";
-
 function displayStatus(status: string, endedAt: string | null): string {
   if (status === "revoked") return "Canceled by Speaker";
   if (status === "active" && endedAt) return "Ended";
@@ -29,6 +29,10 @@ interface ConnectionRowProps {
   initiatedBy: string;
   createdAt: string;
   endedAt: string | null;
+  /** Sponsor catalog items for this connection (only used for length count). */
+  sponsorCatalogItems?: { id: string }[];
+  /** Sponsor Account ID, required for linking to the resource library */
+  sponsorId?: string | null;
 }
 
 export function ConnectionRow({
@@ -38,6 +42,8 @@ export function ConnectionRow({
   initiatedBy,
   createdAt,
   endedAt,
+  sponsorCatalogItems = [],
+  sponsorId,
 }: ConnectionRowProps) {
   const timezone = useTimezone();
   const [loading, setLoading] = useState(false);
@@ -99,62 +105,72 @@ export function ConnectionRow({
 
   return (
     <>
-      <li className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div className="min-w-0">
-          <p className="font-medium truncate">{companyName}</p>
-          <p className="text-xs text-muted-foreground">
-            {subtitle}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          {canRescind && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={() => setConfirmOpen(true)}
-              disabled={loading}
+      <li className="py-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <p className="font-medium truncate">{companyName}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mt-0.5">
+              <span className="text-muted-foreground">{subtitle}</span>
+              {status === "active" && !endedAt && sponsorId && sponsorCatalogItems.length > 0 && (
+                <Link
+                  href={`/dashboard/resources?tab=sponsor&sponsorId=${sponsorId}`}
+                  className="font-medium text-[#3BA5D9] hover:underline whitespace-nowrap"
+                >
+                  {sponsorCatalogItems.length} available resource{sponsorCatalogItems.length !== 1 && "s"} 
+                </Link>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {canRescind && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={() => setConfirmOpen(true)}
+                disabled={loading}
+              >
+                Cancel request
+              </Button>
+            )}
+            {canEndConnection && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setEndConfirmOpen(true)}
+                disabled={loading}
+              >
+                End connection
+              </Button>
+            )}
+            {canHideFromView && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setHideConfirmOpen(true)}
+                disabled={loading}
+              >
+                Hide from list
+              </Button>
+            )}
+            <span
+              className={`text-xs font-medium px-2 py-1 rounded ${
+                status === "active" && endedAt
+                  ? "bg-slate-100 text-slate-600"
+                  : status === "active"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : status === "pending"
+                      ? "bg-amber-100 text-amber-800"
+                      : status === "revoked"
+                        ? "bg-slate-100 text-slate-500"
+                        : "bg-slate-100 text-slate-600"
+              }`}
             >
-              Cancel request
-            </Button>
-          )}
-          {canEndConnection && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => setEndConfirmOpen(true)}
-              disabled={loading}
-            >
-              End connection
-            </Button>
-          )}
-          {canHideFromView && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => setHideConfirmOpen(true)}
-              disabled={loading}
-            >
-              Hide from list
-            </Button>
-          )}
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded ${
-              status === "active" && endedAt
-                ? "bg-slate-100 text-slate-600"
-                : status === "active"
-                  ? "bg-emerald-100 text-emerald-800"
-                  : status === "pending"
-                    ? "bg-amber-100 text-amber-800"
-                    : status === "revoked"
-                      ? "bg-slate-100 text-slate-500"
-                      : "bg-slate-100 text-slate-600"
-            }`}
-          >
-            {statusLabel}
-          </span>
+              {statusLabel}
+            </span>
+          </div>
         </div>
       </li>
 

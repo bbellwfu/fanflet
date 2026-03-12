@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Loader2, Megaphone, Users, FileText, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, Loader2, Megaphone, Users, FileText, Pencil, Trash2 } from "lucide-react";
+import { addDays, endOfMonth, addMonths, endOfQuarter, addQuarters, endOfYear, format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +43,55 @@ const statusBadge: Record<string, string> = {
   ended: "Ended",
 };
 
+function formatLocalDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+  return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+type EndDatePresetKey = "30d" | "eom" | "eonm" | "eoq" | "eonq" | "eoy";
+
+const END_DATE_PRESETS: { key: EndDatePresetKey; label: string; compute: () => string }[] = [
+  { key: "30d", label: "30 days", compute: () => format(addDays(new Date(), 30), "yyyy-MM-dd") },
+  { key: "eom", label: "End of month", compute: () => format(endOfMonth(new Date()), "yyyy-MM-dd") },
+  { key: "eonm", label: "End of next month", compute: () => format(endOfMonth(addMonths(new Date(), 1)), "yyyy-MM-dd") },
+  { key: "eoq", label: "End of quarter", compute: () => format(endOfQuarter(new Date()), "yyyy-MM-dd") },
+  { key: "eonq", label: "End of next quarter", compute: () => format(endOfQuarter(addQuarters(new Date(), 1)), "yyyy-MM-dd") },
+  { key: "eoy", label: "End of year", compute: () => format(endOfYear(new Date()), "yyyy-MM-dd") },
+];
+
+function EndDatePresets({
+  activePreset,
+  onSelect,
+}: {
+  activePreset: EndDatePresetKey | null;
+  onSelect: (key: EndDatePresetKey, value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {END_DATE_PRESETS.map((p) => (
+        <button
+          key={p.key}
+          type="button"
+          onClick={() => onSelect(p.key, p.compute())}
+          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
+            activePreset === p.key
+              ? "border-teal-500 bg-teal-50 text-teal-700"
+              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+          }`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 interface CampaignsClientProps {
   campaigns: SponsorCampaignRow[];
   connectedSpeakers: { id: string; name: string }[];
@@ -65,7 +110,10 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [status, setStatus] = useState<"draft" | "active" | "ended">("draft");
+  const [endDatePreset, setEndDatePreset] = useState<EndDatePresetKey | null>(null);
   const [selectedSpeakerIds, setSelectedSpeakerIds] = useState<Set<string>>(new Set());
+  const [assignAllSpeakers, setAssignAllSpeakers] = useState(false);
+  const [resourceCount, setResourceCount] = useState(0);
 
   const toggleSpeaker = (id: string) => {
     setSelectedSpeakerIds((prev) => {
@@ -92,8 +140,11 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
       setDescription(d.description ?? "");
       setStartDate(d.start_date);
       setEndDate(d.end_date ?? "");
+      setEndDatePreset(null);
       setStatus((d.status as "draft" | "active" | "ended") ?? "draft");
       setSelectedSpeakerIds(new Set(d.speaker_ids ?? []));
+      setAssignAllSpeakers(!!d.all_speakers_assigned);
+      setResourceCount(d.resource_count ?? 0);
     },
     []
   );
@@ -104,8 +155,21 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
     setDescription("");
     setStartDate("");
     setEndDate("");
+    setEndDatePreset(null);
     setStatus("draft");
     setSelectedSpeakerIds(new Set());
+    setAssignAllSpeakers(false);
+    setResourceCount(0);
+  }, []);
+
+  const selectEndDatePreset = useCallback((key: EndDatePresetKey, value: string) => {
+    setEndDate(value);
+    setEndDatePreset(key);
+  }, []);
+
+  const handleEndDateManualChange = useCallback((value: string) => {
+    setEndDate(value);
+    setEndDatePreset(null);
   }, []);
 
   const handleUpdate = async () => {
@@ -125,6 +189,7 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
       start_date: startDate,
       end_date: endDate.trim() || undefined,
       status,
+      all_speakers_assigned: assignAllSpeakers,
       speaker_ids: Array.from(selectedSpeakerIds),
     });
     setSubmitting(false);
@@ -166,6 +231,8 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
       description: description.trim() || undefined,
       start_date: startDate,
       end_date: endDate.trim() || undefined,
+      status,
+      all_speakers_assigned: assignAllSpeakers,
       speaker_ids: Array.from(selectedSpeakerIds),
     });
     setSubmitting(false);
@@ -179,7 +246,10 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
     setDescription("");
     setStartDate("");
     setEndDate("");
+    setEndDatePreset(null);
+    setStatus("draft");
     setSelectedSpeakerIds(new Set());
+    setAssignAllSpeakers(false);
     router.refresh();
   };
 
@@ -205,79 +275,93 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {campaigns.map((c) => (
-            <Card key={c.id} className="flex flex-col">
-              <CardContent className="p-4 flex flex-col flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="shrink-0 w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <Megaphone className="h-4 w-4 text-slate-600" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.start_date}
-                        {c.end_date ? ` – ${c.end_date}` : " – ongoing"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
+            <div
+              key={c.id}
+              className="rounded-xl shadow-sm border border-gray-200 overflow-hidden bg-white hover:shadow-md transition-shadow border-l-4 border-l-violet-500 flex flex-col"
+            >
+              <div className="bg-violet-50/70 border-b border-gray-100 flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="w-4 h-4 text-violet-700" />
+                  <span className="text-xs font-medium text-violet-700">
+                    Campaign
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    aria-label="Edit campaign"
+                    onClick={() => openEdit(c.id)}
+                    title="Edit"
+                    className="p-1.5 rounded-md hover:bg-violet-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 transition-colors"
+                  >
+                    <Pencil className="w-4 h-4 text-violet-700" />
+                  </button>
+                  <button
+                    aria-label="Delete campaign"
+                    onClick={() => setDeleteId(c.id)}
+                    title="Delete"
+                    className="p-1.5 rounded-md hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-500" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 flex-1 flex flex-col">
+                <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
+                  {c.name}
+                </h3>
+                
+                <p className="text-xs text-muted-foreground mt-1">
+                  Date Range: {formatLocalDate(c.start_date)}
+                  {c.end_date ? ` to ${formatLocalDate(c.end_date)}` : " to ongoing"}
+                </p>
+
+                <div className="mt-auto pt-4">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border ${
                         c.status === "active"
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                           : c.status === "ended"
-                            ? "bg-slate-100 text-slate-700"
-                            : "bg-amber-100 text-amber-800"
+                            ? "bg-slate-50 text-slate-700 border-slate-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}
                     >
                       {statusBadge[c.status] ?? c.status}
                     </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">Manage campaign</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEdit(c.id)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onClick={() => setDeleteId(c.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+
+                    <div className="flex items-center gap-3 ml-auto text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {c.all_speakers_assigned ? (
+                          "All speakers"
+                        ) : (
+                          `${c.speaker_count ?? 0} ${speakerLabel}${(c.speaker_count ?? 0) !== 1 ? "s" : ""}`
+                        )}
+                      </span>
+                      <Link 
+                        href={`/sponsor/library?campaign=${c.id}`}
+                        className="flex items-center gap-1 hover:text-violet-600 hover:underline transition-colors"
+                      >
+                        <FileText className="h-3 w-3" />
+                        {c.resource_count ?? 0} resource{(c.resource_count ?? 0) !== 1 ? "s" : ""}
+                      </Link>
+                    </div>
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3.5 w-3" />
-                    {c.speaker_count ?? 0} {speakerLabel}{c.speaker_count !== 1 ? "s" : ""}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <FileText className="h-3.5 w-3" />
-                    {c.resource_count ?? 0} resource{(c.resource_count ?? 0) !== 1 ? "s" : ""}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>New campaign</DialogTitle>
             <DialogDescription>Name your campaign, set the date range, and assign {speakerLabel}s.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 py-4">
+          <div className="space-y-5 pl-1 pr-4 py-4 max-h-[60vh] overflow-y-auto shadow-[inset_0_-20px_20px_-20px_rgba(0,0,0,0.1)]">
             <div>
               <Label htmlFor="campaign-name" className="block mb-1.5">Campaign name</Label>
               <Input
@@ -296,7 +380,7 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>
                 <Label htmlFor="start-date" className="block mb-1.5">Start date</Label>
                 <Input
@@ -308,34 +392,62 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
               </div>
               <div>
                 <Label htmlFor="end-date" className="block mb-1.5">End date (optional)</Label>
+                <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} />
                 <Input
                   id="end-date"
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  onChange={(e) => handleEndDateManualChange(e.target.value)}
+                  className="mt-1.5"
                 />
               </div>
             </div>
             <div>
+              <Label htmlFor="create-status" className="block mb-1.5">Status</Label>
+              <select
+                id="create-status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as "draft" | "active" | "ended")}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="ended">Ended</option>
+              </select>
+            </div>
+            <div>
               <Label className="block mb-1.5">Assigned {speakerLabel}s (optional)</Label>
               <p className="text-xs text-muted-foreground mb-2">Select connected {speakerLabel}s in this campaign.</p>
-              <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                {connectedSpeakers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No active connections yet.</p>
-                ) : (
-                  connectedSpeakers.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedSpeakerIds.has(s.id)}
-                        onChange={() => toggleSpeaker(s.id)}
-                        className="rounded border-slate-300"
-                      />
-                      <span className="text-sm">{s.name}</span>
-                    </label>
-                  ))
-                )}
-              </div>
+              
+              <label className="flex items-center gap-2 cursor-pointer mb-3 p-2 bg-slate-50 border rounded-md">
+                <input
+                  type="checkbox"
+                  checked={assignAllSpeakers}
+                  onChange={(e) => setAssignAllSpeakers(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-sm font-medium">Assign to all current and future connected {speakerLabel}s</span>
+              </label>
+
+              {!assignAllSpeakers && (
+                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                  {connectedSpeakers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No active connections yet.</p>
+                  ) : (
+                    connectedSpeakers.map((s) => (
+                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedSpeakerIds.has(s.id)}
+                          onChange={() => toggleSpeaker(s.id)}
+                          className="rounded border-slate-300"
+                        />
+                        <span className="text-sm">{s.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -350,7 +462,7 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
       </Dialog>
 
       <Dialog open={!!editingId} onOpenChange={(open) => !open && closeEdit()}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit campaign</DialogTitle>
             <DialogDescription>Update name, dates, status, and assigned {speakerLabel}s.</DialogDescription>
@@ -360,7 +472,7 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="space-y-5 py-4">
+            <div className="space-y-5 pl-1 pr-4 py-4 max-h-[60vh] overflow-y-auto shadow-[inset_0_-20px_20px_-20px_rgba(0,0,0,0.1)]">
               <div>
                 <Label htmlFor="edit-campaign-name" className="block mb-1.5">Campaign name</Label>
                 <Input
@@ -379,7 +491,20 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                   rows={2}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              {resourceCount > 0 && (
+                <div className="flex items-center justify-between bg-violet-50/50 border border-violet-100 p-3 rounded-md">
+                  <div className="flex items-center gap-2 text-violet-800">
+                    <FileText className="h-4 w-4" />
+                    <span className="text-sm font-medium">{resourceCount} Linked resource{resourceCount !== 1 && 's'}</span>
+                  </div>
+                  <Button variant="outline" size="sm" asChild className="h-7 text-xs bg-white text-violet-800 border-violet-200 hover:bg-violet-50 hover:text-violet-900">
+                    <Link href={`/sponsor/library?campaign=${editingId}`} target="_blank">
+                      View in Library
+                    </Link>
+                  </Button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <Label htmlFor="edit-start-date" className="block mb-1.5">Start date</Label>
                   <Input
@@ -391,11 +516,13 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                 </div>
                 <div>
                   <Label htmlFor="edit-end-date" className="block mb-1.5">End date (optional)</Label>
+                  <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} />
                   <Input
                     id="edit-end-date"
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => handleEndDateManualChange(e.target.value)}
+                    className="mt-1.5"
                   />
                 </div>
               </div>
@@ -415,23 +542,36 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
               <div>
                 <Label className="block mb-1.5">Assigned {speakerLabel}s</Label>
                 <p className="text-xs text-muted-foreground mb-2">Select connected {speakerLabel}s in this campaign.</p>
-                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                  {connectedSpeakers.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No active connections yet.</p>
-                  ) : (
-                    connectedSpeakers.map((s) => (
-                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSpeakerIds.has(s.id)}
-                          onChange={() => toggleSpeaker(s.id)}
-                          className="rounded border-slate-300"
-                        />
-                        <span className="text-sm">{s.name}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer mb-3 p-2 bg-slate-50 border rounded-md">
+                  <input
+                    type="checkbox"
+                    checked={assignAllSpeakers}
+                    onChange={(e) => setAssignAllSpeakers(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-sm font-medium">Assign to all current and future connected {speakerLabel}s</span>
+                </label>
+
+                {!assignAllSpeakers && (
+                  <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                    {connectedSpeakers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No active connections yet.</p>
+                    ) : (
+                      connectedSpeakers.map((s) => (
+                        <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedSpeakerIds.has(s.id)}
+                            onChange={() => toggleSpeaker(s.id)}
+                            className="rounded border-slate-300"
+                          />
+                          <span className="text-sm">{s.name}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -454,7 +594,7 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
             <AlertDialogTitle>Delete campaign?</AlertDialogTitle>
             <AlertDialogDescription>
               This will remove the campaign. {speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s and resources linked to it will no longer be grouped under this
-              campaign. Resources in Library will keep their content but their campaign link will be cleared. This
+              campaign. Resources in the Resource Library will keep their content but their campaign link will be cleared. This
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

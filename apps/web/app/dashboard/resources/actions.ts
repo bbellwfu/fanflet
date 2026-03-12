@@ -316,3 +316,128 @@ export async function deleteLibraryResource(
   revalidatePath('/dashboard/resources')
   return { success: true }
 }
+
+export type SponsorCatalogResource = {
+  id: string
+  sponsor_id: string
+  sponsor_name: string
+  campaign_id: string | null
+  campaign_name: string | null
+  type: string
+  title: string
+  description: string | null
+  url: string | null
+  file_path: string | null
+  file_type: string | null
+  file_size_bytes: number | null
+  image_url: string | null
+}
+
+export async function listSponsorResourcesForSpeaker(): Promise<{
+  data?: SponsorCatalogResource[]
+  error?: string
+}> {
+  const { supabase, speakerId } = await requireSpeaker()
+
+  // 1. Get active sponsor connections
+  const { data: connections, error: connError } = await supabase
+    .from('sponsor_connections')
+    .select('sponsor_id, sponsor_accounts(company_name)')
+    .eq('speaker_id', speakerId)
+    .eq('status', 'active')
+    .is('ended_at', null)
+
+  if (connError) return { error: connError.message }
+
+  const sponsorMap: Record<string, string> = {}
+  for (const c of connections ?? []) {
+    const row = c as Record<string, unknown>
+    const acc = row.sponsor_accounts as { company_name: string } | { company_name: string }[] | null
+    const sponsor = Array.isArray(acc) ? acc[0] : acc
+    if (sponsor) sponsorMap[c.sponsor_id] = sponsor.company_name
+  }
+
+  const sponsorIds = Object.keys(sponsorMap)
+  if (sponsorIds.length === 0) return { data: [] }
+
+  // 2. Fetch raw published resources for those sponsors
+  const { data: catalogItemsRaw, error: itemsError } = await supabase
+    .from('sponsor_resource_library')
+    .select('id, sponsor_id, type, title, description, url, file_path, file_type, file_size_bytes, image_url')
+    .in('sponsor_id', sponsorIds)
+    .eq('status', 'published')
+    .order('created_at', { ascending: false })
+
+  if (itemsError) return { error: itemsError.message }
+  if (!catalogItemsRaw || catalogItemsRaw.length === 0) return { data: [] }
+
+  // 3. Determine which ones the speaker actually has access to via campaigns
+  // Fetch explicitly assigned campaigns
+  const { data: explicitCampaigns } = await supabase
+    .from('sponsor_campaign_speakers')
+    .select('campaign_id')
+    .eq('speaker_id', speakerId)
+
+  const explicitCampaignIds = (explicitCampaigns ?? []).map((r) => r.campaign_id)
+
+  // Fetch campaign details
+  const { data: campaignsRaw } = await supabase
+    .from('sponsor_campaigns')
+    .select('id, sponsor_id, name')
+    .in('sponsor_id', sponsorIds)
+    .eq('status', 'active')
+    .or(`all_speakers_assigned.eq.true${explicitCampaignIds.length ? `,id.in.(${explicitCampaignIds.join(',')})` : ''}`)
+
+  const campaignMap: Record<string, { name: string; sponsor_id: string }> = {}
+  for (const c of campaignsRaw ?? []) {
+    campaignMap[c.id] = { name: c.name, sponsor_id: c.sponsor_id }
+  }
+
+  // Find out which campaigns the resources belong to
+  const catalogItemIds = catalogItemsRaw.map((r) => r.id)
+  const { data: resourceCampaignsRaw } = await supabase
+    .from('sponsor_resource_campaigns')
+    .select('resource_id, campaign_id')
+    .in('resource_id', catalogItemIds)
+
+  const resourceCampaigns: Record<string, string[]> = {}
+  for (const rc of resourceCampaignsRaw ?? []) {
+    if (!resourceCampaigns[rc.resource_id]) resourceCampaigns[rc.resource_id] = []
+    resourceCampaigns[rc.resource_id].push(rc.campaign_id)
+  }
+
+  const results: SponsorCatalogResource[] = []
+
+  for (const item of catalogItemsRaw) {
+    const itemCampaignIds = resourceCampaigns[item.id] ?? []
+
+    let finalCampaignId: string | null = null
+    let finalCampaignName: string | null = null
+
+    if (itemCampaignIds.length > 0) {
+      // Find the first assigned campaign that the speaker has access to
+      const validCampaignId = itemCampaignIds.find((id) => campaignMap[id] !== undefined)
+      if (!validCampaignId) continue // Item is tied to campaigns, but speaker doesn't have access to any of them
+      finalCampaignId = validCampaignId
+      finalCampaignName = campaignMap[validCampaignId].name
+    }
+
+    results.push({
+      id: item.id,
+      sponsor_id: item.sponsor_id,
+      sponsor_name: sponsorMap[item.sponsor_id],
+      campaign_id: finalCampaignId,
+      campaign_name: finalCampaignName,
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      url: item.url,
+      file_path: item.file_path,
+      file_type: item.file_type,
+      file_size_bytes: item.file_size_bytes,
+      image_url: item.image_url,
+    })
+  }
+
+  return { data: results }
+}

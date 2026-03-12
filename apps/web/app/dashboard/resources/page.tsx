@@ -3,7 +3,7 @@ import { getSpeakerEntitlements } from "@fanflet/db";
 import { getStorageQuota } from "@fanflet/db/storage";
 import { redirect } from "next/navigation";
 import { ResourceLibrary } from "@/components/dashboard/resource-library";
-import { listLibraryResources, getSpeakerStorageUsage } from "./actions";
+import { listLibraryResources, getSpeakerStorageUsage, listSponsorResourcesForSpeaker } from "./actions";
 
 export default async function ResourceLibraryPage() {
   const supabase = await createClient();
@@ -23,9 +23,10 @@ export default async function ResourceLibraryPage() {
     redirect("/dashboard/settings");
   }
 
-  const [entitlements, resourcesResult, storageResult, activeConnectionsResult, endedConnectionsResult] = await Promise.all([
+  const [entitlements, resourcesResult, sponsorResourcesResult, storageResult, activeConnectionsResult, endedConnectionsResult, fanfletsResult] = await Promise.all([
     getSpeakerEntitlements(speaker.id),
     listLibraryResources(),
+    listSponsorResourcesForSpeaker(),
     getSpeakerStorageUsage(),
     supabase
       .from("sponsor_connections")
@@ -39,10 +40,21 @@ export default async function ResourceLibraryPage() {
       .eq("speaker_id", speaker.id)
       .eq("status", "active")
       .not("ended_at", "is", null),
+    supabase
+      .from("fanflets")
+      .select("id, title, status")
+      .eq("speaker_id", speaker.id)
+      .order("created_at", { ascending: false }),
   ]);
 
   const allowSponsorVisibility = entitlements.features.has("sponsor_visibility");
   const quota = getStorageQuota(entitlements.limits);
+  const sponsorResources = sponsorResourcesResult.data ?? [];
+  const speakerFanflets = (fanfletsResult.data ?? []).map((f) => ({
+    id: f.id,
+    title: f.title ?? "Untitled",
+    status: f.status as string,
+  }));
 
   const connectedSponsors = (activeConnectionsResult.data ?? []).map((c) => {
     const row = c as Record<string, unknown>;
@@ -73,6 +85,7 @@ export default async function ResourceLibraryPage() {
 
       <ResourceLibrary
         resources={resourcesResult.data ?? []}
+        sponsorResources={sponsorResources}
         authUserId={user.id}
         allowSponsorVisibility={allowSponsorVisibility}
         storageUsedBytes={storageResult.usedBytes}
@@ -80,6 +93,7 @@ export default async function ResourceLibraryPage() {
         maxFileMb={quota.maxFileMb}
         connectedSponsors={uniqueSponsors}
         endedSponsors={endedSponsors}
+        speakerFanflets={speakerFanflets}
       />
     </div>
   );

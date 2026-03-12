@@ -4,6 +4,7 @@ import { requireSpeaker } from '@/lib/auth-context'
 import { revalidatePath } from 'next/cache'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 import { requireFeature, entitlementErrorToResult } from '@/lib/entitlement-guards'
+import { addSponsorLibraryBlockToFanflet } from '@/app/dashboard/fanflets/[id]/actions'
 
 interface AvailableSponsor {
   id: string
@@ -250,4 +251,36 @@ export async function hideSponsorConnectionFromView(
   await logImpersonationAction('mutation', '/dashboard/sponsor-connections', { action: 'hideSponsorConnectionFromView', speaker_id: speakerId, connection_id: connectionId })
   revalidatePath('/dashboard/sponsor-connections')
   return {}
+}
+
+/**
+ * Add a single sponsor catalog item to one of the speaker's fanflets,
+ * accessible directly from the Sponsor Connections page.
+ * Delegates auth + connection verification to addSponsorLibraryBlockToFanflet.
+ */
+export async function addSponsorResourceToFanflet(
+  fanfletId: string,
+  sponsorResourceItemId: string
+): Promise<{ error?: string; success?: boolean }> {
+  await blockImpersonationWrites()
+  const { speakerId } = await requireSpeaker()
+
+  try {
+    await requireFeature(speakerId, 'sponsor_visibility')
+  } catch (err) {
+    return entitlementErrorToResult(err)
+  }
+
+  const result = await addSponsorLibraryBlockToFanflet(fanfletId, sponsorResourceItemId)
+  if (result.error) return { error: result.error }
+
+  await logImpersonationAction('mutation', '/dashboard/sponsor-connections', {
+    action: 'addSponsorResourceToFanflet',
+    speaker_id: speakerId,
+    fanflet_id: fanfletId,
+    sponsor_resource_item_id: sponsorResourceItemId,
+  })
+  revalidatePath('/dashboard/sponsor-connections')
+  revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+  return { success: true }
 }

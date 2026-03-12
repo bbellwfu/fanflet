@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, BuildingIcon } from "lucide-react";
 import { VerifyButton } from "./verify-button";
 import { ImpersonateButton } from "../../accounts/[id]/impersonate-button";
-import { SponsorPlanForm } from "./sponsor-plan-form";
+import { SponsorPlanSelector } from "./plan-selector";
 import { SponsorProfileForm } from "./sponsor-profile-form";
 
 export default async function SponsorDetailPage({
@@ -131,7 +131,7 @@ export default async function SponsorDetailPage({
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
         {statItems.map((item) => (
           <div
             key={item.label}
@@ -145,18 +145,19 @@ export default async function SponsorDetailPage({
             </p>
           </div>
         ))}
-      </div>
-
-      <div className="bg-surface rounded-lg border border-border-subtle overflow-hidden">
-        <div className="px-5 py-4 border-b border-border-subtle">
-          <h2 className="text-sm font-semibold text-fg">Subscription</h2>
-        </div>
-        <div className="px-5 py-4">
-          <SponsorPlanForm
+        <div className="bg-surface rounded-lg border border-border-subtle p-5">
+          <p className="text-[12px] font-medium uppercase tracking-wider text-fg-muted mb-2">
+            Plan
+          </p>
+          <SponsorPlanSelector
             sponsorId={id}
             currentPlanId={currentPlan?.id ?? null}
-            currentPlanDisplayName={currentPlan?.display_name ?? currentPlan?.name ?? "—"}
-            plans={plans.map((p) => ({ id: p.id, name: p.display_name ?? p.name }))}
+            currentPlanName={currentPlan?.display_name ?? currentPlan?.name ?? "—"}
+            plans={plans.map((p) => ({
+              id: p.id,
+              name: p.name,
+              display_name: p.display_name ?? null,
+            }))}
           />
         </div>
       </div>

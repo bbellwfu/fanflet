@@ -179,6 +179,37 @@ function toDateKey(dateStr: string): string {
   return new Date(dateStr).toISOString().split("T")[0];
 }
 
+/** Sentinel UUID used so .in("fanflet_id", []) is valid and returns no rows. */
+const EMPTY_FANFLET_SENTINEL = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Returns fanflet IDs and speaker IDs for non-demo accounts (is_demo is null or false).
+ * Used to exclude demo traffic and subscribers from platform analytics.
+ * Exported for use by admin overview and other platform-wide queries.
+ */
+export async function getNonDemoScope(supabase: ReturnType<typeof createServiceClient>): Promise<{
+  fanfletIds: string[];
+  speakerIds: string[];
+}> {
+  const { data: speakers } = await supabase
+    .from("speakers")
+    .select("id")
+    .or("is_demo.is.null,is_demo.eq.false");
+  const speakerIds = (speakers ?? []).map((s) => s.id);
+  if (speakerIds.length === 0) {
+    return { fanfletIds: [EMPTY_FANFLET_SENTINEL], speakerIds: [EMPTY_FANFLET_SENTINEL] };
+  }
+  const { data: fanflets } = await supabase
+    .from("fanflets")
+    .select("id")
+    .in("speaker_id", speakerIds);
+  const fanfletIds = (fanflets ?? []).map((f) => f.id);
+  if (fanfletIds.length === 0) {
+    return { fanfletIds: [EMPTY_FANFLET_SENTINEL], speakerIds };
+  }
+  return { fanfletIds, speakerIds };
+}
+
 function extractDomain(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -193,6 +224,7 @@ function extractDomain(url: string): string {
 
 export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
   const prev = prevRange(r);
 
@@ -212,6 +244,7 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("visitor_hash")
       .eq("event_type", "page_view")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -219,11 +252,13 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("id", { count: "exact", head: true })
       .eq("event_type", "resource_click")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("subscribers")
       .select("id", { count: "exact", head: true })
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -231,6 +266,7 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("id", { count: "exact", head: true })
       .eq("event_type", "qr_scan")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
@@ -238,6 +274,7 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("visitor_hash")
       .eq("event_type", "page_view")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
     supabase
@@ -245,22 +282,26 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
       .select("id", { count: "exact", head: true })
       .eq("event_type", "resource_click")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
     supabase
       .from("subscribers")
       .select("id", { count: "exact", head: true })
+      .in("speaker_id", speakerIds)
       .gte("created_at", prev.from)
       .lte("created_at", prev.to),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
       .eq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
   ]);
@@ -298,6 +339,7 @@ export async function getPlatformKPIs(range?: DateRange): Promise<PlatformKPIs> 
 
 export async function getPlatformTimeSeries(range?: DateRange): Promise<TimeSeriesPoint[]> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(60);
 
   const [eventsResult, subsResult] = await Promise.all([
@@ -306,12 +348,14 @@ export async function getPlatformTimeSeries(range?: DateRange): Promise<TimeSeri
       .select("event_type, visitor_hash, created_at")
       .in("event_type", ["page_view", "resource_click"])
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to)
       .order("created_at"),
     supabase
       .from("subscribers")
       .select("created_at")
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
   ]);
@@ -363,6 +407,7 @@ export async function getPlatformTimeSeries(range?: DateRange): Promise<TimeSeri
 
 export async function getDeviceBreakdown(range?: DateRange): Promise<DeviceBreakdown[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
@@ -370,6 +415,7 @@ export async function getDeviceBreakdown(range?: DateRange): Promise<DeviceBreak
     .select("device_type")
     .eq("event_type", "page_view")
     .neq("is_bot", true)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -390,6 +436,7 @@ export async function getDeviceBreakdown(range?: DateRange): Promise<DeviceBreak
 
 export async function getReferrerBreakdown(range?: DateRange): Promise<ReferrerBreakdown[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
@@ -397,6 +444,7 @@ export async function getReferrerBreakdown(range?: DateRange): Promise<ReferrerB
     .select("referrer, source, referrer_category")
     .eq("event_type", "page_view")
     .neq("is_bot", true)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -432,12 +480,14 @@ export async function getReferrerBreakdown(range?: DateRange): Promise<ReferrerB
 
 export async function getEventDistribution(range?: DateRange): Promise<EventDistribution[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
     .from("analytics_events")
     .select("event_type")
     .neq("is_bot", true)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -467,6 +517,7 @@ export async function getEventDistribution(range?: DateRange): Promise<EventDist
 
 export async function getTopFanflets(range?: DateRange, limit = 10): Promise<TopFanflet[]> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const [eventsResult, subsResult, fanfletsResult] = await Promise.all([
@@ -475,17 +526,20 @@ export async function getTopFanflets(range?: DateRange, limit = 10): Promise<Top
       .select("fanflet_id, event_type, visitor_hash")
       .in("event_type", ["page_view", "resource_click"])
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("subscribers")
       .select("source_fanflet_id")
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("fanflets")
       .select("id, title, speaker_id, speakers(name)")
-      .eq("status", "published"),
+      .eq("status", "published")
+      .in("id", fanfletIds),
   ]);
 
   const fanfletMap = new Map<string, { title: string; speakerName: string }>();
@@ -495,9 +549,11 @@ export async function getTopFanflets(range?: DateRange, limit = 10): Promise<Top
   }
 
   const stats: Record<string, { views: number; uniqueHashes: Set<string>; clicks: number; subs: number }> = {};
+  const fanfletIdSet = new Set(fanfletIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL));
 
   for (const ev of eventsResult.data ?? []) {
     const fid = ev.fanflet_id;
+    if (!fanfletIdSet.has(fid)) continue;
     if (!stats[fid]) stats[fid] = { views: 0, uniqueHashes: new Set(), clicks: 0, subs: 0 };
     if (ev.event_type === "page_view") {
       stats[fid].views++;
@@ -540,12 +596,14 @@ export async function getTopFanflets(range?: DateRange, limit = 10): Promise<Top
 
 export async function getPeakActivityHeatmap(range?: DateRange): Promise<HeatmapCell[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
     .from("analytics_events")
     .select("created_at")
     .neq("is_bot", true)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -571,6 +629,7 @@ export async function getPeakActivityHeatmap(range?: DateRange): Promise<Heatmap
 
 export async function getEngagementTable(range?: DateRange): Promise<EngagementRow[]> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const [eventsResult, subsResult, fanfletsResult] = await Promise.all([
@@ -579,16 +638,19 @@ export async function getEngagementTable(range?: DateRange): Promise<EngagementR
       .select("fanflet_id, event_type, visitor_hash")
       .in("event_type", ["page_view", "resource_click"])
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("subscribers")
       .select("source_fanflet_id")
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("fanflets")
-      .select("id, title, event_name, status, speaker_id, speakers(name)"),
+      .select("id, title, event_name, status, speaker_id, speakers(name)")
+      .in("id", fanfletIds),
   ]);
 
   const fanfletMap = new Map<string, { title: string; eventName: string | null; speakerName: string; status: string }>();
@@ -603,9 +665,11 @@ export async function getEngagementTable(range?: DateRange): Promise<EngagementR
   }
 
   const stats: Record<string, { views: number; uniqueHashes: Set<string>; clicks: number; subs: number }> = {};
+  const fanfletIdSet = new Set(fanfletIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL));
 
   for (const ev of eventsResult.data ?? []) {
     const fid = ev.fanflet_id;
+    if (!fanfletIdSet.has(fid)) continue;
     if (!stats[fid]) stats[fid] = { views: 0, uniqueHashes: new Set(), clicks: 0, subs: 0 };
     if (ev.event_type === "page_view") {
       stats[fid].views++;
@@ -655,6 +719,7 @@ export async function getResourceClickBreakdown(range?: DateRange): Promise<{
   clicks: number;
 }[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data: clickEvents } = await supabase
@@ -663,6 +728,7 @@ export async function getResourceClickBreakdown(range?: DateRange): Promise<{
     .eq("event_type", "resource_click")
     .neq("is_bot", true)
     .not("resource_block_id", "is", null)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -676,12 +742,14 @@ export async function getResourceClickBreakdown(range?: DateRange): Promise<{
   const blockIds = Object.keys(counts);
   if (blockIds.length === 0) return [];
 
+  const fanfletIdSet = new Set(fanfletIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL));
   const { data: blocks } = await supabase
     .from("resource_blocks")
     .select("id, title, type, fanflet_id, fanflets(title)")
     .in("id", blockIds);
 
   return (blocks ?? [])
+    .filter((b) => fanfletIdSet.has(b.fanflet_id))
     .map((b) => {
       const fanflet = b.fanflets as unknown as { title: string } | null;
       return {
@@ -701,21 +769,25 @@ export async function getResourceClickBreakdown(range?: DateRange): Promise<{
 
 export async function getSpeakerLeaderboard(range?: DateRange): Promise<SpeakerRanking[]> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
+  const speakerIdSet = new Set(speakerIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL));
 
   const [speakersResult, fanfletsResult, eventsResult, subsResult] = await Promise.all([
-    supabase.from("speakers").select("id, name, email"),
-    supabase.from("fanflets").select("id, title, speaker_id").eq("status", "published"),
+    supabase.from("speakers").select("id, name, email").in("id", speakerIds),
+    supabase.from("fanflets").select("id, title, speaker_id").eq("status", "published").in("id", fanfletIds),
     supabase
       .from("analytics_events")
       .select("fanflet_id, visitor_hash")
       .eq("event_type", "page_view")
       .neq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("subscribers")
       .select("speaker_id")
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
   ]);
@@ -763,6 +835,7 @@ export async function getSpeakerLeaderboard(range?: DateRange): Promise<SpeakerR
   }
 
   return Array.from(speakerMap.entries())
+    .filter(([id]) => speakerIdSet.has(id))
     .map(([id, info]) => {
       const views = speakerViews.get(id);
       const subs = speakerSubs.get(id) ?? 0;
@@ -800,6 +873,7 @@ export async function getSpeakerLeaderboard(range?: DateRange): Promise<SpeakerR
 
 export async function getResourceTypePerformance(range?: DateRange): Promise<ResourceTypePerformance[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data: clickEvents } = await supabase
@@ -808,6 +882,7 @@ export async function getResourceTypePerformance(range?: DateRange): Promise<Res
     .eq("event_type", "resource_click")
     .neq("is_bot", true)
     .not("resource_block_id", "is", null)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -820,7 +895,8 @@ export async function getResourceTypePerformance(range?: DateRange): Promise<Res
 
   const { data: allBlocks } = await supabase
     .from("resource_blocks")
-    .select("id, type");
+    .select("id, type")
+    .in("fanflet_id", fanfletIds);
 
   const byType: Record<string, { totalClicks: number; blockCount: number }> = {};
   for (const block of allBlocks ?? []) {
@@ -849,24 +925,34 @@ export async function getGrowthMetrics(range?: DateRange): Promise<{
   subscribers: GrowthPoint[];
 }> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(90);
+  const validSpeakerIds = speakerIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL);
+  const validFanfletIds = fanfletIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL);
 
   const [speakersResult, fanfletsResult, subsResult] = await Promise.all([
-    supabase
-      .from("speakers")
-      .select("created_at")
-      .gte("created_at", r.from)
-      .lte("created_at", r.to)
-      .order("created_at"),
-    supabase
-      .from("fanflets")
-      .select("created_at")
-      .gte("created_at", r.from)
-      .lte("created_at", r.to)
-      .order("created_at"),
+    validSpeakerIds.length === 0
+      ? { data: [] as { created_at: string }[] }
+      : supabase
+          .from("speakers")
+          .select("created_at")
+          .in("id", validSpeakerIds)
+          .gte("created_at", r.from)
+          .lte("created_at", r.to)
+          .order("created_at"),
+    validFanfletIds.length === 0
+      ? { data: [] as { created_at: string }[] }
+      : supabase
+          .from("fanflets")
+          .select("created_at")
+          .in("id", validFanfletIds)
+          .gte("created_at", r.from)
+          .lte("created_at", r.to)
+          .order("created_at"),
     supabase
       .from("subscribers")
       .select("created_at")
+      .in("speaker_id", speakerIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to)
       .order("created_at"),
@@ -904,12 +990,17 @@ export async function getGrowthMetrics(range?: DateRange): Promise<{
 
 export async function getActivationRate(): Promise<{ totalSpeakers: number; activatedSpeakers: number; rate: number }> {
   const supabase = createServiceClient();
+  const { fanfletIds, speakerIds } = await getNonDemoScope(supabase);
+  const validSpeakerIds = speakerIds.filter((id) => id !== EMPTY_FANFLET_SENTINEL);
+  if (validSpeakerIds.length === 0) {
+    return { totalSpeakers: 0, activatedSpeakers: 0, rate: 0 };
+  }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const [speakersResult, fanfletsResult] = await Promise.all([
-    supabase.from("speakers").select("id, created_at").gte("created_at", thirtyDaysAgo),
-    supabase.from("fanflets").select("speaker_id").eq("status", "published"),
+    supabase.from("speakers").select("id, created_at").in("id", validSpeakerIds).gte("created_at", thirtyDaysAgo),
+    supabase.from("fanflets").select("speaker_id").eq("status", "published").in("id", fanfletIds),
   ]);
 
   const publishedSpeakers = new Set((fanfletsResult.data ?? []).map((f) => f.speaker_id));
@@ -929,6 +1020,7 @@ export async function getActivationRate(): Promise<{ totalSpeakers: number; acti
 
 export async function getGeoBreakdown(range?: DateRange): Promise<GeoBreakdown[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
@@ -937,6 +1029,7 @@ export async function getGeoBreakdown(range?: DateRange): Promise<GeoBreakdown[]
     .eq("event_type", "page_view")
     .neq("is_bot", true)
     .not("country_code", "is", null)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 
@@ -958,18 +1051,21 @@ export async function getGeoBreakdown(range?: DateRange): Promise<GeoBreakdown[]
 
 export async function getBotVsHumanSummary(range?: DateRange): Promise<BotVsHumanSummary> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const [totalResult, botResult] = await Promise.all([
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
     supabase
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
       .eq("is_bot", true)
+      .in("fanflet_id", fanfletIds)
       .gte("created_at", r.from)
       .lte("created_at", r.to),
   ]);
@@ -992,6 +1088,7 @@ export async function getBotVsHumanSummary(range?: DateRange): Promise<BotVsHuma
 
 export async function getTopReferrerDomains(range?: DateRange, limit = 15): Promise<ReferrerDetail[]> {
   const supabase = createServiceClient();
+  const { fanfletIds } = await getNonDemoScope(supabase);
   const r = range ?? defaultRange(30);
 
   const { data } = await supabase
@@ -1000,6 +1097,7 @@ export async function getTopReferrerDomains(range?: DateRange, limit = 15): Prom
     .eq("event_type", "page_view")
     .neq("is_bot", true)
     .not("referrer", "is", null)
+    .in("fanflet_id", fanfletIds)
     .gte("created_at", r.from)
     .lte("created_at", r.to);
 

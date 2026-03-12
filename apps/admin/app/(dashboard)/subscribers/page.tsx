@@ -3,6 +3,7 @@ import { createServiceClient } from "@fanflet/db/service";
 import { formatDate } from "@fanflet/db/timezone";
 import Link from "next/link";
 import { MailIcon } from "lucide-react";
+import { getNonDemoScope } from "../analytics/actions";
 
 type SubscriberRow = {
   id: string;
@@ -26,9 +27,12 @@ export default async function SubscribersPage() {
     .maybeSingle();
   const adminTimezone = adminPrefs?.timezone ?? null;
 
+  const { speakerIds } = await getNonDemoScope(supabase);
+
   const { data: subscribers, error } = await supabase
     .from("subscribers")
     .select("id, email, name, created_at, speaker_id, source_fanflet_id, speakers(name, email)")
+    .in("speaker_id", speakerIds)
     .order("created_at", { ascending: false });
 
   if (error) {

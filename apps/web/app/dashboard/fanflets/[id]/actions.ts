@@ -14,6 +14,18 @@ import {
 } from '@/lib/expiration'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 import { requireActiveConnection, entitlementErrorToResult } from '@/lib/entitlement-guards'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/** Revalidate the public landing page for a fanflet by looking up its slugs. */
+async function revalidatePublicPage(supabase: SupabaseClient, fanfletId: string, speakerId: string) {
+  const [{ data: fanflet }, { data: speaker }] = await Promise.all([
+    supabase.from('fanflets').select('slug').eq('id', fanfletId).single(),
+    supabase.from('speakers').select('slug').eq('id', speakerId).single(),
+  ])
+  if (fanflet?.slug && speaker?.slug) {
+    revalidatePath(`/${speaker.slug}/${fanflet.slug}`)
+  }
+}
 
 export async function updateFanfletDetails(
   id: string,
@@ -120,6 +132,7 @@ export async function updateFanfletDetails(
   if (result.error) return { error: result.error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'updateFanfletDetails', fanflet_id: id, speaker_id: speakerId })
+  await revalidatePublicPage(supabase, id, speakerId)
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath(`/dashboard/fanflets/${id}/qr`)
   revalidatePath('/dashboard/fanflets')
@@ -175,6 +188,7 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
   if (result.error) return { error: result.error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'publishFanflet', fanflet_id: id, speaker_id: speakerId })
+  await revalidatePublicPage(supabase, id, speakerId)
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
   revalidatePath('/dashboard', 'layout')
@@ -196,6 +210,7 @@ export async function unpublishFanflet(id: string): Promise<{ error?: string; su
   if (result.error) return { error: result.error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${id}`, { action: 'unpublishFanflet', fanflet_id: id, speaker_id: speakerId })
+  await revalidatePublicPage(supabase, id, speakerId)
   revalidatePath(`/dashboard/fanflets/${id}`)
   revalidatePath('/dashboard/fanflets')
   revalidatePath('/dashboard', 'layout')
@@ -301,6 +316,7 @@ export async function addResourceBlock(
   }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'addResourceBlock', fanflet_id: fanfletId, block_id: block.id, speaker_id: speakerId })
+  await revalidatePublicPage(supabase, fanfletId, speakerId)
   revalidatePath(`/dashboard/fanflets/${fanfletId}`)
   revalidatePath('/dashboard/resources')
   return { success: true, id: block.id }
@@ -365,6 +381,7 @@ export async function updateResourceBlock(
   if (error) return { error: error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${block.fanflet_id}`, { action: 'updateResourceBlock', block_id: blockId, fanflet_id: block.fanflet_id })
+  await revalidatePublicPage(authSupabase, block.fanflet_id, speakerId)
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }
@@ -387,7 +404,7 @@ export async function deleteResourceBlock(blockId: string): Promise<{ error?: st
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'Fanflet not found' }
   }
-  const { supabase: authSupabase } = ctx
+  const { speakerId, supabase: authSupabase } = ctx
 
   const { error } = await authSupabase
     .from('resource_blocks')
@@ -397,6 +414,7 @@ export async function deleteResourceBlock(blockId: string): Promise<{ error?: st
   if (error) return { error: error.message }
 
   await logImpersonationAction('mutation', `/dashboard/fanflets/${block.fanflet_id}`, { action: 'deleteResourceBlock', block_id: blockId, fanflet_id: block.fanflet_id })
+  await revalidatePublicPage(authSupabase, block.fanflet_id, speakerId)
   revalidatePath(`/dashboard/fanflets/${block.fanflet_id}`)
   return { success: true }
 }
@@ -504,6 +522,80 @@ export async function addLibraryBlockToFanflet(
     revalidatePath(`/dashboard/fanflets/${fanfletId}`)
     return { success: true, id: block.id }
   }
+}
+
+/**
+ * Add a block from a connected sponsor's resource library (Sponsor Catalog).
+ * Creates resource_block with sponsor_library_item_id and sponsor_account_id.
+ */
+export async function addSponsorLibraryBlockToFanflet(
+  fanfletId: string,
+  sponsorLibraryItemId: string
+): Promise<{ error?: string; success?: boolean; id?: string }> {
+  await blockImpersonationWrites()
+  let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
+  try {
+    ctx = await requireFanfletOwner(fanfletId)
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Fanflet not found' }
+  }
+  const { speakerId, supabase } = ctx
+
+  const { data: libItem, error: libError } = await supabase
+    .from('sponsor_resource_library')
+    .select('id, sponsor_id, type, title, description, url, file_path, image_url, status')
+    .eq('id', sponsorLibraryItemId)
+    .single()
+
+  if (libError || !libItem) return { error: 'Sponsor resource not found' }
+  if (libItem.status !== 'available' && libItem.status !== 'unpublished') {
+    return { error: 'This resource is not available for placement' }
+  }
+
+  const { data: conn } = await supabase
+    .from('sponsor_connections')
+    .select('id')
+    .eq('speaker_id', speakerId)
+    .eq('sponsor_id', libItem.sponsor_id)
+    .eq('status', 'active')
+    .is('ended_at', null)
+    .maybeSingle()
+  if (!conn) return { error: 'You are not connected to this sponsor' }
+
+  const { data: maxOrder } = await supabase
+    .from('resource_blocks')
+    .select('display_order')
+    .eq('fanflet_id', fanfletId)
+    .order('display_order', { ascending: false })
+    .limit(1)
+    .single()
+  const nextOrder = (maxOrder?.display_order ?? -1) + 1
+
+  const insertPayload = {
+    fanflet_id: fanfletId,
+    type: libItem.type,
+    title: libItem.title,
+    description: libItem.description,
+    url: libItem.url,
+    file_path: libItem.type === 'file' ? null : libItem.file_path,
+    image_url: libItem.image_url,
+    display_order: nextOrder,
+    section_name: 'Resources',
+    metadata: {},
+    sponsor_library_item_id: sponsorLibraryItemId,
+    sponsor_account_id: libItem.sponsor_id,
+  }
+
+  const { data: block, error } = await supabase
+    .from('resource_blocks')
+    .insert(insertPayload)
+    .select('id')
+    .single()
+
+  if (error) return { error: error.message }
+  await logImpersonationAction('mutation', `/dashboard/fanflets/${fanfletId}`, { action: 'addSponsorLibraryBlockToFanflet', fanflet_id: fanfletId, sponsor_library_item_id: sponsorLibraryItemId, block_id: block.id, speaker_id: speakerId })
+  revalidatePath(`/dashboard/fanflets/${fanfletId}`)
+  return { success: true, id: block.id }
 }
 
 export async function reorderBlock(

@@ -9,6 +9,7 @@ export type AuditCategory =
   | "sponsor"
   | "sponsor_inquiry"
   | "communication"
+  | "worklog"
   | "admin_management"
   | "setting"
   | "impersonation"
@@ -26,11 +27,17 @@ export interface AuditEntry {
   userAgent?: string | null;
 }
 
+export interface AuditResult {
+  success: boolean;
+  error?: string;
+}
+
 /**
- * Record an admin action in the audit log. Fire-and-forget — failures
- * are logged to console but never block the calling operation.
+ * Record an admin action in the audit log.
+ * Returns { success, error? } so compliance-sensitive callers can decide
+ * whether to proceed when the audit trail cannot be written.
  */
-export async function auditAdminAction(entry: AuditEntry): Promise<void> {
+export async function auditAdminAction(entry: AuditEntry): Promise<AuditResult> {
   try {
     const supabase = createServiceClient();
     const { error } = await supabase.from("admin_audit_log").insert({
@@ -45,8 +52,12 @@ export async function auditAdminAction(entry: AuditEntry): Promise<void> {
     });
     if (error) {
       console.error("[audit] Failed to write audit log:", error.message);
+      return { success: false, error: error.message };
     }
+    return { success: true };
   } catch (err) {
-    console.error("[audit] Failed to write audit log:", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[audit] Failed to write audit log:", message);
+    return { success: false, error: message };
   }
 }

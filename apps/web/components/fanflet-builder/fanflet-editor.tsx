@@ -140,6 +140,18 @@ interface FanfletEditorProps {
   connectedSponsors?: { id: string; company_name: string }[];
   /** Ended sponsor connections (for "Connection ended on [date]" and optional Unlink). */
   endedSponsors?: { id: string; company_name: string; ended_at: string }[];
+  /** Sponsor catalog items (from connected sponsors' libraries) for "Add from sponsor catalog". */
+  sponsorCatalogItems?: {
+    id: string;
+    sponsor_id: string;
+    type: string;
+    title: string;
+    description: string | null;
+    url: string | null;
+    file_type: string | null;
+    file_size_bytes: number | null;
+    image_url: string | null;
+  }[];
 }
 
 /** Shown when a block's library source was deleted. No edit UI — only remove to avoid error-prone state. */
@@ -205,6 +217,7 @@ export function FanfletEditor({
   hasSponsorReports = false,
   connectedSponsors = [],
   endedSponsors = [],
+  sponsorCatalogItems = [],
 }: FanfletEditorProps) {
   const router = useRouter();
   const timezone = useTimezone();
@@ -1050,6 +1063,7 @@ export function FanfletEditor({
             linkedLibraryItemIds={new Set(resourceBlocks.map((b) => b.library_item_id).filter(Boolean) as string[])}
             allowSponsorVisibility={allowSponsorVisibility}
             connectedSponsors={connectedSponsors}
+            sponsorCatalogItems={sponsorCatalogItems}
           />
         </div>
       </div>

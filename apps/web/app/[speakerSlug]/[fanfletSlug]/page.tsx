@@ -127,14 +127,46 @@ export default async function AudienceLandingPage({ params }: Props) {
     .eq("fanflet_id", fanflet.id)
     .order("display_order", { ascending: true });
 
-  // For dynamic blocks (library_item_id set), merge library item data over block data
+  const sponsorLibraryIds = (rawBlocks ?? [])
+    .map((b) => (b as { sponsor_library_item_id?: string | null }).sponsor_library_item_id)
+    .filter((id): id is string => !!id);
+  let sponsorLibraryMap: Map<string, { title?: string; description?: string | null; url?: string | null; file_path?: string | null; image_url?: string | null; file_size_bytes?: number | null; file_type?: string | null; type?: string }> = new Map();
+  if (sponsorLibraryIds.length > 0) {
+    const { data: sponsorLibRows } = await supabase
+      .from("sponsor_resource_library")
+      .select("id, title, description, url, file_path, image_url, file_size_bytes, file_type, type")
+      .in("id", sponsorLibraryIds);
+    for (const row of sponsorLibRows ?? []) {
+      sponsorLibraryMap.set(row.id, row);
+    }
+  }
+
+  // For dynamic blocks (library_item_id or sponsor_library_item_id), merge library data over block
   const resourceBlocks = (rawBlocks ?? []).map((block) => {
+    const raw = block as Record<string, unknown> & { library_item_id?: string | null; sponsor_library_item_id?: string | null };
     const lib = block.resource_library as {
       title?: string; description?: string | null; url?: string | null;
       file_path?: string | null; image_url?: string | null;
       metadata?: Record<string, unknown> | null; type?: string;
       file_size_bytes?: number | null; file_type?: string | null;
     } | null;
+    const sponsorLib = raw.sponsor_library_item_id ? sponsorLibraryMap.get(raw.sponsor_library_item_id as string) : null;
+
+    if (sponsorLib && raw.sponsor_library_item_id) {
+      return {
+        ...block,
+        title: sponsorLib.title ?? block.title,
+        description: sponsorLib.description ?? block.description,
+        url: sponsorLib.url ?? block.url,
+        file_path: sponsorLib.file_path ?? block.file_path,
+        image_url: sponsorLib.image_url ?? block.image_url,
+        type: sponsorLib.type ?? block.type,
+        file_size_bytes: sponsorLib.file_size_bytes ?? null,
+        file_type: sponsorLib.file_type ?? null,
+        sponsor_library_item_id: raw.sponsor_library_item_id,
+        resource_library: undefined,
+      };
+    }
     if (lib && block.library_item_id) {
       return {
         ...block,

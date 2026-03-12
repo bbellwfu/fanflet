@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
+import { generateVisitorHash, getClientIp } from '@/lib/visitor-hash'
+import { getSiteUrl } from '@/lib/config'
 
 const SmsBookmarkSchema = z.object({
   fanflet_id: z.string().uuid(),
@@ -45,14 +47,17 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
 
     // Verify the fanflet exists and is published
-    const { data: fanflet } = await supabase
+    const { data: fanflet, error: fanfletError } = await supabase
       .from('fanflets')
       .select('id, title, slug, speaker_id')
       .eq('id', fanflet_id)
       .eq('status', 'published')
       .single()
 
-    if (!fanflet) {
+    if (fanfletError || !fanflet) {
+      if (fanfletError && fanfletError.code !== 'PGRST116') {
+        console.error('[sms] fanflet lookup failed:', fanfletError.code, fanfletError.message)
+      }
       return NextResponse.json(
         { error: 'Fanflet not found.' },
         { status: 404 }
@@ -60,11 +65,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Get speaker slug for building the URL
-    const { data: speaker } = await supabase
+    const { data: speaker, error: speakerError } = await supabase
       .from('speakers')
       .select('slug')
       .eq('id', fanflet.speaker_id)
       .single()
+
+    if (speakerError) {
+      console.error('[sms] speaker lookup failed:', speakerError.code, speakerError.message)
+    }
 
     // Hash the phone number for privacy-preserving rate limiting
     const encoder = new TextEncoder()
@@ -78,12 +87,16 @@ export async function POST(request: NextRequest) {
 
     // Rate limit: max 2 SMS per phone+fanflet per day
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('sms_bookmarks')
       .select('*', { count: 'exact', head: true })
       .eq('phone_hash', phoneHash)
       .eq('fanflet_id', fanflet_id)
       .gte('created_at', oneDayAgo)
+
+    if (countError) {
+      console.error('[sms] rate limit check failed:', countError.code, countError.message)
+    }
 
     if ((count ?? 0) >= 2) {
       return NextResponse.json(
@@ -93,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build the fanflet URL
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://fanflet.com'
+    const siteUrl = getSiteUrl()
     const speakerSlug = speaker?.slug
     const fanfletUrl = `${siteUrl}/${speakerSlug}/${fanflet.slug}`
 
@@ -129,30 +142,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Record the bookmark (even if Twilio not configured — for analytics)
-    await supabase.from('sms_bookmarks').insert({
+    const { error: bookmarkError } = await supabase.from('sms_bookmarks').insert({
       fanflet_id,
       phone_hash: phoneHash,
     })
+    if (bookmarkError) {
+      console.error('[sms] bookmark insert failed:', bookmarkError.code, bookmarkError.message)
+    }
 
     // Also track as analytics event
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getClientIp(request.headers)
     const ua = request.headers.get('user-agent') || 'unknown'
-    const dateStr = new Date().toISOString().split('T')[0]
-    const visitorHashInput = `${ip}-${ua}-${dateStr}`
-    const visitorBuffer = await crypto.subtle.digest(
-      'SHA-256',
-      encoder.encode(visitorHashInput)
-    )
-    const visitorHash = Array.from(new Uint8Array(visitorBuffer))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('')
+    const visitorHash = await generateVisitorHash(ip, ua)
 
-    await supabase.from('analytics_events').insert({
+    const { error: analyticsError } = await supabase.from('analytics_events').insert({
       fanflet_id,
       event_type: 'sms_bookmark',
       visitor_hash: visitorHash,
       device_type: /Mobile|Android|iPhone/i.test(ua) ? 'mobile' : /iPad|Tablet/i.test(ua) ? 'tablet' : 'desktop',
     })
+    if (analyticsError) {
+      console.error('[sms] analytics insert failed:', analyticsError.code, analyticsError.message)
+    }
 
     const configured = Boolean(twilioSid && twilioToken && twilioFrom)
 

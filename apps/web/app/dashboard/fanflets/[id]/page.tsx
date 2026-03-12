@@ -94,6 +94,18 @@ export default async function FanfletEditorPage({
     .eq("speaker_id", speaker.id)
     .order("created_at", { ascending: true });
 
+  // Sponsor catalog: library items from connected sponsors (RLS filters by availability)
+  const connectedSponsorIds = uniqueSponsors.map((s) => s.id);
+  const { data: sponsorCatalogItems } =
+    connectedSponsorIds.length > 0
+      ? await supabase
+          .from("sponsor_resource_library")
+          .select("id, sponsor_id, type, title, description, url, file_type, file_size_bytes, image_url")
+          .in("sponsor_id", connectedSponsorIds)
+          .eq("status", "available")
+          .order("created_at", { ascending: false })
+      : { data: [] };
+
   const baseUrl = getSiteUrl();
   const publicUrl =
     fanflet.status === "published" && speaker.slug
@@ -117,6 +129,17 @@ export default async function FanfletEditorPage({
       authUserId={user.id}
       surveyQuestions={surveyQuestions ?? []}
       libraryItems={libraryItems ?? []}
+      sponsorCatalogItems={(sponsorCatalogItems ?? []).map((r) => ({
+        id: r.id,
+        sponsor_id: r.sponsor_id,
+        type: r.type,
+        title: r.title,
+        description: r.description ?? null,
+        url: r.url ?? null,
+        file_type: r.file_type ?? null,
+        file_size_bytes: r.file_size_bytes ?? null,
+        image_url: r.image_url ?? null,
+      }))}
       allowMultipleThemes={allowMultipleThemes}
       hasSurveys={hasSurveys}
       allowCustomExpiration={allowCustomExpiration}

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@fanflet/db/service";
+import { rateLimit } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const emailSchema = z.string().email().max(320);
 
 export async function GET(request: NextRequest) {
+  const rl = rateLimit(request, "unsubscribe", 10, 60_000);
+  if (rl.limited) return rl.response!;
+
   const { searchParams } = new URL(request.url);
   const email = searchParams.get("email");
   const preview = searchParams.get("preview");
@@ -13,7 +20,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!email) {
+  if (!email || !emailSchema.safeParse(email).success) {
     return htmlResponse("Invalid Link", "Missing required parameter.");
   }
 

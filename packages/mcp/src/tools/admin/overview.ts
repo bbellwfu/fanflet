@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getNonDemoScope } from "./analytics";
 
 export async function adminPlatformOverview(serviceClient: SupabaseClient) {
+  const { fanfletIds, speakerIds } = await getNonDemoScope(serviceClient);
+
   const [
     speakersResult,
     fanfletsResult,
@@ -9,18 +12,21 @@ export async function adminPlatformOverview(serviceClient: SupabaseClient) {
     recentSignupsResult,
     activeFanfletsResult,
   ] = await Promise.all([
-    serviceClient.from("speakers").select("id", { count: "exact", head: true }),
-    serviceClient.from("fanflets").select("id, status", { count: "exact" }),
+    serviceClient.from("speakers").select("id", { count: "exact", head: true }).in("id", speakerIds),
+    serviceClient.from("fanflets").select("id, status", { count: "exact" }).in("id", fanfletIds),
     serviceClient
       .from("subscribers")
-      .select("id", { count: "exact", head: true }),
+      .select("id", { count: "exact", head: true })
+      .in("speaker_id", speakerIds),
     serviceClient
       .from("analytics_events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "page_view"),
+      .eq("event_type", "page_view")
+      .in("fanflet_id", fanfletIds),
     serviceClient
       .from("speakers")
       .select("id", { count: "exact", head: true })
+      .in("id", speakerIds)
       .gte(
         "created_at",
         new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -28,6 +34,7 @@ export async function adminPlatformOverview(serviceClient: SupabaseClient) {
     serviceClient
       .from("analytics_events")
       .select("fanflet_id", { count: "exact", head: true })
+      .in("fanflet_id", fanfletIds)
       .gte(
         "created_at",
         new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -52,9 +59,11 @@ export async function adminRecentSignups(
   serviceClient: SupabaseClient,
   limit: number
 ) {
+  const { speakerIds } = await getNonDemoScope(serviceClient);
   const { data, error } = await serviceClient
     .from("speakers")
     .select("id, name, email, created_at, status")
+    .in("id", speakerIds)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -66,12 +75,14 @@ export async function adminRecentFanflets(
   serviceClient: SupabaseClient,
   limit: number
 ) {
+  const { fanfletIds } = await getNonDemoScope(serviceClient);
   const { data, error } = await serviceClient
     .from("fanflets")
     .select(
       "id, title, slug, status, published_at, speaker_id, speakers(name)"
     )
     .eq("status", "published")
+    .in("id", fanfletIds)
     .order("published_at", { ascending: false })
     .limit(limit);
 

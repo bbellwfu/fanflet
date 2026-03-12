@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@fanflet/ui/button";
 import { Input } from "@fanflet/ui/input";
 import {
@@ -34,6 +35,7 @@ export function ResetAccountButton({
   speakerName,
   stats,
 }: ResetAccountButtonProps) {
+  const router = useRouter();
   const [step, setStep] = useState<"idle" | "confirm-name" | "final">("idle");
   const [typedName, setTypedName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -70,7 +72,7 @@ export function ResetAccountButton({
       toast.error(result.error);
     } else {
       toast.success("Account reset to new status");
-      window.location.reload();
+      router.refresh();
     }
   }
 

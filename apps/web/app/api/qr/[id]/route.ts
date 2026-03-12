@@ -50,23 +50,29 @@ export async function GET(
 
   const supabase = await createClient()
 
-  const { data: fanflet } = await supabase
+  const { data: fanflet, error: fanfletError } = await supabase
     .from('fanflets')
     .select('id, slug, status, speaker_id')
     .eq('id', id)
     .single()
 
-  if (!fanflet || fanflet.status !== 'published') {
+  if (fanfletError || !fanflet || fanflet.status !== 'published') {
+    if (fanfletError && fanfletError.code !== 'PGRST116') {
+      console.error('[qr] fanflet lookup failed:', fanfletError.code, fanfletError.message)
+    }
     return NextResponse.json({ error: 'Fanflet not found' }, { status: 404 })
   }
 
-  const { data: speaker } = await supabase
+  const { data: speaker, error: speakerError } = await supabase
     .from('speakers')
     .select('slug')
     .eq('id', fanflet.speaker_id)
     .single()
 
-  if (!speaker?.slug) {
+  if (speakerError || !speaker?.slug) {
+    if (speakerError && speakerError.code !== 'PGRST116') {
+      console.error('[qr] speaker lookup failed:', speakerError.code, speakerError.message)
+    }
     return NextResponse.json({ error: 'Fanflet not found' }, { status: 404 })
   }
 

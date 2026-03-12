@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
+import { generateVisitorHash, getClientIp } from '@/lib/visitor-hash'
 
 const SurveyResponseSchema = z.object({
   fanflet_id: z.string().uuid(),
@@ -24,21 +25,14 @@ export async function POST(request: NextRequest) {
     const { fanflet_id, question_id, response_value } = parsed.data
 
     // Generate visitor hash from IP + User-Agent + date (daily uniqueness)
-    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const ip = getClientIp(request.headers)
     const ua = request.headers.get('user-agent') || 'unknown'
-    const dateStr = new Date().toISOString().split('T')[0]
-    const hashInput = `${ip}-${ua}-${dateStr}`
-
-    const encoder = new TextEncoder()
-    const data = encoder.encode(hashInput)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    const visitor_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    const visitor_hash = await generateVisitorHash(ip, ua)
 
     const supabase = await createClient()
 
     // Check for duplicate submission (same visitor + fanflet + question)
-    const { data: existing } = await supabase
+    const { data: existing, error: lookupError } = await supabase
       .from('survey_responses')
       .select('id')
       .eq('fanflet_id', fanflet_id)
@@ -46,20 +40,30 @@ export async function POST(request: NextRequest) {
       .eq('visitor_hash', visitor_hash)
       .maybeSingle()
 
+    if (lookupError) {
+      console.error('[survey] duplicate check failed:', lookupError.code, lookupError.message)
+    }
+
     if (existing) {
       // Already submitted — silently succeed
       return new NextResponse(null, { status: 204 })
     }
 
-    await supabase.from('survey_responses').insert({
+    const { error: insertError } = await supabase.from('survey_responses').insert({
       fanflet_id,
       question_id,
       response_value: String(response_value),
       visitor_hash,
     })
 
+    if (insertError) {
+      console.error('[survey] insert failed:', insertError.code, insertError.message)
+      return new NextResponse(null, { status: 500 })
+    }
+
     return new NextResponse(null, { status: 204 })
-  } catch {
-    return new NextResponse(null, { status: 204 }) // Fail silently
+  } catch (err) {
+    console.error('[survey] unexpected error:', err)
+    return new NextResponse(null, { status: 500 })
   }
 }

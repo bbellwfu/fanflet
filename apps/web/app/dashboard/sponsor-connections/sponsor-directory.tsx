@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -181,6 +182,7 @@ interface SponsorDirectoryProps {
 }
 
 export function SponsorDirectory({ sponsors, speakerProfile }: SponsorDirectoryProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [connectSponsor, setConnectSponsor] = useState<AvailableSponsor | null>(null);
   const [showSlugFallback, setShowSlugFallback] = useState(false);
@@ -205,7 +207,7 @@ export function SponsorDirectory({ sponsors, speakerProfile }: SponsorDirectoryP
 
   function handleConnectSuccess() {
     setConnectSponsor(null);
-    window.location.reload();
+    router.refresh();
   }
 
   async function handleSlugSubmit(e: React.FormEvent) {
@@ -225,7 +227,7 @@ export function SponsorDirectory({ sponsors, speakerProfile }: SponsorDirectoryP
       toast.success("Connection request sent!");
       setSlug("");
       setSlugMessage("");
-      window.location.reload();
+      router.refresh();
     }
   }
 

@@ -29,11 +29,18 @@ export async function POST(request: NextRequest) {
 
   const { fanfletId } = parsed.data
 
-  let { data: audience } = await supabase
+  const { data: existingAudience, error: audienceLookupError } = await supabase
     .from('audience_accounts')
     .select('id')
     .eq('auth_user_id', user.id)
     .maybeSingle()
+
+  if (audienceLookupError) {
+    console.error('[audience/save] lookup error:', audienceLookupError.code, audienceLookupError.message)
+    return NextResponse.json({ error: 'Failed to look up account' }, { status: 500 })
+  }
+
+  let audience = existingAudience
 
   if (!audience) {
     const service = createServiceClient()

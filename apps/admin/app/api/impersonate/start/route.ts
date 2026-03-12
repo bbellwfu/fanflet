@@ -59,13 +59,6 @@ export async function POST(request: NextRequest) {
 
     const { targetUserId, targetRole, reason, writeEnabled, returnPath } = parsed.data;
 
-    if (targetUserId === user.id) {
-      return NextResponse.json(
-        { error: "Cannot impersonate yourself" },
-        { status: 400 }
-      );
-    }
-
     const supabase = createServiceClient();
 
     const { data: targetUser, error: targetUserError } =
@@ -176,7 +169,7 @@ export async function POST(request: NextRequest) {
     }
     const establishUrl = `${webUrl}/api/impersonate/establish?${establishParams}`;
 
-    await auditAdminAction({
+    const auditResult = await auditAdminAction({
       adminId: user.id,
       action: "impersonation.start",
       category: "impersonation",
@@ -190,6 +183,13 @@ export async function POST(request: NextRequest) {
       ipAddress: ip ?? null,
       userAgent: userAgent,
     });
+
+    if (!auditResult.success) {
+      return NextResponse.json(
+        { error: "Audit trail required for impersonation — please retry" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ redirectUrl: establishUrl });
   } catch (err) {

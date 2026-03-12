@@ -24,6 +24,13 @@ const updateDraftSchema = z.object({
   bodyHtml: z.string().max(500_000).optional(),
 });
 
+const worklogFilenameSchema = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine((s) => !s.includes("/") && !s.includes("\\"), "Invalid filename")
+  .refine((s) => s.endsWith(".md"), "Must be a .md file");
+
 export interface CommunicationRow {
   id: string;
   created_at: string;
@@ -666,4 +673,106 @@ export async function resendFailedRecipients(
   revalidatePath("/communications");
   revalidatePath(`/communications/${validCommunicationId}`);
   return { sentCount: results.filter((r) => r.success).length };
+}
+
+export async function getArchivedWorklogFilenames(): Promise<string[]> {
+  try {
+    await requireAdmin();
+  } catch {
+    return [];
+  }
+  const supabase = createServiceClient();
+  const { data: rows } = await supabase
+    .from("worklog_archives")
+    .select("worklog_filename");
+  return (rows ?? []).map((r) => r.worklog_filename);
+}
+
+export async function archiveWorklog(worklogFilename: string): Promise<{ error?: string }> {
+  const parsed = worklogFilenameSchema.safeParse(worklogFilename);
+  if (!parsed.success) return { error: "Invalid worklog filename" };
+  const filename = parsed.data;
+
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  const supabase = createServiceClient();
+  const { data: row, error } = await supabase
+    .from("worklog_archives")
+    .insert({
+      worklog_filename: filename,
+      archived_by_admin_id: admin.user.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      revalidatePath("/communications");
+      revalidatePath("/communications/new");
+      revalidatePath("/communications/archived-worklogs");
+      return {};
+    }
+    console.error("[communications] archiveWorklog:", error.message);
+    return { error: "Failed to archive worklog" };
+  }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "worklog.archive",
+    category: "worklog",
+    targetType: "worklog_archive",
+    targetId: row?.id,
+    details: { worklog_filename: filename },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath("/communications");
+  revalidatePath("/communications/new");
+  revalidatePath("/communications/archived-worklogs");
+  return {};
+}
+
+export async function unarchiveWorklog(worklogFilename: string): Promise<{ error?: string }> {
+  const parsed = worklogFilenameSchema.safeParse(worklogFilename);
+  if (!parsed.success) return { error: "Invalid worklog filename" };
+  const filename = parsed.data;
+
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("worklog_archives")
+    .delete()
+    .eq("worklog_filename", filename);
+
+  if (error) {
+    console.error("[communications] unarchiveWorklog:", error.message);
+    return { error: "Failed to unarchive worklog" };
+  }
+
+  await auditAdminAction({
+    adminId: admin.user.id,
+    action: "worklog.unarchive",
+    category: "worklog",
+    targetType: "worklog_archive",
+    details: { worklog_filename: filename },
+    ipAddress: admin.ipAddress,
+    userAgent: admin.userAgent,
+  });
+
+  revalidatePath("/communications");
+  revalidatePath("/communications/new");
+  revalidatePath("/communications/archived-worklogs");
+  return {};
 }

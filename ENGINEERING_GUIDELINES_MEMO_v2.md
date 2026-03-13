@@ -22,6 +22,7 @@
 - [Section 9: Testing Strategy](#section-9-testing-strategy)
 - [Section 10: Developer Experience & Code Quality](#section-10-developer-experience--code-quality)
 - [Section 11: Observability & Monitoring](#section-11-observability--monitoring)
+- [Section 12: Architecture Maturity & When to Split](#section-12-architecture-maturity--when-to-split)
 - [Appendix: Ship Checklists](#appendix-ship-checklists)
 
 ---
@@ -740,6 +741,123 @@ Monitor these endpoints with an external uptime service (UptimeRobot, Checkly, P
 - [ ] Admin portal access restricted (role checks, optional IP allowlisting)
 - [ ] Security monitoring configured (failed login alerts, audit log review)
 - [ ] Cleanup jobs scheduled (expired sessions, old rate-limiting records, stale security logs)
+
+---
+
+## Section 12: Architecture Maturity & When to Split
+
+### Why This Section Exists
+
+Early-stage teams often worry they're building something that will need to be thrown away. The fear is that architectural decisions made today will become technical debt that forces a rewrite. This section provides concrete criteria for evaluating architectural maturity and knowing when (and when not) to split a codebase.
+
+### The Monorepo-to-Services Spectrum
+
+Most applications evolve through these stages. The key insight is that **you don't need to plan for stage 4 when you're at stage 2** — you just need clean boundaries so the transition is a migration, not a rewrite.
+
+```
+Stage 1: Single App              "One Next.js app does everything"
+Stage 2: Modular Monorepo        "Multiple apps + shared packages in one repo"
+Stage 3: Monorepo + Workers      "Add background processing, event queues"
+Stage 4: Service Extraction       "Extract high-traffic or divergent components"
+Stage 5: Distributed Services     "Independent teams, independent deployments"
+```
+
+**Most successful products stay at Stage 2-3 until 10-20 engineers.** Premature progression to Stage 4-5 is the most common architectural mistake in startups — it trades feature velocity for infrastructure complexity.
+
+### Signals That Your Architecture Is Sound
+
+An architecture is production-grade (not a "vibe-coded weekend project") when it has:
+
+| Property | What It Means | How to Verify |
+|----------|---------------|---------------|
+| **Type safety** | TypeScript strict mode, no `any`, Zod validation on inputs | `tsc --noEmit` passes with zero errors |
+| **Data isolation** | Authorization enforced at database level, not application code | RLS policies on every table, tested in CI |
+| **Schema versioning** | Database changes are versioned, ordered, and reproducible | Migration files in version control, idempotent |
+| **Separation of concerns** | Business logic is framework-agnostic | Shared packages (`core`, `db`) have zero React/Next.js imports |
+| **Automated quality gates** | CI catches regressions before deployment | Lint, type-check, tests, build all pass on every PR |
+| **Test coverage** | Critical business logic has automated verification | Pure functions tested, security properties verified |
+| **Environment separation** | Development, staging, and production are isolated | Separate database instances, deployment URLs, env vars |
+| **Deployment automation** | Code ships via CI/CD, not manual steps | Push to branch → automatic deployment |
+
+If your codebase has all eight, it is production-grade software. The specific framework, hosting provider, or language is secondary — these properties are what determine whether a codebase can scale, be maintained by a team, and survive refactoring.
+
+### Signals That Warrant Splitting
+
+Do **not** split proactively. Split reactively when one of these becomes a blocking problem:
+
+| Signal | Threshold | What to Do |
+|--------|-----------|------------|
+| **Build time** | Deploys exceed 10 minutes consistently | Optimize build caching first. If that fails, extract the slowest app into its own deployment. |
+| **Team contention** | Two teams regularly block each other's PRs or deploys | Split along team boundaries. Each team owns its own app/service. |
+| **Runtime mismatch** | A component needs a fundamentally different runtime (Python ML, WebSocket server, GPU compute) | Extract that component into its own service. Keep everything else together. |
+| **Scaling mismatch** | One component needs 100x the resources of another | Extract the hot component. Serverless platforms handle moderate scaling mismatches automatically. |
+| **Release cadence conflict** | Team A needs to ship hourly, Team B ships weekly, and they share a deployment | Separate deployments. This doesn't necessarily mean separate repos. |
+| **Data boundary** | A subsystem needs its own database (different scaling, backup, or compliance requirements) | Extract the subsystem and its data. This is the most expensive split. |
+| **Compliance boundary** | Regulation requires physical isolation of data or infrastructure (HIPAA, SOX, PCI-DSS) | Isolate the regulated components into their own infrastructure. Non-negotiable when applicable. |
+
+### The Cost of Splitting
+
+Every split introduces ongoing costs that didn't exist before:
+
+| Cost | Description |
+|------|-------------|
+| **Type sharing** | Direct imports become a publish/consume cycle. Types can drift between producer and consumer. |
+| **Deployment coordination** | Features that span services require coordinated deploys. Rollbacks become multi-step. |
+| **API versioning** | Internal function calls become HTTP contracts. Breaking changes require migration strategies. |
+| **Auth propagation** | Tokens must be forwarded between services. CORS configuration. Service-to-service auth. |
+| **Local development** | Running the full system locally means starting multiple processes with correct env vars. |
+| **Distributed debugging** | Errors span multiple services. Correlation IDs and distributed tracing become required, not optional. |
+| **Contract testing** | Changes to shared interfaces must be verified across all consumers. |
+
+For a team of 1-5 engineers, these costs typically exceed the benefits. The break-even point is roughly 8-10 engineers working on the same codebase.
+
+### What to Extract First (When the Time Comes)
+
+When splitting becomes warranted, extract in this order:
+
+1. **Background workers** — Jobs that don't need to respond to HTTP requests (email sending, analytics aggregation, cleanup tasks, webhook delivery). These have the cleanest boundary and lowest coordination cost. Most serverless platforms (Vercel + Inngest, AWS Lambda + SQS) provide this without a separate service.
+
+2. **Public API** — If you need API consumers beyond your own frontend (mobile app, third-party integrations), extract a standalone API service. Your existing `packages/core` business logic becomes the service layer with zero rewrite.
+
+3. **Admin/internal tools** — If the admin app has different scaling, security, or access requirements. This is often already a separate deployment in a monorepo setup.
+
+4. **Data-intensive pipelines** — Analytics processing, reporting, ML features. These often need different runtimes (Python) or database configurations (read replicas, columnar storage).
+
+### What Makes a Codebase Splittable (Invest Here)
+
+The ability to split later depends entirely on having clean boundaries today. These boundaries cost almost nothing to maintain but make future extraction straightforward:
+
+| Boundary | Implementation | Why It Matters |
+|----------|----------------|----------------|
+| **Framework-agnostic business logic** | Shared package (`packages/core`) with zero framework imports | If you extract an API service, core becomes its business layer with no rewrite |
+| **Database access abstraction** | Shared package (`packages/db`) that creates typed clients | Swap the database provider or connection strategy in one place |
+| **Type contracts** | Shared package (`packages/types`) with generated types | Types travel with the business logic, not the framework |
+| **Explicit dependency direction** | Apps depend on packages, packages never depend on apps | Clean extraction — pull the package out, publish it, import it |
+
+### Vendor Lock-In Assessment
+
+Evaluate each major dependency for exit cost:
+
+| Dependency | Lock-In Risk | Exit Strategy |
+|------------|-------------|---------------|
+| **PostgreSQL** | Very low | Industry standard. Runs anywhere. All major cloud providers offer managed Postgres. |
+| **TypeScript** | Very low | Compiles to standard JavaScript. Types are a development tool, not a runtime dependency. |
+| **React/Next.js** | Low | Business logic in `packages/core` is framework-agnostic. UI is the replaceable layer. Next.js runs self-hosted (not Vercel-only). |
+| **Supabase** | Low-Medium | Uses standard Postgres, standard SQL, standard RLS policies. Auth helpers are isolated in `packages/db`. Migration cost: 2-3 weeks to swap the client library and auth flow. |
+| **Vercel** | Low | Next.js deploys on any Node.js platform (Railway, Render, Coolify, self-hosted). No Vercel-specific APIs beyond optional analytics. |
+| **Tailwind CSS** | Low | Utility classes compile to standard CSS. Switching to another CSS approach doesn't affect business logic. |
+
+The highest lock-in risk is always the **data layer** — your database schema, migrations, and access policies. These should be the most portable part of your stack, and with standard Postgres + SQL migrations, they are.
+
+### Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It's Harmful |
+|-------------|-----------------|
+| **Premature microservices** | Distributed systems are harder to build, test, debug, and operate. The infrastructure overhead for a small team exceeds the benefits. |
+| **Splitting for "clean architecture"** | If two components communicate frequently, splitting them adds latency and failure modes. Co-locate things that change together. |
+| **Rewriting instead of migrating** | A "clean rewrite" discards all the edge cases and bug fixes encoded in the existing code. Migrate incrementally — extract, test, replace. |
+| **Over-abstracting for hypothetical future** | Building plugin systems, adapter patterns, and configuration layers for requirements that don't exist yet. The abstraction cost is paid now; the benefit may never materialize. |
+| **Chasing new frameworks** | Rewriting a working app in the latest framework provides zero user value. Frameworks are a means, not an end. |
 
 ---
 

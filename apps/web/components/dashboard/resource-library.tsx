@@ -387,7 +387,6 @@ export function ResourceLibrary({
   useEffect(() => {
     if (!shouldFetchSignedUrl) return;
     let cancelled = false;
-    setEditSignedUrl(null);
     const supabase = createClient();
     supabase.storage
       .from(STORAGE_BUCKET)
@@ -622,6 +621,7 @@ export function ResourceLibrary({
     setEditImageUrl(r.image_url ?? "");
     setEditMetadata(r.metadata ?? {});
     setEditDefaultSponsorId(r.default_sponsor_account_id ?? "");
+    setEditSignedUrl(null);
   };
 
   const editingResource = editingId ? resources.find((r) => r.id === editingId) : null;

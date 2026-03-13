@@ -47,6 +47,7 @@ type Fanflet = {
   theme_config?: Record<string, unknown> | null;
   expiration_date?: string | null;
   show_expiration_notice?: boolean;
+  has_explicit_sponsors?: boolean;
 };
 
 interface SurveyGatedLandingProps {

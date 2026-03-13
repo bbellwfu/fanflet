@@ -46,7 +46,11 @@ export {
   getSpeakerResourceTypePerformance,
   getSpeakerActivityHeatmap,
   getSpeakerConversionFunnel,
+  getSponsorKPIs,
+  getSponsorFanfletPerformance,
+  getSponsorResourceTypePerformance,
   exportSpeakerAnalyticsCSV,
+  exportSponsorAnalyticsCSV,
 } from "./analytics";
 export type {
   FanfletAnalytics,
@@ -54,9 +58,11 @@ export type {
   DashboardOverview,
   DateRange,
   SpeakerKPIs,
+  SponsorKPIs,
   DeviceBreakdown,
   ReferrerBreakdown,
   ResourceTypePerformance,
+  SponsorFanfletPerformance,
   HeatmapCell,
   ConversionFunnelStep,
 } from "./analytics";

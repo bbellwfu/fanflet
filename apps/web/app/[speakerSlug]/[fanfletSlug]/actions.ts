@@ -11,24 +11,18 @@ export async function subscribeToSpeaker(
   sponsorConsent: boolean = false
 ) {
   const supabase = await createClient();
-
-  // Generate the ID server-side so we can return it without INSERT ... RETURNING.
-  // RETURNING requires a SELECT RLS policy, which anon users don't have on subscribers.
-  const id = crypto.randomUUID();
-
-  const { error } = await supabase.from("subscribers").insert({
-    id,
-    email: email.toLowerCase().trim(),
-    speaker_id: speakerId,
-    source_fanflet_id: fanfletId,
-    sponsor_consent: sponsorConsent,
-  });
+  const { data, error } = await supabase
+    .rpc("subscribe_and_distribute_leads", {
+      p_email: email.toLowerCase().trim(),
+      p_name: "", // We don't capture name in this form currently, but the RPC expects it
+      p_speaker_id: speakerId,
+      p_fanflet_id: fanfletId,
+      p_sponsor_consent: sponsorConsent,
+    })
+    .single<{ subscriber_id: string }>();
 
   if (error) {
-    if (error.code === "23505") {
-      return { error: "already_subscribed" };
-    }
-    console.error("[subscribeToSpeaker] Supabase error:", error.code, error.message);
+    console.error("[subscribeToSpeaker] RPC error:", error.code, error.message);
     return { error: "Something went wrong. Please try again later." };
   }
 
@@ -42,7 +36,7 @@ export async function subscribeToSpeaker(
     );
   });
 
-  return { success: true, subscriber_id: id };
+  return { success: true, subscriber_id: data?.subscriber_id };
 }
 
 /**

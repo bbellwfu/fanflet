@@ -42,7 +42,7 @@ type Speaker = {
 
 type ResourceBlock = {
   id: string;
-  type: "link" | "file" | "embed" | "text" | "sponsor";
+  type: "link" | "file" | "embed" | "text" | "sponsor" | "sponsor_block" | "video";
   title: string;
   description: string | null;
   url: string | null;
@@ -71,6 +71,7 @@ type Fanflet = {
   theme_config?: Record<string, unknown> | null;
   expiration_date?: string | null;
   show_expiration_notice?: boolean;
+  has_explicit_sponsors?: boolean;
 };
 
 type LandingPageProps = {
@@ -119,10 +120,10 @@ export function LandingPage({
   const themeVars = getThemeCSSVariables(themeId);
 
   const nonSponsorBlocks = fanflet.resource_blocks.filter(
-    (b) => b.type !== "sponsor"
+    (b) => b.type !== "sponsor" && b.type !== "sponsor_block"
   );
   const sponsorBlocks = fanflet.resource_blocks.filter(
-    (b) => b.type === "sponsor"
+    (b) => b.type === "sponsor" || b.type === "sponsor_block"
   );
 
   const blocksBySection = nonSponsorBlocks.reduce<Record<string, ResourceBlock[]>>(
@@ -283,7 +284,7 @@ export function LandingPage({
               speakerId={speaker.id}
               fanfletId={fanflet.id}
               subscriberCount={subscriberCount}
-              hasSponsorBlocks={fanflet.resource_blocks.some((b) => b.type === "sponsor" || b.sponsor_account_id)}
+              hasSponsorBlocks={fanflet.has_explicit_sponsors || fanflet.resource_blocks.some((b) => b.type === "sponsor" || b.type === "sponsor_block" || b.sponsor_account_id)}
             />
           </CardContent>
         </Card>
@@ -417,7 +418,7 @@ export function LandingPage({
                 );
               }
 
-              if (block.type === "embed" && block.url) {
+              if ((block.type === "embed" || block.type === "video") && block.url) {
                 return (
                   <a
                     key={block.id}

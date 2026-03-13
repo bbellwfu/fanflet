@@ -31,6 +31,8 @@ export default function robots(): MetadataRoute.Robots {
     "/sponsor/leads",
     "/sponsor/integrations",
     "/sponsor/onboarding",
+    "/sponsor/pitch/",
+    "/pitch-assets/",
     "/my",
     "/reports/",
   ];

@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
     <title>Fanflet — Pitch Deck</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
         rel="stylesheet">
@@ -400,12 +401,66 @@
 
         /* Slide-specific backgrounds */
         .slide-title {
-            background: linear-gradient(135deg, var(--dark) 0%, #111827 50%, var(--dark) 100%);
+            background: linear-gradient(to bottom, rgba(15, 23, 42, 0.7), rgba(15, 23, 42, 0.9)),
+                url('/pitch-assets/speaker_hero.png') center/cover no-repeat;
         }
 
         .slide-hero-bg {
             background: linear-gradient(to bottom, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.97)),
-                url('/pitch/speaker_hero.png') center/cover no-repeat;
+                url('/pitch-assets/speaker_hero.png') center/cover no-repeat;
+        }
+
+        /* Phone Animation */
+        @keyframes phoneScroll {
+            0%, 15% { transform: translateY(0); }
+            35%, 50% { transform: translateY(-30%); }
+            70%, 85% { transform: translateY(-60%); }
+            100% { transform: translateY(0); }
+        }
+
+        .phone-mockup {
+            width: 320px;
+            height: 600px;
+            background: #1e293b;
+            border-radius: 40px;
+            border: 12px solid #334155;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 50px 100px -20px rgba(0,0,0,0.5), 0 30px 60px -30px rgba(0,0,0,0.6);
+        }
+
+        .phone-mockup::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 25px;
+            background: #334155;
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+            z-index: 10;
+        }
+
+        .phone-viewport {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0f172a;
+        }
+
+        .phone-screen {
+            width: 100%;
+            display: block;
+            /* No clip-path needed for tall clean screenshots */
+        }
+
+        .screenshot-crop {
+            overflow: hidden;
+            position: relative;
+            /* Crop bottom 50px */
+            clip-path: inset(0 0 7% 0);
         }
 
         .slide-navy {
@@ -480,12 +535,12 @@
         <div class="slide slide-title active" data-slide="0">
             <div class="text-center" style="max-width: 700px;">
                 <div class="flex gap-2 mb-2" style="justify-content: center;">
-                    <img src="/pitch/logo.png" class="logo-mark" alt="Fanflet Logo">
+                    <img src="/pitch-assets/logo.png" class="logo-mark" alt="Fanflet Logo">
                 </div>
                 <h1 style="margin-bottom: 24px;">
                     Turn Event Talks into<br>
                     <span
-                        style="background: linear-gradient(90deg, var(--sky), #7dd3fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Lasting
+                        style="background: linear-gradient(90deg, var(--sky), #7dd3fc); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">Lasting
                         Engagement</span>
                 </h1>
                 <p class="lead text-center" style="margin: 0 auto 40px;">
@@ -533,8 +588,16 @@
             </div>
         </div>
 
-        <!-- SLIDE 3: Quote / Insight -->
-        <div class="slide slide-hero-bg" data-slide="2">
+        <!-- SLIDE 3: The Reality (State of the Art) -->
+        <div class="slide" data-slide="2" style="background: url('/pitch-assets/origin_story.png') center/cover no-repeat; justify-content: flex-end; padding-bottom: 100px;">
+            <div style="background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 32px 48px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.1); max-width: 800px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6);">
+                <h2 style="font-size: 2.2rem; margin-bottom: 8px; font-weight: 700; text-shadow: none;">This is current "state of the art"</h2>
+                <h2 style="font-size: 3.2rem; color: var(--red); margin-bottom: 0; font-weight: 900; letter-spacing: -0.04em; text-shadow: none;">...and THAT is a problem.</h2>
+            </div>
+        </div>
+
+        <!-- SLIDE 4: Quote / Insight -->
+        <div class="slide slide-hero-bg" data-slide="3">
             <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow">The Core Insight</span>
                 <div class="blockquote mt-2" style="border-left: none; text-align: center;">
@@ -551,8 +614,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 4: The Solution -->
-        <div class="slide" data-slide="3">
+        <!-- SLIDE 5: The Solution -->
+        <div class="slide" data-slide="4">
             <div class="max-w">
                 <span class="eyebrow">The Solution</span>
                 <h2>One QR code. Every resource. Lifelong fans.</h2>
@@ -613,8 +676,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 5: Example Speaker Slide -->
-        <div class="slide" data-slide="4">
+        <!-- SLIDE 6: Example Speaker Slide -->
+        <div class="slide" data-slide="5">
             <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow">Product In Action</span>
                 <h2 style="margin-bottom: 8px;">What the audience sees on screen</h2>
@@ -667,7 +730,7 @@
                     <div style="flex-shrink: 0; z-index: 1; text-align: center;">
                         <div
                             style="background: white; border-radius: 16px; padding: 10px; display: inline-block; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
-                            <img src="/pitch/qr_branded.png" alt="QR Code with Fanflet logo"
+                            <img src="qr_branded.png" alt="QR Code with Fanflet logo"
                                 style="width: 280px; height: 280px; display: block;">
                         </div>
                         <p
@@ -678,46 +741,62 @@
             </div>
         </div>
 
-        <!-- SLIDE 6: Landing Page Example -->
-        <div class="slide" data-slide="5">
-            <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
-                <span class="eyebrow">Audience Experience</span>
-                <h2 style="margin-bottom: 8px;">What opens when they scan</h2>
-                <p style="font-size: 0.95rem; color: var(--slate-400); margin-bottom: 28px;">A branded, mobile-first
-                    landing page with everything from the talk — plus email capture and sponsor placements.</p>
-                <div style="
-              max-width: 380px; width: 100%;
-              border-radius: 24px; overflow: hidden;
-              border: 3px solid rgba(255,255,255,0.1);
-              box-shadow: 0 25px 60px rgba(0,0,0,0.5);
-            ">
-                    <img src="/pitch/screenshot_landing.png" alt="Fanflet event landing page"
-                        style="width: 100%; display: block;">
+             <!-- SLIDE 7: Landing Page Example -->
+        <div class="slide" data-slide="6">
+            <div class="max-w">
+                <div class="grid-2" style="align-items: center; gap: 60px;">
+                    <div>
+                        <span class="eyebrow">Audience Experience</span>
+                        <h2 style="font-size: 3rem; line-height: 1.1; margin-bottom: 24px;">What opens when<br>they scan</h2>
+                        <p class="lead" style="font-size: 1.25rem; color: var(--slate-300); margin-bottom: 32px;">A branded, mobile-first landing page that acts as the audience's digital "companion" for your talk.</p>
+                        
+                        <div class="card card-dark mb-3" style="padding: 24px; border-left: 4px solid var(--sky);">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: white;">🎯 Contextual Content</h3>
+                            <p style="font-size: 0.95rem; color: var(--slate-400);">Links, PDFs, and slide decks delivered instantly. No hunting through email or shared drives.</p>
+                        </div>
+                        
+                        <div class="card card-dark mb-3" style="padding: 24px; border-left: 4px solid var(--emerald);">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: white;">⚡ One-Click Connection</h3>
+                            <p style="font-size: 0.95rem; color: var(--slate-400);">Built-in email capture and CRM integration transforms listeners into qualified leads.</p>
+                        </div>
+                        
+                        <div class="card card-dark" style="padding: 24px; border-left: 4px solid var(--amber);">
+                            <h3 style="font-size: 1.1rem; margin-bottom: 8px; color: white;">💰 Sponsor Layer</h3>
+                            <p style="font-size: 0.95rem; color: var(--slate-400);">Seamlessly integrate partner resources without disrupting the learner's journey.</p>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center;">
+                        <div class="phone-mockup">
+                            <div class="phone-viewport">
+                                <img src="/pitch-assets/screenshot_landing_tall.png" class="phone-screen" alt="Fanflet Demo Preview">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- SLIDE 7: Dashboard Example -->
-        <div class="slide" data-slide="6">
+        <!-- SLIDE 8: Dashboard Example -->
+        <div class="slide" data-slide="7">
             <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow">Speaker Dashboard</span>
                 <h2 style="margin-bottom: 8px;">Real-time analytics for every talk</h2>
                 <p style="font-size: 0.95rem; color: var(--slate-400); margin-bottom: 28px;">Speakers see subscribers,
                     downloads, and sponsor clicks across all their Fanflets — with data to prove ROI.</p>
-                <div style="
+                <div class="screenshot-crop" style="
               max-width: 880px; width: 100%;
-              border-radius: 16px; overflow: hidden;
               border: 3px solid rgba(255,255,255,0.1);
               box-shadow: 0 25px 60px rgba(0,0,0,0.5);
             ">
-                    <img src="/pitch/screenshot_dashboard.png" alt="Fanflet speaker dashboard"
+                    <img src="/pitch-assets/screenshot_dashboard.png" alt="Speaker Dashboard"
                         style="width: 100%; display: block;">
                 </div>
             </div>
         </div>
 
-        <!-- SLIDE 8: Market Opportunity -->
-        <div class="slide" data-slide="7">
+        <!-- SLIDE 9: Market Opportunity -->
+        <div class="slide" data-slide="8">
             <div class="max-w">
                 <span class="eyebrow">Market Opportunity</span>
                 <h2>A massive, growing market with no purpose-built solution.</h2>
@@ -752,8 +831,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 6: Business Model -->
-        <div class="slide" data-slide="8">
+        <!-- SLIDE 10: Business Model -->
+        <div class="slide" data-slide="9">
             <div class="max-w">
                 <span class="eyebrow">Business Model</span>
                 <h2>Multiple revenue streams, compounding value.</h2>
@@ -807,8 +886,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 7: Competitive Landscape -->
-        <div class="slide" data-slide="9">
+        <!-- SLIDE 11: Competitive Landscape -->
+        <div class="slide" data-slide="10">
             <div class="max-w">
                 <span class="eyebrow">Competitive Landscape</span>
                 <h2>No one owns the post-event engagement layer.</h2>
@@ -859,8 +938,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 8: Go-to-Market -->
-        <div class="slide" data-slide="10">
+        <!-- SLIDE 12: Go-to-Market -->
+        <div class="slide" data-slide="11">
             <div class="max-w">
                 <span class="eyebrow">Go-to-Market Strategy</span>
                 <h2>Healthcare first. Then expand.</h2>
@@ -900,8 +979,8 @@
             </div>
         </div>
 
-        <!-- SLIDE 9: Moat -->
-        <div class="slide slide-navy" data-slide="11">
+        <!-- SLIDE 13: Moat -->
+        <div class="slide slide-navy" data-slide="12">
             <div class="max-w text-center" style="display: flex; flex-direction: column; align-items: center;">
                 <span class="eyebrow">Defensibility</span>
                 <h2 style="color: var(--white);">Compounding moats over time.</h2>
@@ -928,59 +1007,70 @@
             </div>
         </div>
 
-        <!-- SLIDE 10: Founder -->
-        <div class="slide" data-slide="12">
+        <!-- SLIDE 14: Founder -->
+        <div class="slide" data-slide="13">
             <div class="max-w">
                 <div class="grid-2">
                     <div>
                         <span class="eyebrow">Founder-Market Fit</span>
                         <h2>Built by someone who knows the game.</h2>
+                        <h2 style="font-size: 2.8rem; margin-bottom: 24px;">Built by the powerhouse duo.</h2>
                         <div class="accent-line"></div>
                         <div class="journey-step">
-                            <div class="icon-circle ic-blue">💼</div>
+                            <div class="icon-circle ic-blue">🩺</div>
                             <div>
-                                <h3 style="font-size: 1rem;">20+ Years Enterprise SaaS</h3>
-                                <p style="font-size: 0.9rem;">From startup founding to Fortune 50 executive leadership
-                                </p>
+                                <h3 style="font-size: 1rem;">Clinical Authority</h3>
+                                <p style="font-size: 0.9rem;">Dr. Jennifer Bell is a DDS, MAGD, FICD, Align Tech Faculty, and international KOL.</p>
                             </div>
                         </div>
                         <div class="journey-step">
-                            <div class="icon-circle ic-green">📈</div>
+                            <div class="icon-circle ic-green">🚀</div>
                             <div>
-                                <h3 style="font-size: 1rem;">$1B+ Enterprise Value Delivered</h3>
-                                <p style="font-size: 0.9rem;">Track record with Tier 1 private equity and B2B SaaS
-                                    growth</p>
+                                <h3 style="font-size: 1rem;">Technical Scale</h3>
+                                <p style="font-size: 0.9rem;">Brian Bell brings 20+ years of Enterprise SaaS leadership and $1B+ in value delivered.</p>
                             </div>
                         </div>
                         <div class="journey-step">
                             <div class="icon-circle ic-amber">🤝</div>
                             <div>
-                                <h3 style="font-size: 1rem;">Deep Speaker Network</h3>
-                                <p style="font-size: 0.9rem;">Direct access to the healthcare conference ecosystem and
-                                    enterprise sales motion</p>
+                                <h3 style="font-size: 1rem;">Industry Synergy</h3>
+                                <p style="font-size: 0.9rem;">Combining deep speaker networks with world-class B2B product and sales motion.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="card card-glow"
-                        style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-                        <div
-                            style="width: 100px; height: 100px; border-radius: 50%; background: linear-gradient(135deg, var(--navy), var(--sky)); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: 800; margin-bottom: 20px;">
-                            BB</div>
-                        <h3 style="font-size: 1.3rem; margin-bottom: 4px;">Brian Bell</h3>
-                        <p style="color: var(--sky); font-size: 0.9rem; font-weight: 600; margin-bottom: 16px;">Founder
-                            & CEO</p>
-                        <p style="font-size: 0.9rem;">Fanflet's long-term value lies in its B2B motion — sponsor
-                            integrations and enterprise event partnerships. Brian's network and instincts are a
-                            meaningful unfair advantage.</p>
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- Jennifer Card -->
+                        <div class="card card-glow" style="display: flex; align-items: center; gap: 20px; padding: 20px; text-align: left;">
+                            <img src="/pitch-assets/jennifer.jpg" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid var(--sky); flex-shrink: 0;" alt="Dr. Jennifer Bell">
+                            <div>
+                                <h3 style="font-size: 1.15rem; margin-bottom: 2px;">Dr. Jennifer Bell</h3>
+                                <p style="color: var(--sky); font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">DDS, MAGD, FICD</p>
+                                <p style="color: var(--slate-400); font-size: 0.75rem; font-weight: 500;">Co-Founder & CEO</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Brian Card -->
+                        <div class="card card-dark" style="display: flex; align-items: center; gap: 20px; padding: 20px; text-align: left; background: rgba(255,255,255,0.03);">
+                            <img src="/pitch-assets/brian.jpg" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid var(--emerald); flex-shrink: 0;" alt="Brian Bell">
+                            <div>
+                                <h3 style="font-size: 1.15rem; margin-bottom: 2px;">Brian Bell</h3>
+                                <p style="color: var(--emerald); font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">Enterprise SaaS Executive</p>
+                                <p style="color: var(--slate-400); font-size: 0.75rem; font-weight: 500;">Co-Founder & Head of Product</p>
+                            </div>
+                        </div>
+                        
+                        <p style="font-size: 0.85rem; color: var(--slate-400); line-height: 1.5; margin-top: 10px;">
+                            Fanflet combines Jennifer's frontline speaker insights with Brian's 20+ year track record of building and scaling billion-dollar B2B platforms.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- SLIDE 11: The Ask / CTA -->
-        <div class="slide slide-title" data-slide="13">
+        <!-- SLIDE 15: The Ask / CTA -->
+        <div class="slide slide-title" data-slide="14">
             <div class="text-center" style="max-width: 700px;">
-                <img src="/pitch/logo.png" class="logo-mark mb-2" alt="Fanflet Logo" style="margin: 0 auto 24px;">
+                <img src="/pitch-assets/logo.png" class="logo-mark mb-2" alt="Fanflet Logo" style="margin: 0 auto 24px;">
                 <h2 style="font-size: 2.8rem; margin-bottom: 16px;">
                     Ready to own the<br>
                     <span style="color: var(--sky);">post-event engagement layer?</span>
@@ -1004,7 +1094,7 @@
     <!-- Navigation -->
     <div class="nav">
         <button class="nav-btn" id="prev" aria-label="Previous slide">←</button>
-        <div class="slide-counter"><span id="current">1</span> / <span id="total">14</span></div>
+        <div class="slide-counter"><span id="current">1</span> / <span id="total">15</span></div>
         <button class="nav-btn" id="next" aria-label="Next slide">→</button>
     </div>
     <div class="progress-bar" id="progress"></div>
@@ -1021,7 +1111,18 @@
             slides[current].classList.add('active');
             document.getElementById('current').textContent = current + 1;
             document.getElementById('progress').style.width = ((current + 1) / total * 100) + '%';
+            // Update URL hash without jumping
+            history.replaceState(null, null, '#' + (current + 1));
         }
+
+        // Initialize from hash
+        window.addEventListener('load', () => {
+            const hash = window.location.hash.substring(1);
+            const slideNum = parseInt(hash);
+            if (!isNaN(slideNum) && slideNum >= 1 && slideNum <= total) {
+                goTo(slideNum - 1);
+            }
+        });
 
         document.getElementById('next').addEventListener('click', () => goTo(current + 1));
         document.getElementById('prev').addEventListener('click', () => goTo(current - 1));

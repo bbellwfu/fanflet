@@ -4,20 +4,12 @@ import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { generateVisitorHash, getClientIp } from '@/lib/visitor-hash'
 import { getSiteUrl } from '@/lib/config'
+import { normalizePhone } from '@/lib/phone'
 
 const SmsBookmarkSchema = z.object({
   fanflet_id: z.string().uuid(),
   phone: z.string().min(10).max(20),
 })
-
-/** Strip a US/CA phone to digits-only E.164 format. */
-function normalizePhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, '')
-  if (digits.length === 10) return `+1${digits}`
-  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
-  if (digits.length >= 11 && digits.length <= 15) return `+${digits}`
-  return null
-}
 
 export async function POST(request: NextRequest) {
   const rl = rateLimit(request, 'sms', 5, 60_000)

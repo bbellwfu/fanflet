@@ -634,7 +634,7 @@ export async function seedSponsorDemoEnvironment(
 
     // ── Step 4: Create sponsor resource library (Library tab) ──
     const payloadLibraryType = (t: string): "file" | "link" | "video" | "sponsor_block" => {
-      if (t === "link" || t === "file") return t;
+      if (t === "link" || t === "file" || t === "video" || t === "sponsor_block") return t;
       if (t === "text" || t === "promo") return "sponsor_block";
       return "link"; // fallback
     };
@@ -647,8 +647,10 @@ export async function seedSponsorDemoEnvironment(
           type: libType,
           title: resource.title,
           description: resource.description || null,
-          url: resource.url || null,
-          status: "available",
+          url: libType === "link" || libType === "video" ? resource.url || null : null,
+          file_path: libType === "file" ? `demo/${sponsorAccount.id}/${slugify(resource.title)}.pdf` : null,
+          file_size_bytes: libType === "file" ? Math.floor(Math.random() * 10 * 1024 * 1024) + 2 * 1024 * 1024 : null, // 2-12MB
+          status: "published",
           availability: "all",
         })
         .select("id")
@@ -689,7 +691,6 @@ export async function seedSponsorDemoEnvironment(
 
     // ── Step 5b: Create campaigns and link library items (Enterprise) ──
     const campaigns = payload.campaigns ?? [];
-    let firstCampaignId: string | null = null;
     for (const camp of campaigns) {
       const startDate = camp.start_date || new Date().toISOString().slice(0, 10);
       const { data: campaignRow, error: campError } = await serviceClient
@@ -701,6 +702,7 @@ export async function seedSponsorDemoEnvironment(
           start_date: startDate,
           end_date: camp.end_date || null,
           status: "active",
+          all_speakers_assigned: camp.all_speakers_assigned ?? false,
         })
         .select("id")
         .single();
@@ -711,15 +713,27 @@ export async function seedSponsorDemoEnvironment(
       }
       if (campaignRow) {
         manifest.sponsor_campaign_ids.push(campaignRow.id);
-        if (!firstCampaignId) firstCampaignId = campaignRow.id;
+        
+        // Link unique library items to this campaign
+        if (manifest.sponsor_resource_library_ids.length > 0) {
+          const campaignIndex = manifest.sponsor_campaign_ids.length - 1;
+          const resourcesToLink = manifest.sponsor_resource_library_ids.slice(
+            campaignIndex * 2,
+            (campaignIndex + 1) * 2
+          );
+          
+          if (resourcesToLink.length > 0) {
+            const resourceJunctions = resourcesToLink.map(resourceId => ({
+              resource_id: resourceId,
+              campaign_id: campaignRow.id,
+            }));
+            
+            await serviceClient
+              .from("sponsor_resource_campaigns")
+              .insert(resourceJunctions);
+          }
+        }
       }
-    }
-    if (firstCampaignId && manifest.sponsor_resource_library_ids.length > 0) {
-      const idsToLink = manifest.sponsor_resource_library_ids.slice(0, 2);
-      await serviceClient
-        .from("sponsor_resource_library")
-        .update({ campaign_id: firstCampaignId })
-        .in("id", idsToLink);
     }
 
     // ── Step 6: Create demo speaker accounts with fanflets ──
@@ -982,6 +996,61 @@ export async function seedSponsorDemoEnvironment(
         }
         if (leadRow) manifest.lead_ids.push(leadRow.id);
       }
+    }
+
+    // ── Step 7b: Assign speakers to campaigns ──
+    for (const campaignId of manifest.sponsor_campaign_ids) {
+      const speakerAssignments = manifest.demo_speakers.map(s => ({
+        campaign_id: campaignId,
+        speaker_id: s.speaker_id,
+      }));
+      
+      await serviceClient
+        .from("sponsor_campaign_speakers")
+        .insert(speakerAssignments);
+    }
+
+    // ── Step 7c: Seed analytics events ──
+    const analyticsEvents = [];
+    for (const speaker of manifest.demo_speakers) {
+      const fanfletId = speaker.fanflet_ids[0];
+      if (!fanfletId) continue;
+
+      // Page views
+      for (let i = 0; i < 20; i++) {
+        analyticsEvents.push({
+          fanflet_id: fanfletId,
+          event_type: "page_view",
+          device_type: Math.random() > 0.3 ? "mobile" : "desktop",
+          referrer: "https://google.com",
+          created_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      }
+
+      // Resource clicks for sponsor blocks
+      const { data: blocks } = await serviceClient
+        .from("resource_blocks")
+        .select("id")
+        .eq("fanflet_id", fanfletId)
+        .eq("type", "sponsor");
+
+      if (blocks) {
+        for (const block of blocks) {
+          for (let i = 0; i < 5; i++) {
+            analyticsEvents.push({
+              fanflet_id: fanfletId,
+              event_type: "resource_click",
+              resource_block_id: block.id,
+              device_type: Math.random() > 0.3 ? "mobile" : "desktop",
+              created_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+          }
+        }
+      }
+    }
+
+    if (analyticsEvents.length > 0) {
+      await serviceClient.from("analytics_events").insert(analyticsEvents);
     }
 
     // ── Step 8: Update demo_environments row ──

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Loader2, Megaphone, Users, FileText, Pencil, Trash2 } from "lucide-react";
+import { Plus, Loader2, Megaphone, Users, FileText, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { addDays, endOfMonth, addMonths, endOfQuarter, addQuarters, endOfYear, format } from "date-fns";
 import {
   Dialog,
@@ -36,6 +36,7 @@ import {
   type SponsorCampaignRow,
 } from "./actions";
 import { toast } from "sonner";
+import { DateRangeField } from "@/components/ui/date-range-field";
 
 const statusBadge: Record<string, string> = {
   draft: "Draft",
@@ -56,29 +57,38 @@ function formatLocalDate(dateStr: string | null | undefined): string {
 
 type EndDatePresetKey = "30d" | "eom" | "eonm" | "eoq" | "eonq" | "eoy";
 
-const END_DATE_PRESETS: { key: EndDatePresetKey; label: string; compute: () => string }[] = [
-  { key: "30d", label: "30 days", compute: () => format(addDays(new Date(), 30), "yyyy-MM-dd") },
-  { key: "eom", label: "End of month", compute: () => format(endOfMonth(new Date()), "yyyy-MM-dd") },
-  { key: "eonm", label: "End of next month", compute: () => format(endOfMonth(addMonths(new Date(), 1)), "yyyy-MM-dd") },
-  { key: "eoq", label: "End of quarter", compute: () => format(endOfQuarter(new Date()), "yyyy-MM-dd") },
-  { key: "eonq", label: "End of next quarter", compute: () => format(endOfQuarter(addQuarters(new Date(), 1)), "yyyy-MM-dd") },
-  { key: "eoy", label: "End of year", compute: () => format(endOfYear(new Date()), "yyyy-MM-dd") },
+const END_DATE_PRESETS: { key: EndDatePresetKey; label: string; compute: (base: Date) => string }[] = [
+  { key: "30d", label: "30 days", compute: (base) => format(addDays(base, 30), "yyyy-MM-dd") },
+  { key: "eom", label: "End of month", compute: (base) => format(endOfMonth(base), "yyyy-MM-dd") },
+  { key: "eonm", label: "End of next month", compute: (base) => format(endOfMonth(addMonths(base, 1)), "yyyy-MM-dd") },
+  { key: "eoq", label: "End of quarter", compute: (base) => format(endOfQuarter(base), "yyyy-MM-dd") },
+  { key: "eonq", label: "End of next quarter", compute: (base) => format(endOfQuarter(addQuarters(base, 1)), "yyyy-MM-dd") },
+  { key: "eoy", label: "End of year", compute: (base) => format(endOfYear(base), "yyyy-MM-dd") },
 ];
 
 function EndDatePresets({
   activePreset,
   onSelect,
+  baseDate,
 }: {
   activePreset: EndDatePresetKey | null;
   onSelect: (key: EndDatePresetKey, value: string) => void;
+  baseDate: string;
 }) {
+  const base = useMemo(() => {
+    if (!baseDate) return new Date();
+    const parts = baseDate.split("-");
+    if (parts.length !== 3) return new Date();
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }, [baseDate]);
+
   return (
     <div className="flex flex-wrap gap-1.5">
       {END_DATE_PRESETS.map((p) => (
         <button
           key={p.key}
           type="button"
-          onClick={() => onSelect(p.key, p.compute())}
+          onClick={() => onSelect(p.key, p.compute(base))}
           className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium transition-colors ${
             activePreset === p.key
               ? "border-teal-500 bg-teal-50 text-teal-700"
@@ -169,6 +179,11 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
 
   const handleEndDateManualChange = useCallback((value: string) => {
     setEndDate(value);
+    setEndDatePreset(null);
+  }, []);
+
+  const handleStartDateChange = useCallback((value: string) => {
+    setStartDate(value);
     setEndDatePreset(null);
   }, []);
 
@@ -287,6 +302,14 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <Link
+                    href={`/sponsor/analytics?campaignId=${c.id}`}
+                    aria-label="View analytics"
+                    title="Analytics"
+                    className="p-1.5 rounded-md hover:bg-violet-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 transition-colors"
+                  >
+                    <BarChart3 className="w-4 h-4 text-violet-700" />
+                  </Link>
                   <button
                     aria-label="Edit campaign"
                     onClick={() => openEdit(c.id)}
@@ -380,28 +403,20 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <Label htmlFor="start-date" className="block mb-1.5">Start date</Label>
-                <Input
-                  id="start-date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+            <DateRangeField
+              from={startDate}
+              to={endDate}
+              onFromChange={handleStartDateChange}
+              onToChange={handleEndDateManualChange}
+              fromId="create-start-date"
+              toId="create-end-date"
+              toLabel="End date (optional)"
+              className="mt-1"
+            >
+              <div className="mt-2">
+                <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} baseDate={startDate} />
               </div>
-              <div>
-                <Label htmlFor="end-date" className="block mb-1.5">End date (optional)</Label>
-                <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} />
-                <Input
-                  id="end-date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => handleEndDateManualChange(e.target.value)}
-                  className="mt-1.5"
-                />
-              </div>
-            </div>
+            </DateRangeField>
             <div>
               <Label htmlFor="create-status" className="block mb-1.5">Status</Label>
               <select
@@ -504,28 +519,20 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
                   </Button>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <Label htmlFor="edit-start-date" className="block mb-1.5">Start date</Label>
-                  <Input
-                    id="edit-start-date"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
+              <DateRangeField
+                from={startDate}
+                to={endDate}
+                onFromChange={handleStartDateChange}
+                onToChange={handleEndDateManualChange}
+                fromId="edit-start-date"
+                toId="edit-end-date"
+                toLabel="End date (optional)"
+                className="mt-1"
+              >
+                <div className="mt-2">
+                  <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} baseDate={startDate} />
                 </div>
-                <div>
-                  <Label htmlFor="edit-end-date" className="block mb-1.5">End date (optional)</Label>
-                  <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} />
-                  <Input
-                    id="edit-end-date"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => handleEndDateManualChange(e.target.value)}
-                    className="mt-1.5"
-                  />
-                </div>
-              </div>
+              </DateRangeField>
               <div>
                 <Label htmlFor="edit-status" className="block mb-1.5">Status</Label>
                 <select

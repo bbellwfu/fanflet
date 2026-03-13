@@ -49,11 +49,14 @@ next-env.d.ts
 # Legacy marketing site (merged into application)
 marketing_site/
 
-# Pitch deck assets (not part of the application)
-pitch_deck/
-
 # Admin worklog index (build artifact)
 apps/admin/generated/
+
+# Test coverage output
+coverage/
+
+# Lint output
+lint-output.txt
 
 # Misc
 *.pptx

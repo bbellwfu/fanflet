@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { isbot } from 'isbot'
 import { generateVisitorHash, getClientIp } from '@/lib/visitor-hash'
+import { classifyReferrer } from '@/lib/referrer'
 
 const VALID_EVENT_TYPES = [
   'page_view', 'resource_click', 'email_signup',
@@ -20,28 +21,6 @@ const TrackEventSchema = z.object({
   referrer: z.string().max(2048).optional().nullable(),
   source: z.enum(SOURCE_VALUES).optional().default('direct'),
 })
-
-function classifyReferrer(referrer: string | null, source: string | null): string {
-  if (source === 'qr') return 'qr_code'
-  if (source === 'portfolio') return 'portfolio'
-  if (source === 'share') return 'share_link'
-  if (!referrer) return 'direct'
-
-  let hostname: string
-  try {
-    hostname = new URL(referrer).hostname.toLowerCase()
-  } catch {
-    return 'other'
-  }
-
-  if (/google\.|bing\.|yahoo\.|duckduckgo\.|baidu\.|yandex\./.test(hostname)) return 'search'
-  if (/linkedin\.|twitter\.|x\.com|facebook\.|instagram\.|threads\.net/.test(hostname)) return 'social'
-  if (/mail\.|outlook\.|gmail\./.test(hostname)) return 'email'
-  if (/slack\.|teams\.|discord\.|telegram\./.test(hostname)) return 'messaging'
-  if (hostname.includes('fanflet.com')) return 'internal'
-
-  return 'other'
-}
 
 export async function POST(request: NextRequest) {
   const rl = rateLimit(request, 'track', 100, 60_000)

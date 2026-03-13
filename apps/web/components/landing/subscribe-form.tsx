@@ -112,8 +112,7 @@ export function SubscribeForm({
             className="mt-1 rounded border-slate-300 text-[#3BA5D9] focus:ring-[#3BA5D9]"
           />
           <span>
-            I agree to share my name and email with sponsors whose content I
-            engage with on this page.
+            I agree to share my name and email with the sponsors of this event.
           </span>
         </label>
       )}

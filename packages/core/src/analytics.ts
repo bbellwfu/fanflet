@@ -50,6 +50,22 @@ export interface SpeakerKPIs {
   prevResourceClicks: number;
 }
 
+export interface SponsorKPIs {
+  uniqueVisitors: number;
+  totalResourceClicks: number;
+  totalLeads: number;
+  conversionRate: number;
+}
+
+export interface SponsorFanfletPerformance {
+  id: string;
+  title: string;
+  event_name: string;
+  views: number;
+  clicks: number;
+  leads: number;
+}
+
 export interface DeviceBreakdown {
   device: string;
   count: number;
@@ -619,6 +635,242 @@ export async function getSpeakerConversionFunnel(
           : 0,
     }))
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sponsor Analytics (Pro)                                            */
+/* ------------------------------------------------------------------ */
+
+export async function getSponsorKPIs(
+  supabase: UserScopedClient,
+  sponsorId: string,
+  fanfletIds: string[],
+  blockIds: string[],
+  range?: DateRange
+): Promise<ServiceResult<SponsorKPIs>> {
+  const r = range ?? defaultRange(30);
+
+  const [eventsRes, leadsRes] = await Promise.all([
+    supabase
+      .from("analytics_events")
+      .select("event_type, visitor_hash, resource_block_id")
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+      .in("fanflet_id", fanfletIds)
+      .in("event_type", ["page_view", "resource_click"]),
+    supabase
+      .from("sponsor_leads")
+      .select("id")
+      .eq("sponsor_id", sponsorId)
+      .in("fanflet_id", fanfletIds)
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+  ]);
+
+  const events = eventsRes.data ?? [];
+  const leads = leadsRes.data ?? [];
+
+  const uniqueHashes = new Set<string>();
+  let totalResourceClicks = 0;
+  const blockIdSet = new Set(blockIds);
+
+  for (const e of events) {
+    if (e.event_type === "page_view" && e.visitor_hash) uniqueHashes.add(e.visitor_hash);
+    if (e.event_type === "resource_click" && e.resource_block_id && blockIdSet.has(e.resource_block_id)) totalResourceClicks++;
+  }
+
+  const uniqueVisitors = uniqueHashes.size;
+  const totalLeads = leads.length;
+
+  return ok({
+    uniqueVisitors,
+    totalResourceClicks,
+    totalLeads,
+    conversionRate: uniqueVisitors > 0 ? (totalLeads / uniqueVisitors) * 100 : 0
+  });
+}
+
+export async function getSponsorFanfletPerformance(
+  supabase: UserScopedClient,
+  sponsorId: string,
+  fanfletIds: string[],
+  blockIds: string[],
+  range?: DateRange
+): Promise<ServiceResult<SponsorFanfletPerformance[]>> {
+  const r = range ?? defaultRange(30);
+
+  const [fanfletsRes, eventsRes, leadsRes] = await Promise.all([
+    supabase.from("fanflets").select("id, title, event_name").in("id", fanfletIds),
+    supabase
+      .from("analytics_events")
+      .select("event_type, fanflet_id, resource_block_id")
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+      .in("fanflet_id", fanfletIds)
+      .in("event_type", ["page_view", "resource_click"]),
+    supabase
+      .from("sponsor_leads")
+      .select("fanflet_id")
+      .eq("sponsor_id", sponsorId)
+      .in("fanflet_id", fanfletIds)
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+  ]);
+
+  const fanflets = fanfletsRes.data ?? [];
+  const events = eventsRes.data ?? [];
+  const leads = leadsRes.data ?? [];
+
+  const statsMap: Record<string, { views: number; clicks: number; leads: number }> = {};
+  for (const f of fanflets) {
+    statsMap[f.id] = { views: 0, clicks: 0, leads: 0 };
+  }
+
+  const blockIdSet = new Set(blockIds);
+  for (const e of events) {
+    if (statsMap[e.fanflet_id]) {
+      if (e.event_type === "page_view") statsMap[e.fanflet_id].views++;
+      else if (e.event_type === "resource_click" && e.resource_block_id && blockIdSet.has(e.resource_block_id)) statsMap[e.fanflet_id].clicks++;
+    }
+  }
+
+  for (const l of leads) {
+    if (statsMap[l.fanflet_id]) statsMap[l.fanflet_id].leads++;
+  }
+
+  return ok(
+    fanflets.map(f => ({
+      id: f.id,
+      title: f.title,
+      event_name: f.event_name,
+      ...statsMap[f.id]
+    })).sort((a, b) => b.views - a.views)
+  );
+}
+
+export async function getSponsorResourceTypePerformance(
+  supabase: UserScopedClient,
+  sponsorId: string,
+  blockIds: string[],
+  range?: DateRange
+): Promise<ServiceResult<ResourceTypePerformance[]>> {
+  const r = range ?? defaultRange(30);
+
+  const [blocksRes, eventsRes] = await Promise.all([
+    supabase.from("resource_blocks").select("id, type").in("id", blockIds),
+    supabase
+      .from("analytics_events")
+      .select("resource_block_id")
+      .eq("event_type", "resource_click")
+      .in("resource_block_id", blockIds)
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+  ]);
+
+  const blocks = blocksRes.data ?? [];
+  const events = eventsRes.data ?? [];
+
+  const clickMap: Record<string, number> = {};
+  for (const e of events) {
+    if (e.resource_block_id) {
+      clickMap[e.resource_block_id] = (clickMap[e.resource_block_id] ?? 0) + 1;
+    }
+  }
+
+  const typeMap: Record<string, { totalClicks: number; blockCount: number }> = {};
+  for (const b of blocks) {
+    if (!typeMap[b.type]) typeMap[b.type] = { totalClicks: 0, blockCount: 0 };
+    typeMap[b.type].blockCount++;
+    typeMap[b.type].totalClicks += clickMap[b.id] ?? 0;
+  }
+
+  return ok(
+    Object.entries(typeMap).map(([type, d]) => ({
+      type,
+      totalClicks: d.totalClicks,
+      avgClicksPerBlock: d.blockCount > 0 ? d.totalClicks / d.blockCount : 0,
+      blockCount: d.blockCount
+    })).sort((a, b) => b.totalClicks - a.totalClicks)
+  );
+}
+
+export async function exportSponsorAnalyticsCSV(
+  supabase: UserScopedClient,
+  sponsorId: string,
+  fanfletIds: string[],
+  blockIds: string[],
+  range?: DateRange,
+  type: "aggregated" | "raw" = "raw"
+): Promise<ServiceResult<string>> {
+  const r = range ?? defaultRange(30);
+
+  if (type === "raw") {
+    const { data: events, error } = await supabase
+      .from("analytics_events")
+      .select("created_at, event_type, fanflet_id, device_type, source, referrer, resource_block_id")
+      .gte("created_at", r.from)
+      .lte("created_at", r.to)
+      .or(`fanflet_id.in.(${fanfletIds.join(",")}),resource_block_id.in.(${blockIds.join(",")})`)
+      .order("created_at", { ascending: false });
+
+    if (error) return err("internal_error", error.message);
+
+    const { data: fanflets } = await supabase.from("fanflets").select("id, title").in("id", fanfletIds);
+    const { data: blocks } = await supabase.from("resource_blocks").select("id, title").in("id", blockIds);
+    const fanfletMap = new Map((fanflets ?? []).map(f => [f.id, f.title]));
+    const blockMap = new Map((blocks ?? []).map(b => [b.id, b.title]));
+
+    const rows = ["Timestamp,Event Type,Fanflet,Resource,Device,Source,Referrer"];
+    for (const ev of events ?? []) {
+      const ts = new Date(ev.created_at).toISOString();
+      const fTitle = (fanfletMap.get(ev.fanflet_id) ?? "Unknown").replace(/"/g, '""');
+      const bTitle = ev.resource_block_id ? (blockMap.get(ev.resource_block_id) ?? "Unknown").replace(/"/g, '""') : "N/A";
+      const referrer = (ev.referrer ?? "").replace(/"/g, '""');
+      rows.push(`"${ts}","${ev.event_type}","${fTitle}","${bTitle}","${ev.device_type ?? ""}","${(ev as any).source ?? ""}","${referrer}"`);
+    }
+    return ok(rows.join("\n"));
+  } else {
+    // Aggregated Export
+    const [kpiRes, fanfletPerfRes, resourceTypePerfRes] = await Promise.all([
+      getSponsorKPIs(supabase, sponsorId, fanfletIds, blockIds, r),
+      getSponsorFanfletPerformance(supabase, sponsorId, fanfletIds, blockIds, r),
+      getSponsorResourceTypePerformance(supabase, sponsorId, blockIds, r)
+    ]);
+
+    const kpi = kpiRes.data;
+    const fanfletStats = fanfletPerfRes.data ?? [];
+    const resourceTypeStats = resourceTypePerfRes.data ?? [];
+
+    const rows: string[] = [];
+    
+    // KPIs Section
+    rows.push("--- KEY PERFORMANCE INDICATORS ---");
+    rows.push("Metric,Value");
+    rows.push(`Unique Views,${kpi?.uniqueVisitors ?? 0}`);
+    rows.push(`Resource Clicks,${kpi?.totalResourceClicks ?? 0}`);
+    rows.push(`New Leads,${kpi?.totalLeads ?? 0}`);
+    rows.push(`Conversion Rate,${(kpi?.conversionRate ?? 0).toFixed(2)}%`);
+    rows.push("");
+
+    // Fanflet Performance
+    rows.push("--- FANFLET PERFORMANCE ---");
+    rows.push("Fanflet,Event,Views,Clicks,Leads");
+    for (const f of fanfletStats) {
+      const title = f.title.replace(/"/g, '""');
+      const event = (f.event_name ?? "").replace(/"/g, '""');
+      rows.push(`"${title}","${event}",${f.views},${f.clicks},${f.leads}`);
+    }
+    rows.push("");
+
+    // Resource Type Performance
+    rows.push("--- RESOURCE TYPE ENGAGEMENT ---");
+    rows.push("Type,Total Clicks,Avg Clicks Per Block,Block Count");
+    for (const rt of resourceTypeStats) {
+      rows.push(`${rt.type},${rt.totalClicks},${rt.avgClicksPerBlock.toFixed(2)},${rt.blockCount}`);
+    }
+
+    return ok(rows.join("\n"));
+  }
 }
 
 /* ------------------------------------------------------------------ */

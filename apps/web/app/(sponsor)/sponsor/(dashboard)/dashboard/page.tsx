@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { loadSponsorEntitlements } from "@fanflet/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Users, MousePointerClick, Link2, Bell } from "lucide-react";
+import { Users, MousePointerClick, Link2, Bell, BarChart3 } from "lucide-react";
 import { ContentPerformanceSection } from "./content-performance-section";
 import type { ContentPerformanceRow, CrossSpeakerRow } from "./content-performance-section";
 
@@ -304,36 +304,42 @@ export default async function SponsorDashboardPage() {
       )}
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active connections</CardTitle>
-            <Link2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{connectionsCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">{speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s you&apos;re connected with</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total leads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{leadsCount ?? 0}</p>
-            <p className="text-xs text-muted-foreground">Consented subscribers who engaged</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total clicks</CardTitle>
-            <MousePointerClick className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{clicksCount}</p>
-            <p className="text-xs text-muted-foreground">Clicks on your content</p>
-          </CardContent>
-        </Card>
+        <Link href="/sponsor/connections" className="block group">
+          <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active connections</CardTitle>
+              <Link2 className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{connectionsCount ?? 0}</p>
+              <p className="text-xs text-muted-foreground">{speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s you&apos;re connected with</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/sponsor/leads" className="block group">
+          <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total leads</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{leadsCount ?? 0}</p>
+              <p className="text-xs text-muted-foreground">Consented subscribers who engaged</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/sponsor/analytics" className="block group">
+          <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total clicks</CardTitle>
+              <MousePointerClick className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{clicksCount}</p>
+              <p className="text-xs text-muted-foreground">Clicks on your content</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <Card>
@@ -343,8 +349,15 @@ export default async function SponsorDashboardPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Link
-            href="/sponsor/leads"
+            href="/sponsor/analytics"
             className="inline-flex items-center rounded-md bg-[#1B365D] px-4 py-2 text-sm font-medium text-white hover:bg-[#152b4d]"
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Full Analytics
+          </Link>
+          <Link
+            href="/sponsor/leads"
+            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             View leads
           </Link>

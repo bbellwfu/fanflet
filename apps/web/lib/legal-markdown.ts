@@ -32,7 +32,7 @@ export async function loadLegalMarkdown(filename: string): Promise<string> {
   return markdownToHtml(cleaned);
 }
 
-function markdownToHtml(md: string): string {
+export function markdownToHtml(md: string): string {
   let html = md;
 
   // Tables
@@ -106,7 +106,7 @@ function markdownToHtml(md: string): string {
   return html;
 }
 
-function inlineFormat(text: string): string {
+export function inlineFormat(text: string): string {
   return text
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.+?)\*/g, "<em>$1</em>")

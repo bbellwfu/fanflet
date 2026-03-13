@@ -33,13 +33,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   createSponsorLibraryResource,
   updateSponsorLibraryResource,
@@ -139,11 +138,11 @@ export function SponsorLibraryClient({
     }
     toast.success("Resource added.");
     setAddOpen(false);
-    resetAddForm();
+    resetAddFrom();
     router.refresh();
   };
 
-  const resetAddForm = () => {
+  const resetAddFrom = () => {
     setAddTitle("");
     setAddDescription("");
     setAddUrl("");
@@ -531,13 +530,17 @@ export function SponsorLibraryClient({
         </div>
       )}
 
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add resource</DialogTitle>
-            <DialogDescription>Add a link or upload a file for {speakerLabel}s to use in their fanflets.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 py-4">
+      <Sheet open={addOpen} onOpenChange={(open) => {
+        setAddOpen(open);
+        if (!open) resetAddFrom();
+      }}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>Add resource</SheetTitle>
+            <SheetDescription>Add a link or upload a file for {speakerLabel}s to use in their fanflets.</SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
             <div className="flex gap-2 flex-wrap">
               {(["link", "video", "sponsor_block", "file"] as const).map((t) => (
                 <Button
@@ -546,112 +549,130 @@ export function SponsorLibraryClient({
                   variant={addType === t ? "default" : "outline"}
                   size="sm"
                   onClick={() => setAddType(t)}
+                  className={addType === t ? "bg-[#20ACE4] hover:bg-[#20ACE4]/90" : ""}
                 >
                   {typeLabels[t]}
                 </Button>
               ))}
             </div>
+
             {addType === "file" ? (
-              <div>
-                <Label className="block mb-1.5">Upload file</Label>
-                <Input
-                  type="file"
-                  className="mt-2"
-                  accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg"
-                  onChange={handleFileSelect}
-                  disabled={uploading}
-                />
-                {uploading && (
-                  <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading…
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">Max {maxFileMb} MB per file.</p>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="font-medium text-slate-900">Upload file</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.pptx,.ppt,.docx,.doc,.xlsx,.xls,.csv,.txt,.zip,.png,.jpg,.jpeg,.gif,.webp,.svg"
+                    onChange={handleFileSelect}
+                    disabled={uploading}
+                    className="bg-white border-slate-200"
+                  />
+                  {uploading && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Uploading…
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Max {maxFileMb} MB per file.</p>
+                </div>
               </div>
             ) : (
-              <>
-                <div>
-                  <Label htmlFor="add-title" className="block mb-1.5">Title</Label>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="add-title" className="font-medium text-slate-900">Title</Label>
                   <Input
                     id="add-title"
                     value={addTitle}
                     onChange={(e) => setAddTitle(e.target.value)}
                     placeholder="Resource title"
+                    className="bg-white border-slate-200"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="add-url" className="block mb-1.5">URL</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="add-url" className="font-medium text-slate-900">URL</Label>
                   <Input
                     id="add-url"
                     type="url"
                     value={addUrl}
                     onChange={(e) => setAddUrl(e.target.value)}
                     placeholder="https://…"
+                    className="bg-white border-slate-200"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="add-desc" className="block mb-1.5">Description (optional)</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="add-desc" className="font-medium text-slate-900">Description (optional)</Label>
                   <Textarea
                     id="add-desc"
                     value={addDescription}
                     onChange={(e) => setAddDescription(e.target.value)}
-                    rows={2}
+                    rows={4}
+                    className="bg-white border-slate-200"
                   />
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setAddOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateLink} disabled={!addTitle.trim()}>
-                    Add
-                  </Button>
-                </DialogFooter>
-              </>
+              </div>
             )}
           </div>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Resource</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-5 py-4">
-            <div>
-              <Label htmlFor="edit-title" className="block mb-1.5">Title</Label>
+          <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-end gap-3 sticky bottom-0 z-10">
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            {addType !== "file" && (
+              <Button 
+                onClick={handleCreateLink} 
+                className="bg-[#20ACE4] hover:bg-[#20ACE4]/90"
+                disabled={!addTitle.trim()}
+              >
+                Add
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!editId} onOpenChange={(open) => !open && setEditId(null)}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>Edit Resource</SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="edit-title" className="font-medium text-slate-900">Title</Label>
               <Input
                 id="edit-title"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
+                className="bg-white border-slate-200"
               />
             </div>
-            <div>
-              <Label htmlFor="edit-url" className="block mb-1.5">URL</Label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-url" className="font-medium text-slate-900">URL</Label>
               <Input
                 id="edit-url"
                 type="url"
                 value={editUrl}
                 onChange={(e) => setEditUrl(e.target.value)}
+                className="bg-white border-slate-200"
               />
             </div>
-            <div>
-              <Label htmlFor="edit-desc" className="block mb-1.5">Description</Label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-desc" className="font-medium text-slate-900">Description</Label>
               <Textarea
                 id="edit-desc"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                rows={2}
+                rows={4}
+                className="bg-white border-slate-200"
               />
             </div>
-            <div>
-              <Label htmlFor="edit-status" className="block mb-1.5">Status</Label>
+            <div className="space-y-2">
+              <Label htmlFor="edit-status" className="font-medium text-slate-900">Status</Label>
               <select
                 id="edit-status"
                 value={editStatus}
                 onChange={(e) => setEditStatus(e.target.value as "draft" | "published" | "archived")}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
@@ -663,28 +684,28 @@ export function SponsorLibraryClient({
                 ? campaigns.filter((c) => c.name.toLowerCase().includes(campaignSearch.toLowerCase()))
                 : campaigns;
               return (
-                <div>
-                  <Label className="block mb-1.5">Campaigns (optional)</Label>
-                  <p className="text-xs text-muted-foreground mb-2">Assign this resource to one or more campaigns.</p>
+                <div className="space-y-2">
+                  <Label className="font-medium text-slate-900">Campaigns (optional)</Label>
+                  <p className="text-xs text-muted-foreground">Assign this resource to one or more campaigns.</p>
                   {campaigns.length > 10 && (
                     <Input
                       placeholder="Search campaigns…"
                       value={campaignSearch}
                       onChange={(e) => setCampaignSearch(e.target.value)}
-                      className="mb-2"
+                      className="bg-white"
                     />
                   )}
-                  <div className="border rounded-md p-3 max-h-60 overflow-y-auto space-y-2">
+                  <div className="border bg-white rounded-md p-3 max-h-60 overflow-y-auto space-y-2">
                     {filtered.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No campaigns match your search.</p>
                     ) : (
                       filtered.map((c) => (
-                        <label key={c.id} className="flex items-center gap-2 cursor-pointer">
+                        <label key={c.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1.5 rounded transition-colors">
                           <input
                             type="checkbox"
                             checked={editCampaignIds.has(c.id)}
                             onChange={() => toggleEditCampaign(c.id)}
-                            className="rounded border-slate-300"
+                            className="rounded border-slate-300 text-[#20ACE4] focus:ring-[#20ACE4]"
                           />
                           <span className="text-sm">{c.name}</span>
                         </label>
@@ -695,14 +716,20 @@ export function SponsorLibraryClient({
               );
             })()}
           </div>
-          <DialogFooter>
+
+          <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-end gap-3 sticky bottom-0 z-10">
             <Button variant="outline" onClick={() => setEditId(null)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <Button 
+              onClick={handleUpdate}
+              className="bg-[#20ACE4] hover:bg-[#20ACE4]/90"
+            >
+              Save
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!removeId} onOpenChange={(open) => !open && setRemoveId(null)}>
         <AlertDialogContent>

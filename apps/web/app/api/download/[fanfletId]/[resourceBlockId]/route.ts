@@ -61,7 +61,13 @@ export async function GET(
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
 
-  const typedRow = row as unknown as DownloadRow
+  // Handle potential array from join
+  const rawLib = (row as Record<string, unknown>).resource_library
+  const lib = Array.isArray(rawLib) ? rawLib[0] : rawLib
+  const typedRow = {
+    ...row,
+    resource_library: lib
+  } as unknown as DownloadRow
   const fanflet = typedRow.fanflets
   const speakerSlug = fanflet.speakers.slug
   const fanfletSlug = fanflet.slug

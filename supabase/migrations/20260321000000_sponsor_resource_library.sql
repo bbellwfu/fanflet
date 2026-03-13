@@ -89,15 +89,22 @@ CREATE POLICY "Speakers can read placed sponsor library items"
     )
   );
 
--- Public can read sponsor library rows linked to blocks on published fanflets (landing page + download)
+-- Public can read sponsor library rows linked to blocks on published fanflets (landing page + download),
+-- and authenticated speakers can read rows linked to their own fanflets (for preview).
 DROP POLICY IF EXISTS "Public can read sponsor library on published fanflets" ON public.sponsor_resource_library;
 CREATE POLICY "Public can read sponsor library on published fanflets"
   ON public.sponsor_resource_library FOR SELECT TO anon, authenticated
   USING (
-    id IN (
-      SELECT rb.sponsor_library_item_id FROM public.resource_blocks rb
+    EXISTS (
+      SELECT 1
+      FROM public.resource_blocks rb
       JOIN public.fanflets f ON f.id = rb.fanflet_id
-      WHERE f.status = 'published' AND rb.sponsor_library_item_id IS NOT NULL
+      JOIN public.speakers s ON s.id = f.speaker_id
+      WHERE rb.sponsor_library_item_id = public.sponsor_resource_library.id
+        AND (
+          f.status = 'published'
+          OR (auth.role() = 'authenticated' AND s.auth_user_id = auth.uid())
+        )
     )
   );
 

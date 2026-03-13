@@ -108,3 +108,16 @@ export type {
   HealthCheckResult,
 } from "./integrations";
 export { zapierAdapter, getAdapter, availableAdapters } from "./integrations";
+export { rewriteTechnicalText } from "./rewrite-ai";
+export { logAiUsage, calculateAiCost } from "./ai-usage";
+export type { AiUsageData, AiUsageLogEntry } from "./ai-usage";
+export {
+  generateDemoContent,
+  generateSponsorDemoContent,
+} from "./demo-ai";
+export type {
+  DemoProspectInput,
+  SponsorDemoProspectInput,
+  GeneratedDemoPayload,
+  GeneratedSponsorDemoPayload,
+} from "./demo-ai";

@@ -4,6 +4,8 @@
  * demo content (talks, resources, sponsors, bio, survey questions).
  */
 
+import { AiUsageData } from "./ai-usage";
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -109,7 +111,7 @@ export interface GeneratedSponsorDemoPayload {
       }>;
     };
   }>;
-  sample_leads: Array<{
+  sample_leads?: Array<{
     name: string;
     email: string;
     resource_title: string;
@@ -209,7 +211,7 @@ Rules:
 export async function generateDemoContent(
   input: DemoProspectInput,
   apiKey: string,
-): Promise<GeneratedDemoPayload> {
+): Promise<{ data: GeneratedDemoPayload; usage: AiUsageData }> {
   const prompt = buildPrompt(input);
 
   const controller = new AbortController();
@@ -247,6 +249,12 @@ export async function generateDemoContent(
   }
 
   const result = (await response.json()) as {
+    id?: string;
+    model: string;
+    usage?: {
+      input_tokens: number;
+      output_tokens: number;
+    };
     content?: Array<{ type: string; text?: string }>;
   };
   const textBlock = result.content?.find(
@@ -268,7 +276,17 @@ export async function generateDemoContent(
     throw new Error(`Failed to parse AI response as JSON: ${textBlock.text.substring(0, 200)}`);
   }
 
-  return mergeWithExplicitInput(input, parsed);
+  return {
+    data: mergeWithExplicitInput(input, parsed),
+    usage: {
+      model: result.model || "claude-haiku-4-5",
+      prompt_tokens: result.usage?.input_tokens ?? 0,
+      completion_tokens: result.usage?.output_tokens ?? 0,
+      total_tokens:
+        (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0),
+      provider_request_id: result.id,
+    },
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -327,13 +345,6 @@ Generate a complete demo environment as JSON with this exact structure:
       }
     }
   ],
-  "sample_leads": [
-    {
-      "name": "Realistic attendee name",
-      "email": "email@example.com",
-      "resource_title": "Which resource they clicked",
-      "created_at": "ISO date within last 30 days"
-    }
   ],
   "campaigns": [
     {
@@ -356,7 +367,6 @@ Rules:
   - Speaker #2: connection_status "none" — a discoverable speaker NOT yet connected. No sponsor resource for ${input.company_name} in their fanflet.
   - Speaker #3: connection_status "pending" — a pending connection request. No sponsor resource for ${input.company_name} yet.
 - Each speaker should have a realistic specialty, 3-5 resources in their fanflet.
-- Generate 5-8 sample leads with realistic names, emails, and dates spread over the last 30 days.
 - Use REAL company names and URLs when referencing the sponsor.
 - The theme should be one of: navy, crimson, forest, sunset, royal, slate, midnight, terracotta.
 - Return ONLY valid JSON, no markdown fences or explanation.`;
@@ -365,7 +375,7 @@ Rules:
 export async function generateSponsorDemoContent(
   input: SponsorDemoProspectInput,
   apiKey: string,
-): Promise<GeneratedSponsorDemoPayload> {
+): Promise<{ data: GeneratedSponsorDemoPayload; usage: AiUsageData }> {
   const prompt = buildSponsorPrompt(input);
 
   const controller = new AbortController();
@@ -403,6 +413,12 @@ export async function generateSponsorDemoContent(
   }
 
   const result = (await response.json()) as {
+    id?: string;
+    model: string;
+    usage?: {
+      input_tokens: number;
+      output_tokens: number;
+    };
     content?: Array<{ type: string; text?: string }>;
   };
   const textBlock = result.content?.find(
@@ -429,7 +445,17 @@ export async function generateSponsorDemoContent(
     parsed.slug = slugifySponsor(input.company_name);
   }
 
-  return parsed;
+  return {
+    data: parsed,
+    usage: {
+      model: result.model || "claude-haiku-4-5",
+      prompt_tokens: result.usage?.input_tokens ?? 0,
+      completion_tokens: result.usage?.output_tokens ?? 0,
+      total_tokens:
+        (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0),
+      provider_request_id: result.id,
+    },
+  };
 }
 
 function slugifySponsor(text: string): string {

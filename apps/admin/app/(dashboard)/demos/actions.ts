@@ -4,12 +4,12 @@ import { createServiceClient } from "@fanflet/db/service";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin-auth";
 import { auditAdminAction } from "@/lib/audit";
-import { generateDemoContent, generateSponsorDemoContent } from "@fanflet/core/demo-ai";
+import { generateDemoContent, generateSponsorDemoContent, logAiUsage } from "@fanflet/core";
 import { seedDemoEnvironment, seedSponsorDemoEnvironment } from "@fanflet/core/demo-seeder";
 import { cleanupDemoEnvironment, convertDemoToReal } from "@fanflet/core/demo-cleanup";
 import { generateMagicLink } from "@fanflet/core/magic-link";
 import { buildDemoSignInEmail } from "@fanflet/core/magic-link-email";
-import type { DemoProspectInput, SponsorDemoProspectInput } from "@fanflet/core/demo-ai";
+import type { DemoProspectInput, SponsorDemoProspectInput, AiUsageData } from "@fanflet/core";
 import { z } from "zod";
 
 const createSpeakerDemoSchema = z.object({
@@ -238,7 +238,16 @@ async function provisionSpeakerDemo(
   siteUrl: string,
 ): Promise<void> {
   try {
-    const payload = await generateDemoContent(input, apiKey);
+    const { data: payload, usage } = await generateDemoContent(input, apiKey);
+
+    // Log AI usage
+    await logAiUsage(serviceClient, {
+      admin_id: adminUserId,
+      feature_name: "demo_generation_speaker",
+      ...usage,
+      status: "success",
+      context: { demo_id: demoId, prospect_name: input.full_name },
+    });
 
     await serviceClient
       .from("demo_environments")
@@ -260,6 +269,16 @@ async function provisionSpeakerDemo(
       error instanceof Error ? error.message : "Unknown provisioning error";
     console.error(`[demo] Speaker provisioning failed for ${demoId}:`, message);
 
+    // Log AI error
+    await logAiUsage(serviceClient, {
+      admin_id: adminUserId,
+      feature_name: "demo_generation_speaker",
+      model: "claude-haiku-4-5",
+      status: "error",
+      error_message: message,
+      context: { demo_id: demoId, prospect_name: input.full_name },
+    });
+
     await serviceClient
       .from("demo_environments")
       .update({
@@ -279,7 +298,16 @@ async function provisionSponsorDemo(
   siteUrl: string,
 ): Promise<void> {
   try {
-    const payload = await generateSponsorDemoContent(input, apiKey);
+    const { data: payload, usage } = await generateSponsorDemoContent(input, apiKey);
+
+    // Log AI usage
+    await logAiUsage(serviceClient, {
+      admin_id: adminUserId,
+      feature_name: "demo_generation_sponsor",
+      ...usage,
+      status: "success",
+      context: { demo_id: demoId, company_name: input.company_name },
+    });
 
     await serviceClient
       .from("demo_environments")
@@ -300,6 +328,16 @@ async function provisionSponsorDemo(
     const message =
       error instanceof Error ? error.message : "Unknown provisioning error";
     console.error(`[demo] Sponsor provisioning failed for ${demoId}:`, message);
+
+    // Log AI error
+    await logAiUsage(serviceClient, {
+      admin_id: adminUserId,
+      feature_name: "demo_generation_sponsor",
+      model: "claude-haiku-4-5",
+      status: "error",
+      error_message: message,
+      context: { demo_id: demoId, company_name: input.company_name },
+    });
 
     await serviceClient
       .from("demo_environments")

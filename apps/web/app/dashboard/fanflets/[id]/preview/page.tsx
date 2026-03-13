@@ -51,22 +51,72 @@ export default async function FanfletPreviewPage({
     .eq("fanflet_id", fanflet.id)
     .order("display_order", { ascending: true });
 
+  const sponsorLibraryIds = (rawBlocks ?? [])
+    .map((b) => (b as { sponsor_library_item_id?: string | null }).sponsor_library_item_id)
+    .filter((id): id is string => !!id);
+  const sponsorLibraryMap: Map<string, { title?: string; description?: string | null; url?: string | null; file_path?: string | null; image_url?: string | null; file_size_bytes?: number | null; file_type?: string | null; type?: string }> = new Map();
+  if (sponsorLibraryIds.length > 0) {
+    const { data: sponsorLibRows } = await supabase
+      .from("sponsor_resource_library")
+      .select("id, title, description, url, file_path, image_url, file_size_bytes, file_type, type")
+      .in("id", sponsorLibraryIds);
+    for (const row of sponsorLibRows ?? []) {
+      sponsorLibraryMap.set(row.id, row);
+    }
+  }
+
   const resourceBlocks = (rawBlocks ?? []).map((block) => {
-    const lib = block.resource_library;
-    if (lib && block.library_item_id) {
+    const raw = block as Record<string, unknown> & { library_item_id?: string | null; sponsor_library_item_id?: string | null };
+    const rawLib = block.resource_library;
+    const lib = (Array.isArray(rawLib) ? rawLib[0] : rawLib) as {
+      title?: string;
+      description?: string | null;
+      url?: string | null;
+      file_path?: string | null;
+      image_url?: string | null;
+      metadata?: Record<string, unknown> | null;
+      type?: string;
+      file_size_bytes?: number | null;
+      file_type?: string | null;
+    } | null;
+    const sponsorLib = raw.sponsor_library_item_id ? sponsorLibraryMap.get(raw.sponsor_library_item_id as string) : null;
+
+    if (sponsorLib && raw.sponsor_library_item_id) {
       return {
         ...block,
-        title: lib.title ?? block.title,
-        description: lib.description ?? block.description,
-        url: lib.url ?? block.url,
-        file_path: lib.file_path ?? block.file_path,
-        image_url: lib.image_url ?? block.image_url,
-        metadata: lib.metadata ?? block.metadata,
-        type: lib.type ?? block.type,
+        title: block.title || sponsorLib.title,
+        description: block.description || sponsorLib.description,
+        url: block.url || sponsorLib.url,
+        file_path: block.file_path || sponsorLib.file_path,
+        image_url: block.image_url || sponsorLib.image_url,
+        type: block.type || sponsorLib.type || "link",
+        file_size_bytes: sponsorLib.file_size_bytes ?? null,
+        file_type: sponsorLib.file_type ?? null,
+        sponsor_library_item_id: raw.sponsor_library_item_id,
         resource_library: undefined,
       };
     }
-    return { ...block, resource_library: undefined };
+    if (lib && block.library_item_id) {
+      return {
+        ...block,
+        title: block.title || lib.title,
+        description: block.description || lib.description,
+        url: block.url || lib.url,
+        file_path: block.file_path || lib.file_path,
+        image_url: block.image_url || lib.image_url,
+        metadata: { ...(lib.metadata ?? {}), ...(block.metadata ?? {}) },
+        type: block.type || lib.type || "link",
+        file_size_bytes: lib.file_size_bytes ?? null,
+        file_type: lib.file_type ?? null,
+        resource_library: undefined,
+      };
+    }
+    return {
+      ...block,
+      file_size_bytes: (lib?.file_size_bytes as number | null) ?? null,
+      file_type: (lib?.file_type as string | null) ?? null,
+      resource_library: undefined,
+    };
   });
 
   const { count: subscriberCount } = await supabase

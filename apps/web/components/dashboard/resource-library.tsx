@@ -376,9 +376,28 @@ export function ResourceLibrary({
   const [editImageUrl, setEditImageUrl] = useState("");
   const [editDefaultSponsorId, setEditDefaultSponsorId] = useState<string>("");
   const [editMetadata, setEditMetadata] = useState<Record<string, unknown> | null>(null);
+  const [editSignedUrl, setEditSignedUrl] = useState<string | null>(null);
 
   // Power the active Sheet edit state
   const editResource = resources.find((r) => r.id === editingId) || null;
+
+  const editFilePath = editResource?.type === "file" ? editResource.file_path : null;
+  const shouldFetchSignedUrl = !!editingId && !!editFilePath;
+
+  useEffect(() => {
+    if (!shouldFetchSignedUrl) return;
+    let cancelled = false;
+    const supabase = createClient();
+    supabase.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(editFilePath!, 3600)
+      .then(({ data }) => {
+        if (!cancelled && data?.signedUrl) setEditSignedUrl(data.signedUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldFetchSignedUrl, editFilePath]);
 
   const typeIcons: Record<string, React.ElementType> = {
     file: FileDown,
@@ -602,6 +621,7 @@ export function ResourceLibrary({
     setEditImageUrl(r.image_url ?? "");
     setEditMetadata(r.metadata ?? {});
     setEditDefaultSponsorId(r.default_sponsor_account_id ?? "");
+    setEditSignedUrl(null);
   };
 
   const editingResource = editingId ? resources.find((r) => r.id === editingId) : null;
@@ -1139,9 +1159,77 @@ export function ResourceLibrary({
               />
             </div>
             
+            {editResource?.type === "file" && editResource.file_path && (
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[#1B365D] font-semibold">Attached File</Label>
+                  {editResource.file_size_bytes != null && (
+                    <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-full">
+                      {formatFileSize(editResource.file_size_bytes)}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-white shadow-sm group hover:border-[#3BA5D9]/50 transition-all">
+                  <div className="w-10 h-10 rounded-lg bg-[#3BA5D9]/10 flex items-center justify-center text-[#3BA5D9]">
+                    {editResource.file_type ? (
+                      (() => {
+                        const Icon = getFileIcon(editResource.file_type);
+                        return <Icon className="w-5 h-5" />;
+                      })()
+                    ) : (
+                      <FileDown className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">
+                      {extractFilename(editResource.file_path)}
+                    </p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {editResource.file_type || "Resource file"}
+                    </p>
+                  </div>
+                  {editSignedUrl ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-2 border-[#3BA5D9]/20 text-[#3BA5D9] hover:bg-[#3BA5D9]/5 hover:text-[#3BA5D9] hover:border-[#3BA5D9]/30"
+                    >
+                      <a href={editSignedUrl} target="_blank" rel="noopener noreferrer">
+                        <Download className="w-3.5 h-3.5" />
+                        View File
+                      </a>
+                    </Button>
+                  ) : (
+                    <div className="h-8 w-8 flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  To replace this file, delete this resource and upload a new one.
+                </p>
+              </div>
+            )}
+            
           </div>
           
-          <div className="px-6 py-4 border-t border-border bg-white sticky bottom-0 z-10 flex gap-2 justify-end">
+          <div className="px-6 py-4 border-t border-border bg-white sticky bottom-0 z-10 flex gap-2 items-center">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50 gap-2 mr-auto"
+              onClick={() => {
+                if (editResource) {
+                  handleDeleteClick(editResource.id, editResource);
+                  setEditingId(null);
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
               Cancel
             </Button>

@@ -53,6 +53,12 @@ export async function cleanupDemoEnvironment(
         await serviceClient.auth.admin.deleteUser(s.auth_user_id).catch(() => {});
       }
     }
+    if (sponsorManifest.subscriber_ids?.length) {
+      await serviceClient.from("subscribers").delete().in("id", sponsorManifest.subscriber_ids);
+    }
+    if (sponsorManifest.analytics_event_ids?.length) {
+      await serviceClient.from("analytics_events").delete().in("id", sponsorManifest.analytics_event_ids);
+    }
     if (sponsorManifest.sponsor_account_id) {
       await serviceClient
         .from("sponsor_accounts")

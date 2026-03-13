@@ -22,6 +22,8 @@
 - [Section 9: Testing Strategy](#section-9-testing-strategy)
 - [Section 10: Developer Experience & Code Quality](#section-10-developer-experience--code-quality)
 - [Section 11: Observability & Monitoring](#section-11-observability--monitoring)
+- [Section 12: Architecture Maturity & When to Split](#section-12-architecture-maturity--when-to-split)
+- [Section 13: Secrets Management, Machine Hygiene & Bus Factor](#section-13-secrets-management-machine-hygiene--bus-factor)
 - [Appendix: Ship Checklists](#appendix-ship-checklists)
 
 ---
@@ -687,6 +689,162 @@ Monitor these endpoints with an external uptime service (UptimeRobot, Checkly, P
 
 ---
 
+## Section 13: Secrets Management, Machine Hygiene & Bus Factor
+
+### Why This Section Exists
+
+A solo founder or small team has a single point of failure: the person who set everything up. If that person's laptop dies, their account gets locked, or they're unavailable, can someone else keep the product running? This section covers secrets management, local machine practices, and operational continuity — the things that don't feel urgent until they are.
+
+### Secrets Management
+
+#### The Hierarchy of Secrets
+
+Not all secrets are equal. Classify them by blast radius:
+
+| Tier | Examples | Compromise Impact | Storage |
+|------|----------|-------------------|---------|
+| **Critical** | Supabase service role key, database password, Supabase JWT secret | Full data access, bypass all RLS | Deployment platform only (Vercel env vars, server-only scope) |
+| **High** | Twilio auth token, Resend API key, Anthropic API key | Can send messages/emails/AI calls as you, incur costs | Deployment platform only |
+| **Medium** | Supabase anon key, `NEXT_PUBLIC_*` vars | Public by design, but scope abuse possible | Deployment platform + `.env.local` |
+| **Low** | GitHub PATs (scoped), MCP OAuth client secrets | Scoped access, revocable | Deployment platform, 1Password/Bitwarden |
+
+#### Rules
+
+1. **Never commit secrets to git.** Even in a private repo. Git history is forever — `git filter-branch` is unreliable and painful. Use `.env.local` (gitignored) for local development, deployment platform env vars for staging/production.
+
+2. **Never put critical secrets in `NEXT_PUBLIC_*` variables.** These are embedded in client-side JavaScript bundles and visible to anyone who opens browser DevTools. Only the Supabase anon key and site URL belong in `NEXT_PUBLIC_*`.
+
+3. **Use a password manager for all credentials.** 1Password, Bitwarden, or equivalent. Every API key, every login, every recovery code. The password manager is your single source of truth — not a `.env` file on your laptop, not a Slack message, not your memory.
+
+4. **Rotate secrets on a schedule.** At minimum: when someone leaves the team, when a secret may have been exposed, and annually for long-lived keys. Document the rotation procedure for each secret (where to generate a new one, where to update it).
+
+5. **Scope API keys to minimum required permissions.** A GitHub PAT should have only the permissions it needs. A Supabase service role key should only exist in server-side code. Twilio keys should be restricted to the specific phone numbers in use.
+
+#### Where Secrets Should Live
+
+| Environment | Secret Storage | Access |
+|-------------|---------------|--------|
+| **Local development** | `.env.local` (gitignored) + password manager | Developer's machine only |
+| **CI (GitHub Actions)** | Repository secrets or environment secrets | Encrypted, injected at runtime |
+| **Staging (Vercel)** | Project environment variables, Preview scope | Vercel dashboard, team members |
+| **Production (Vercel)** | Project environment variables, Production scope | Vercel dashboard, restricted to admins |
+
+#### Secret Inventory
+
+Maintain a living inventory of every secret the platform uses. Store this in your password manager, not in the repo.
+
+| Secret | Provider | Where Used | Rotation URL | Notes |
+|--------|----------|------------|-------------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Client + server | Supabase dashboard → Settings → API | Public, non-sensitive |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Client + server | Supabase dashboard → Settings → API | Public, RLS-scoped |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Server only (admin ops) | Supabase dashboard → Settings → API | **Critical** — bypasses RLS |
+| `SUPABASE_JWT_SECRET` | Supabase | Server only (MCP auth) | Supabase dashboard → Settings → API | **Critical** — validates JWTs |
+| `TWILIO_ACCOUNT_SID` | Twilio | Server only (SMS) | Twilio console → Account Info | |
+| `TWILIO_AUTH_TOKEN` | Twilio | Server only (SMS) | Twilio console → Account Info | Regeneratable |
+| `TWILIO_PHONE_NUMBER` | Twilio | Server only (SMS) | Twilio console → Phone Numbers | |
+| `RESEND_API_KEY` | Resend | Server only (email) | Resend dashboard → API Keys | |
+| `ANTHROPIC_API_KEY` | Anthropic | Admin server only (demo AI) | Anthropic console → API Keys | |
+| GitHub PATs | GitHub | CI workflows | GitHub → Settings → Developer settings → PATs | Scope to minimum permissions |
+
+### Local Development Machine
+
+#### What's on Your Laptop That Isn't in the Cloud
+
+Your local machine contains things that don't exist anywhere else. Identify and protect them:
+
+| Item | Risk if Lost | Mitigation |
+|------|-------------|------------|
+| **`.env.local` files** | Can't run the app locally until recreated | Store all values in password manager. Document which env vars each app needs in `.env.example`. |
+| **SSH keys** | Lose git push access, server access | Back up private keys to password manager. Or: use per-machine keys and just generate new ones. |
+| **GPG keys** (if signing commits) | Lose verified commit ability | Back up to password manager. Or: use SSH signing instead. |
+| **Browser sessions / cookies** | Lose access to Supabase dashboard, Vercel, GitHub, etc. | All behind password manager + 2FA. Recoverable from any machine. |
+| **Uncommitted code** | Lose work in progress | Push WIP branches frequently. Use `git stash` for quick saves. |
+| **Local database state** | Lose test data | Supabase is remote — local state is just a dev convenience, not critical. |
+| **IDE settings / extensions** | Lose productivity setup | VS Code: Settings Sync. Cursor: exports. Low-priority — recreatable in an hour. |
+
+#### Backup Strategy
+
+| Layer | Tool | What It Covers | Frequency |
+|-------|------|---------------|-----------|
+| **Full machine backup** | Time Machine (macOS) | Everything on disk — code, config, documents, apps | Continuous (hourly) |
+| **Off-site backup** | iCloud Drive, Backblaze, or similar | Recovery from theft, fire, hardware failure | Continuous |
+| **Code** | GitHub | All committed code, branches, PRs, issues | Every push |
+| **Secrets** | 1Password / Bitwarden | API keys, passwords, recovery codes, SSH keys | Synced to cloud automatically |
+| **Database** | Supabase automatic backups | All production data | Daily (Supabase Pro) or point-in-time recovery |
+
+**The test:** If your laptop caught fire right now, could you buy a new one and be fully operational within 4 hours? If yes, your backup strategy is adequate.
+
+Checklist for the "new laptop" scenario:
+1. Install password manager → all credentials restored
+2. Install git, clone repo → all code restored
+3. Copy `.env.local` values from password manager → local dev working
+4. Log into Vercel, Supabase, GitHub via password manager → cloud access restored
+5. Install IDE + extensions → productivity restored
+
+#### macOS-Specific Recommendations
+
+- **FileVault disk encryption:** Enable it. Non-negotiable. A stolen laptop with an unencrypted disk is a full data breach.
+- **Firmware password / Find My Mac:** Enable both. Remote wipe capability if the machine is stolen.
+- **Automatic updates:** Keep macOS and Xcode command line tools updated. Security patches matter.
+- **Don't store secrets in plain text files.** No `passwords.txt` on the desktop. No API keys in Notes.app. Password manager only.
+
+### Bus Factor: Operational Continuity
+
+The "bus factor" is the number of people who, if unavailable, would halt the project. For a solo founder, it's 1. The goal is to make that number irrelevant by ensuring everything is documented and accessible.
+
+#### Access Inventory
+
+Document every system the platform depends on, who has access, and how to grant it to someone new:
+
+| System | Purpose | Access Method | Recovery Path |
+|--------|---------|---------------|---------------|
+| **GitHub** (bbellwfu/fanflet) | Source code, CI, issues | GitHub account + 2FA | Add collaborator via GitHub settings. Org account preferred over personal. |
+| **Vercel** (fanflet project) | Hosting, deployments, env vars | Vercel account + 2FA | Add team member via Vercel dashboard. Use a Vercel Team, not a personal account. |
+| **Supabase** (project: eoihlmxmbtzsixoapgif) | Database, auth, storage, RLS | Supabase account + 2FA | Add team member via Supabase Org settings. Service role key in password manager. |
+| **Domain registrar** | DNS for fanflet.com | Registrar account + 2FA | Transfer or add collaborator. Document the registrar and account. |
+| **Twilio** | SMS sending | Twilio account + 2FA | Add team member via Twilio console. |
+| **Resend** | Email sending | Resend account + 2FA | Add team member via Resend dashboard. |
+| **Apple Developer** (if applicable) | App Store, signing | Apple ID + 2FA | Add to team via App Store Connect. |
+
+#### Critical Actions Someone Else Must Be Able To Do
+
+If you're unavailable, another person must be able to:
+
+| Action | How | Documented Where |
+|--------|-----|-----------------|
+| **Deploy a hotfix** | Push to `develop` → auto-deploys to staging. Merge to `main` → auto-deploys to production. | This memo + CLAUDE.md |
+| **Roll back a broken deploy** | Vercel dashboard → Deployments → promote previous deployment | Vercel docs |
+| **Access production database** | Supabase dashboard → SQL Editor (requires Supabase org access) | Password manager |
+| **Rotate a compromised secret** | Generate new key at provider → update in Vercel env vars → redeploy | Secret inventory above |
+| **Apply a database migration** | Push migration file to `develop` or `main` → `migrate.yml` workflow runs automatically | CLAUDE.md, `supabase/migrations/README.md` |
+| **Access error logs** | Vercel dashboard → Deployments → Runtime Logs; Supabase → Logs | — |
+| **Send a platform communication** | Admin portal → Communications → New | Admin app UI |
+
+#### Recommended Steps (Do These Now)
+
+1. **Use organization accounts, not personal accounts.** Create a Vercel Team, a Supabase Organization, and a GitHub Organization. Personal accounts die with the person (or their email access). Org accounts can have multiple owners.
+
+2. **Add a trusted second person to every critical system.** Even if they're not actively developing, they need the ability to log in and take action. A co-founder, a trusted advisor, or a contracted DevOps person.
+
+3. **Store recovery codes in your password manager.** Every 2FA-enabled account generates recovery codes. If you lose your phone and your laptop simultaneously, recovery codes are the only way back in. They must be in a cloud-synced password manager, not on the devices they're protecting.
+
+4. **Document the "emergency runbook."** A single document (stored in the password manager, not in the repo) that says: "If Brian is unavailable, here's how to keep Fanflet running." Include: account credentials (or paths to them in the password manager), how to deploy, how to roll back, who to contact at each provider for account recovery.
+
+5. **Test the runbook.** Have your second person actually log into each system and perform a non-destructive action (view a deployment, run a read-only SQL query). An untested runbook is a fiction.
+
+#### Password Manager as the Keystone
+
+Everything above converges on one tool: your password manager. It is the single point of recovery for every other system. Protect it accordingly:
+
+- Use a strong, unique master password (20+ characters, memorized, written nowhere digital)
+- Enable 2FA on the password manager itself (TOTP, not SMS)
+- Store the emergency kit / recovery key in a physical location (safe deposit box, sealed envelope with a trusted person)
+- Use the password manager's sharing features to grant access to specific vaults for your second person
+
+If your password manager is secure, accessible, and shared appropriately, every other system is recoverable.
+
+---
+
 ## Appendix: Ship Checklists
 
 ### Before Shipping a Feature
@@ -740,6 +898,123 @@ Monitor these endpoints with an external uptime service (UptimeRobot, Checkly, P
 - [ ] Admin portal access restricted (role checks, optional IP allowlisting)
 - [ ] Security monitoring configured (failed login alerts, audit log review)
 - [ ] Cleanup jobs scheduled (expired sessions, old rate-limiting records, stale security logs)
+
+---
+
+## Section 12: Architecture Maturity & When to Split
+
+### Why This Section Exists
+
+Early-stage teams often worry they're building something that will need to be thrown away. The fear is that architectural decisions made today will become technical debt that forces a rewrite. This section provides concrete criteria for evaluating architectural maturity and knowing when (and when not) to split a codebase.
+
+### The Monorepo-to-Services Spectrum
+
+Most applications evolve through these stages. The key insight is that **you don't need to plan for stage 4 when you're at stage 2** — you just need clean boundaries so the transition is a migration, not a rewrite.
+
+```
+Stage 1: Single App              "One Next.js app does everything"
+Stage 2: Modular Monorepo        "Multiple apps + shared packages in one repo"
+Stage 3: Monorepo + Workers      "Add background processing, event queues"
+Stage 4: Service Extraction       "Extract high-traffic or divergent components"
+Stage 5: Distributed Services     "Independent teams, independent deployments"
+```
+
+**Most successful products stay at Stage 2-3 until 10-20 engineers.** Premature progression to Stage 4-5 is the most common architectural mistake in startups — it trades feature velocity for infrastructure complexity.
+
+### Signals That Your Architecture Is Sound
+
+An architecture is production-grade (not a "vibe-coded weekend project") when it has:
+
+| Property | What It Means | How to Verify |
+|----------|---------------|---------------|
+| **Type safety** | TypeScript strict mode, no `any`, Zod validation on inputs | `tsc --noEmit` passes with zero errors |
+| **Data isolation** | Authorization enforced at database level, not application code | RLS policies on every table, tested in CI |
+| **Schema versioning** | Database changes are versioned, ordered, and reproducible | Migration files in version control, idempotent |
+| **Separation of concerns** | Business logic is framework-agnostic | Shared packages (`core`, `db`) have zero React/Next.js imports |
+| **Automated quality gates** | CI catches regressions before deployment | Lint, type-check, tests, build all pass on every PR |
+| **Test coverage** | Critical business logic has automated verification | Pure functions tested, security properties verified |
+| **Environment separation** | Development, staging, and production are isolated | Separate database instances, deployment URLs, env vars |
+| **Deployment automation** | Code ships via CI/CD, not manual steps | Push to branch → automatic deployment |
+
+If your codebase has all eight, it is production-grade software. The specific framework, hosting provider, or language is secondary — these properties are what determine whether a codebase can scale, be maintained by a team, and survive refactoring.
+
+### Signals That Warrant Splitting
+
+Do **not** split proactively. Split reactively when one of these becomes a blocking problem:
+
+| Signal | Threshold | What to Do |
+|--------|-----------|------------|
+| **Build time** | Deploys exceed 10 minutes consistently | Optimize build caching first. If that fails, extract the slowest app into its own deployment. |
+| **Team contention** | Two teams regularly block each other's PRs or deploys | Split along team boundaries. Each team owns its own app/service. |
+| **Runtime mismatch** | A component needs a fundamentally different runtime (Python ML, WebSocket server, GPU compute) | Extract that component into its own service. Keep everything else together. |
+| **Scaling mismatch** | One component needs 100x the resources of another | Extract the hot component. Serverless platforms handle moderate scaling mismatches automatically. |
+| **Release cadence conflict** | Team A needs to ship hourly, Team B ships weekly, and they share a deployment | Separate deployments. This doesn't necessarily mean separate repos. |
+| **Data boundary** | A subsystem needs its own database (different scaling, backup, or compliance requirements) | Extract the subsystem and its data. This is the most expensive split. |
+| **Compliance boundary** | Regulation requires physical isolation of data or infrastructure (HIPAA, SOX, PCI-DSS) | Isolate the regulated components into their own infrastructure. Non-negotiable when applicable. |
+
+### The Cost of Splitting
+
+Every split introduces ongoing costs that didn't exist before:
+
+| Cost | Description |
+|------|-------------|
+| **Type sharing** | Direct imports become a publish/consume cycle. Types can drift between producer and consumer. |
+| **Deployment coordination** | Features that span services require coordinated deploys. Rollbacks become multi-step. |
+| **API versioning** | Internal function calls become HTTP contracts. Breaking changes require migration strategies. |
+| **Auth propagation** | Tokens must be forwarded between services. CORS configuration. Service-to-service auth. |
+| **Local development** | Running the full system locally means starting multiple processes with correct env vars. |
+| **Distributed debugging** | Errors span multiple services. Correlation IDs and distributed tracing become required, not optional. |
+| **Contract testing** | Changes to shared interfaces must be verified across all consumers. |
+
+For a team of 1-5 engineers, these costs typically exceed the benefits. The break-even point is roughly 8-10 engineers working on the same codebase.
+
+### What to Extract First (When the Time Comes)
+
+When splitting becomes warranted, extract in this order:
+
+1. **Background workers** — Jobs that don't need to respond to HTTP requests (email sending, analytics aggregation, cleanup tasks, webhook delivery). These have the cleanest boundary and lowest coordination cost. Most serverless platforms (Vercel + Inngest, AWS Lambda + SQS) provide this without a separate service.
+
+2. **Public API** — If you need API consumers beyond your own frontend (mobile app, third-party integrations), extract a standalone API service. Your existing `packages/core` business logic becomes the service layer with zero rewrite.
+
+3. **Admin/internal tools** — If the admin app has different scaling, security, or access requirements. This is often already a separate deployment in a monorepo setup.
+
+4. **Data-intensive pipelines** — Analytics processing, reporting, ML features. These often need different runtimes (Python) or database configurations (read replicas, columnar storage).
+
+### What Makes a Codebase Splittable (Invest Here)
+
+The ability to split later depends entirely on having clean boundaries today. These boundaries cost almost nothing to maintain but make future extraction straightforward:
+
+| Boundary | Implementation | Why It Matters |
+|----------|----------------|----------------|
+| **Framework-agnostic business logic** | Shared package (`packages/core`) with zero framework imports | If you extract an API service, core becomes its business layer with no rewrite |
+| **Database access abstraction** | Shared package (`packages/db`) that creates typed clients | Swap the database provider or connection strategy in one place |
+| **Type contracts** | Shared package (`packages/types`) with generated types | Types travel with the business logic, not the framework |
+| **Explicit dependency direction** | Apps depend on packages, packages never depend on apps | Clean extraction — pull the package out, publish it, import it |
+
+### Vendor Lock-In Assessment
+
+Evaluate each major dependency for exit cost:
+
+| Dependency | Lock-In Risk | Exit Strategy |
+|------------|-------------|---------------|
+| **PostgreSQL** | Very low | Industry standard. Runs anywhere. All major cloud providers offer managed Postgres. |
+| **TypeScript** | Very low | Compiles to standard JavaScript. Types are a development tool, not a runtime dependency. |
+| **React/Next.js** | Low | Business logic in `packages/core` is framework-agnostic. UI is the replaceable layer. Next.js runs self-hosted (not Vercel-only). |
+| **Supabase** | Low-Medium | Uses standard Postgres, standard SQL, standard RLS policies. Auth helpers are isolated in `packages/db`. Migration cost: 2-3 weeks to swap the client library and auth flow. |
+| **Vercel** | Low | Next.js deploys on any Node.js platform (Railway, Render, Coolify, self-hosted). No Vercel-specific APIs beyond optional analytics. |
+| **Tailwind CSS** | Low | Utility classes compile to standard CSS. Switching to another CSS approach doesn't affect business logic. |
+
+The highest lock-in risk is always the **data layer** — your database schema, migrations, and access policies. These should be the most portable part of your stack, and with standard Postgres + SQL migrations, they are.
+
+### Anti-Patterns to Avoid
+
+| Anti-Pattern | Why It's Harmful |
+|-------------|-----------------|
+| **Premature microservices** | Distributed systems are harder to build, test, debug, and operate. The infrastructure overhead for a small team exceeds the benefits. |
+| **Splitting for "clean architecture"** | If two components communicate frequently, splitting them adds latency and failure modes. Co-locate things that change together. |
+| **Rewriting instead of migrating** | A "clean rewrite" discards all the edge cases and bug fixes encoded in the existing code. Migrate incrementally — extract, test, replace. |
+| **Over-abstracting for hypothetical future** | Building plugin systems, adapter patterns, and configuration layers for requirements that don't exist yet. The abstraction cost is paid now; the benefit may never materialize. |
+| **Chasing new frameworks** | Rewriting a working app in the latest framework provides zero user value. Frameworks are a means, not an end. |
 
 ---
 

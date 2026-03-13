@@ -162,42 +162,48 @@ export default async function DashboardPage() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Subscribers</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{subscriberCount ?? 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Email signups across your Fanflets
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Page Views</CardTitle>
-                <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{pageViewCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Across {publishedCount} published Fanflet{publishedCount !== 1 ? "s" : ""}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Resource Clicks</CardTitle>
-                <MousePointerClick className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{resourceClickCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Links and downloads
-                </p>
-              </CardContent>
-            </Card>
+            <Link href="/dashboard/subscribers" className="block group">
+              <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Subscribers</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{subscriberCount ?? 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Email signups across your Fanflets
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/dashboard/analytics" className="block group">
+              <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Page Views</CardTitle>
+                  <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{pageViewCount}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Across {publishedCount} published Fanflet{publishedCount !== 1 ? "s" : ""}
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+            <Link href="/dashboard/analytics" className="block group">
+              <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Resource Clicks</CardTitle>
+                  <MousePointerClick className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{resourceClickCount}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Links and downloads
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-7">

@@ -289,11 +289,11 @@ function SpeakerDemoForm({ isWorking, handleSubmit }: DemoFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <Label htmlFor="website_url">Website</Label>
-              <Input id="website_url" name="website_url" type="url" disabled={isWorking} />
+              <Input id="website_url" name="website_url" disabled={isWorking} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="linkedin_url">LinkedIn</Label>
-              <Input id="linkedin_url" name="linkedin_url" type="url" disabled={isWorking} />
+              <Input id="linkedin_url" name="linkedin_url" disabled={isWorking} />
             </div>
           </div>
 
@@ -312,7 +312,7 @@ function SpeakerDemoForm({ isWorking, handleSubmit }: DemoFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <Label htmlFor="photo_url">Photo URL</Label>
-              <Input id="photo_url" name="photo_url" type="url" disabled={isWorking} />
+              <Input id="photo_url" name="photo_url" disabled={isWorking} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="theme">Theme</Label>
@@ -412,11 +412,11 @@ function SponsorDemoForm({ isWorking, handleSubmit }: DemoFormProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <Label htmlFor="website_url">Website</Label>
-              <Input id="website_url" name="website_url" type="url" disabled={isWorking} />
+              <Input id="website_url" name="website_url" disabled={isWorking} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="logo_url">Logo URL</Label>
-              <Input id="logo_url" name="logo_url" type="url" disabled={isWorking} />
+              <Input id="logo_url" name="logo_url" disabled={isWorking} />
             </div>
           </div>
 

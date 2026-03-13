@@ -117,7 +117,7 @@ export function ContentPerformanceSection({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `content-performance-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `fanflet-content-performance-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

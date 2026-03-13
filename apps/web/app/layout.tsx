@@ -68,6 +68,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
+        style={{
+          "--banner-height": impersonation ? "40px" : "0px",
+        } as React.CSSProperties}
       >
         <CookieConsent gtmId={GTM_ID} />
         {impersonation && (
@@ -80,11 +83,7 @@ export default async function RootLayout({
             adminUrl={adminUrl}
           />
         )}
-        {impersonation ? (
-          <div style={{ paddingTop: "40px" }}>{children}</div>
-        ) : (
-          children
-        )}
+        <div style={{ paddingTop: "var(--banner-height)" }}>{children}</div>
         <Toaster position="top-right" richColors />
         <Analytics />
       </body>

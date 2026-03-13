@@ -53,6 +53,19 @@ export async function createDemoEnvironment(
   }
 
   const raw = Object.fromEntries(formData.entries());
+  
+  // Normalize URLs (assume https:// if protocol is missing)
+  const urlFields = ["website_url", "linkedin_url", "photo_url", "logo_url"];
+  for (const field of urlFields) {
+    const val = raw[field];
+    if (typeof val === "string" && val.trim() !== "") {
+      const trimmed = val.trim();
+      if (!/^https?:\/\//i.test(trimmed)) {
+        raw[field] = `https://${trimmed}`;
+      }
+    }
+  }
+
   const demoType = (raw.demo_type as string) || "speaker";
   raw.demo_type = demoType;
 

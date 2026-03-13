@@ -230,9 +230,15 @@ export default async function AudienceLandingPage({ params }: Props) {
     .maybeSingle();
   const showSmsBookmark = smsFlag?.is_global === true;
 
+  const { count: explicitSponsorCount } = await supabase
+    .from("fanflet_sponsors")
+    .select("*", { count: "exact", head: true })
+    .eq("fanflet_id", fanflet.id);
+
   const fanfletWithBlocks = {
     ...fanflet,
     resource_blocks: resourceBlocks,
+    has_explicit_sponsors: (explicitSponsorCount ?? 0) > 0,
   };
 
   const themeId = resolveThemeId(fanflet.theme_config as Record<string, unknown> | null);

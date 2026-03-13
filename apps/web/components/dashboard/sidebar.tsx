@@ -188,14 +188,14 @@ export function Sidebar({
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
+      <aside className="hidden md:block w-64 shrink-0 fixed top-[var(--banner-height,0px)] bottom-0 left-0 z-50">
         <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} />
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
         {/* Mobile Header with Sheet */}
-        <header className="md:hidden h-16 bg-white border-b flex items-center px-4 justify-between sticky top-0 z-40">
+        <header className="md:hidden h-16 bg-white border-b flex items-center px-4 justify-between sticky top-[var(--banner-height,0px)] z-40">
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="Fanflet Logo" width={24} height={24} className="w-6 h-6" />
             <span className="font-bold text-slate-900">Fanflet</span>

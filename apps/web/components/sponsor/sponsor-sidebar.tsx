@@ -3,13 +3,14 @@
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock, Library, Megaphone } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock, Library, Megaphone, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { RoleSwitcher } from "@/components/dashboard/role-switcher";
 
 const sponsorNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/sponsor/dashboard" },
+  { icon: BarChart3, label: "Analytics", href: "/sponsor/analytics" },
   { icon: Library, label: "Resource Library", href: "/sponsor/library" },
   { icon: Megaphone, label: "Campaigns", href: "/sponsor/campaigns" },
   { icon: Users, label: "Leads", href: "/sponsor/leads" },
@@ -150,7 +151,7 @@ export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorS
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <aside className="hidden md:block w-64 shrink-0 fixed inset-y-0 left-0 z-50">
+      <aside className="hidden md:block w-64 shrink-0 fixed top-[var(--banner-height,0px)] bottom-0 left-0 z-50">
         <SponsorSidebarContent
           pathname={pathname}
           companyName={sponsor.company_name}
@@ -164,7 +165,7 @@ export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorS
       </aside>
 
       <main className="flex-1 md:ml-64 min-h-screen flex flex-col">
-        <header className="md:hidden h-16 bg-white border-b flex items-center px-4 justify-between sticky top-0 z-40">
+        <header className="md:hidden h-16 bg-white border-b flex items-center px-4 justify-between sticky top-[var(--banner-height,0px)] z-40">
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="Fanflet Logo" width={24} height={24} className="w-6 h-6" />
             <span className="font-bold text-zinc-900">Fanflet</span>

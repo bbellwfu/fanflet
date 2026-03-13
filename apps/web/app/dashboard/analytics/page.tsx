@@ -28,7 +28,21 @@ export const metadata = {
   title: "Analytics",
 };
 
-function buildDateRange(rangeParam: string | undefined): { range: DateRange | undefined; days: number | null } {
+function buildDateRange(
+  rangeParam: string | undefined,
+  fromParam?: string,
+  toParam?: string
+): { range: DateRange | undefined; days: number | null } {
+  if (rangeParam === "custom") {
+    const from = fromParam ? new Date(fromParam) : new Date();
+    const to = toParam ? new Date(toParam) : new Date();
+    // Ensure "to" includes the full end of the day if just a date is provided
+    if (toParam && !toParam.includes("T")) {
+      to.setHours(23, 59, 59, 999);
+    }
+    return { range: { from: from.toISOString(), to: to.toISOString() }, days: null };
+  }
+
   if (!rangeParam || rangeParam === "30") {
     const to = new Date();
     const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -81,11 +95,16 @@ const TYPE_ICONS: Record<string, typeof Link2> = {
 };
 
 interface AnalyticsPageProps {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const resolvedParams = await searchParams;
+  const rangeParam = resolvedParams.range;
+  const fromParam = resolvedParams.from;
+  const toParam = resolvedParams.to;
+  
+  const { range, days: rangeDays } = buildDateRange(rangeParam, fromParam, toParam);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -126,8 +145,6 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     );
   }
 
-  const rangeParam = typeof resolvedParams.range === "string" ? resolvedParams.range : undefined;
-  const { range, days: rangeDays } = buildDateRange(rangeParam);
 
   // Fetch all fanflets for this speaker
   const { data: fanflets } = await supabase
@@ -343,28 +360,32 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       {/* KPI Cards                                                        */}
       {/* ================================================================ */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="h-full">
-          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium leading-tight">Unique Views</CardTitle>
-            <Eye className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{(kpis?.uniqueVisitors ?? totalUniqueViews).toLocaleString()}</div>
-            {kpis && <ChangeIndicator current={kpis.uniqueVisitors} previous={kpis.prevUniqueVisitors} />}
-          </CardContent>
-        </Card>
-        <Card className="h-full">
-          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium leading-tight">Resource Clicks</CardTitle>
-            <MousePointerClick className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{(kpis?.totalResourceClicks ?? totalClicks).toLocaleString()}</div>
-            {kpis && <ChangeIndicator current={kpis.totalResourceClicks} previous={kpis.prevResourceClicks} />}
-          </CardContent>
-        </Card>
-        <Card className="h-full">
-          <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+        <Link href="#fanflet-performance" className="block group">
+          <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium leading-tight">Unique Views</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{(kpis?.uniqueVisitors ?? totalUniqueViews).toLocaleString()}</div>
+              {kpis && <ChangeIndicator current={kpis.uniqueVisitors} previous={kpis.prevUniqueVisitors} />}
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="#resource-click-breakdown" className="block group">
+          <Card className="transition-all duration-200 group-hover:border-[#3BA5D9]/50 group-hover:shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium leading-tight">Resource Clicks</CardTitle>
+              <MousePointerClick className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{(kpis?.totalResourceClicks ?? totalClicks).toLocaleString()}</div>
+              {kpis && <ChangeIndicator current={kpis.totalResourceClicks} previous={kpis.prevResourceClicks} />}
+            </CardContent>
+          </Card>
+        </Link>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium leading-tight">Conversion Rate</CardTitle>
             <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -379,9 +400,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
             <p className="text-xs text-muted-foreground mt-1">Subscribers / Unique Views</p>
           </CardContent>
         </Card>
-        <Link href="/dashboard/subscribers" className="h-full">
-          <Card className="h-full transition-colors hover:border-slate-400">
-            <CardHeader className="flex min-h-16 flex-row items-start justify-between space-y-0 pb-2">
+        <Link href="/dashboard/subscribers" className="block">
+          <Card className="transition-colors hover:border-slate-400">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium leading-tight">Total Subscribers</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -396,11 +417,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       {/* ================================================================ */}
       {/* Per-Fanflet Breakdown (Free tier)                                */}
       {/* ================================================================ */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Fanflet Performance</CardTitle>
-          <CardDescription>Engagement breakdown by Fanflet.</CardDescription>
-        </CardHeader>
+      <div id="fanflet-performance">
+        <Card>
+          <CardHeader>
+            <CardTitle>Fanflet Performance</CardTitle>
+            <CardDescription>Engagement breakdown by Fanflet.</CardDescription>
+          </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {fanfletStats.map((f) => (
@@ -448,6 +470,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* ================================================================ */}
       {/* Pro-Tier: Device & Traffic Sources                               */}
@@ -557,10 +580,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
       {/* Pro-Tier: Resource Click Breakdown */}
       {hasClickAnalytics ? (
-        <ResourceClickBreakdown
-          stats={resourceClickStats}
-          fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
-        />
+        <div id="resource-click-breakdown">
+          <ResourceClickBreakdown
+            stats={resourceClickStats}
+            fanflets={(fanflets || []).map((f) => ({ id: f.id, title: f.title }))}
+          />
+        </div>
       ) : (
         <LockedFeatureCard
           title="Resource Click Breakdown"

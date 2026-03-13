@@ -88,7 +88,7 @@ export interface GeneratedSponsorDemoPayload {
     title: string;
     description: string;
     url?: string;
-    type: "link" | "file" | "text" | "promo";
+    type: "link" | "file" | "video" | "sponsor_block";
   }>;
   demo_speakers: Array<{
     full_name: string;
@@ -121,6 +121,7 @@ export interface GeneratedSponsorDemoPayload {
     description?: string;
     start_date: string;
     end_date?: string;
+    all_speakers_assigned?: boolean;
   }>;
   theme: string;
 }
@@ -339,15 +340,17 @@ Generate a complete demo environment as JSON with this exact structure:
       "name": "Campaign or initiative name",
       "description": "Short description of the campaign",
       "start_date": "YYYY-MM-DD (within next 3 months)",
-      "end_date": "YYYY-MM-DD (optional, after start_date)"
+      "end_date": "YYYY-MM-DD (optional, after start_date)",
+      "all_speakers_assigned": true
     }
   ],
   "theme": "navy"
 }
 
 Rules:
-- Generate 3-5 sponsor resources for the sponsor's Library (mix of types: "link" for URLs/product pages, "file" for documents, "promo" for promotional materials, "text" for text-based resources). These appear in the sponsor's Library tab and can be placed on speaker fanflets.
-- Generate exactly 2 campaigns: realistic initiative or product launch names with start_date within the next 3 months and optional end_date. These showcase the Campaigns tab (Enterprise).
+- Generate 3-5 sponsor resources for the sponsor's Library (mix of types: "link" for URLs/product pages, "file" for documents, "video" for videos, "sponsor_block" for custom text/HTML blocks). These appear in the sponsor's Library tab and can be placed on speaker fanflets. 
+- Resource status should be considered "published" by default.
+- Generate exactly 2 distinct campaigns: realistic initiative or product launch names with start_date within the next 3 months and optional end_date. Ensure each campaign has a unique name and description that feels like a separate focus (e.g., one clinical focus, one technology focus). Set "all_speakers_assigned" to true for one of them.
 - Generate exactly 3 demo speakers:
   - Speaker #1: connection_status "active" — an established relationship. Include a "sponsor" type resource in their fanflet referencing ${input.company_name}.
   - Speaker #2: connection_status "none" — a discoverable speaker NOT yet connected. No sponsor resource for ${input.company_name} in their fanflet.

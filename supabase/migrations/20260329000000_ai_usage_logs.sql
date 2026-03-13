@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS public.ai_usage_logs (
 );
 
 -- Indexes for performance and reporting
-CREATE INDEX idx_ai_usage_logs_admin ON public.ai_usage_logs(admin_id, created_at DESC);
-CREATE INDEX idx_ai_usage_logs_feature ON public.ai_usage_logs(feature_name, created_at DESC);
-CREATE INDEX idx_ai_usage_logs_created ON public.ai_usage_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_admin ON public.ai_usage_logs(admin_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_feature ON public.ai_usage_logs(feature_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_logs_created ON public.ai_usage_logs(created_at DESC);
 
 -- Security: Service role managed, Admins (super_admin) can read for reporting
 ALTER TABLE public.ai_usage_logs ENABLE ROW LEVEL SECURITY;

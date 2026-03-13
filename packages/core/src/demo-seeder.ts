@@ -511,6 +511,17 @@ export async function seedDemoEnvironment(
 /*  Sponsor Demo Seed Engine                                           */
 /* ------------------------------------------------------------------ */
 
+const STATIC_DEMO_SUBSCRIBERS = [
+  { name: "Sarah Chen", email: "sarah.chen@tech.com", resource_title: "Product Overview PDF" },
+  { name: "Marcus Thorne", email: "m.thorne@global.net", resource_title: "Book a Demo" },
+  { name: "Elena Rodriguez", email: "elena.r@healthcare.org", resource_title: "Case Study" },
+  { name: "David Kim", email: "david.kim@startup.io", resource_title: "Product Overview PDF" },
+  { name: "Aisha Patel", email: "aisha.p@media.group", resource_title: "Whitepaper" },
+  { name: "Thomas Mueller", email: "t.mueller@industrial.de", resource_title: "Technical Specs" },
+  { name: "Sophie Laurent", email: "sophie.l@luxury.fr", resource_title: "Partner Program" },
+  { name: "James Wilson", email: "j.wilson@edu.au", resource_title: "Product Overview PDF" },
+];
+
 export interface SponsorSeedManifest {
   sponsor_auth_user_id: string;
   sponsor_account_id: string;
@@ -530,6 +541,8 @@ export interface SponsorSeedManifest {
     subscription_id: string | null;
   }>;
   lead_ids: string[];
+  subscriber_ids: string[];
+  analytics_event_ids: string[];
 }
 
 export interface SponsorSeedDemoResult {
@@ -555,6 +568,8 @@ export async function seedSponsorDemoEnvironment(
     sponsor_subscription_id: null,
     demo_speakers: [],
     lead_ids: [],
+    subscriber_ids: [],
+    analytics_event_ids: [],
   };
 
   try {
@@ -738,6 +753,7 @@ export async function seedSponsorDemoEnvironment(
 
     // ── Step 6: Create demo speaker accounts with fanflets ──
     const connectedSpeakerIds: string[] = [];
+    const sponsorBlockIds: string[] = [];
 
     for (const demoSpeaker of payload.demo_speakers) {
       const speakerSlug = demoSpeaker.slug.startsWith("demo-")
@@ -919,7 +935,6 @@ export async function seedSponsorDemoEnvironment(
             resource.type === "sponsor" && manifest.sponsor_resource_library_ids.length > 0
               ? manifest.sponsor_resource_library_ids[0]
               : null;
-
           await serviceClient.from("resource_blocks").insert({
             fanflet_id: fanflet.id,
             library_item_id: libItem.id,
@@ -936,6 +951,11 @@ export async function seedSponsorDemoEnvironment(
             sponsor_account_id: sponsorAccountId,
             sponsor_library_item_id: sponsorLibraryItemId,
           });
+
+          if (sponsorAccountId === sponsorAccount.id) {
+            const { data: latestBlock } = await serviceClient.from("resource_blocks").select("id").eq("fanflet_id", fanflet.id).order("created_at", { ascending: false }).limit(1).single();
+            if (latestBlock) sponsorBlockIds.push(latestBlock.id);
+          }
         }
       }
 
@@ -959,7 +979,8 @@ export async function seedSponsorDemoEnvironment(
     const firstFanfletId = connectedSpeaker?.fanflet_ids[0] ?? null;
 
     if (connectedSpeaker && firstFanfletId) {
-      for (const lead of payload.sample_leads) {
+      // Use static subscribers instead of AI-generated leads
+      for (const lead of STATIC_DEMO_SUBSCRIBERS) {
         // Create a demo subscriber record for the lead
         const { data: subscriber, error: subError } = await serviceClient
           .from("subscribers")
@@ -968,6 +989,7 @@ export async function seedSponsorDemoEnvironment(
             name: lead.name,
             speaker_id: connectedSpeaker.speaker_id,
             source_fanflet_id: firstFanfletId,
+            sponsor_consent: true, // Explicitly set sponsor consent for demo leads
           })
           .select("id")
           .single();
@@ -977,15 +999,22 @@ export async function seedSponsorDemoEnvironment(
           continue;
         }
 
+        manifest.subscriber_ids.push(subscriber.id);
+
+        const randomBlockId = sponsorBlockIds.length > 0 
+          ? sponsorBlockIds[Math.floor(Math.random() * sponsorBlockIds.length)]
+          : null;
+
         const { data: leadRow, error: leadError } = await serviceClient
           .from("sponsor_leads")
           .insert({
             subscriber_id: subscriber.id,
             sponsor_id: sponsorAccount.id,
             fanflet_id: firstFanfletId,
+            resource_block_id: randomBlockId,
             engagement_type: "resource_click",
             resource_title: lead.resource_title,
-            created_at: lead.created_at || new Date().toISOString(),
+            created_at: new Date(Date.now() - Math.random() * 3 * 24 * 60 * 60 * 1000).toISOString(),
           })
           .select("id")
           .single();
@@ -994,6 +1023,7 @@ export async function seedSponsorDemoEnvironment(
           console.error(`Lead creation failed: ${leadError.message}`);
           continue;
         }
+
         if (leadRow) manifest.lead_ids.push(leadRow.id);
       }
     }
@@ -1012,36 +1042,39 @@ export async function seedSponsorDemoEnvironment(
 
     // ── Step 7c: Seed analytics events ──
     const analyticsEvents = [];
+    const eventIds = [];
     for (const speaker of manifest.demo_speakers) {
       const fanfletId = speaker.fanflet_ids[0];
       if (!fanfletId) continue;
 
       // Page views
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 40; i++) {
         analyticsEvents.push({
           fanflet_id: fanfletId,
           event_type: "page_view",
           device_type: Math.random() > 0.3 ? "mobile" : "desktop",
           referrer: "https://google.com",
+          visitor_hash: Math.random().toString(36).substring(2), // Ensure unique visitors
           created_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
         });
       }
 
-      // Resource clicks for sponsor blocks
+      // Resource clicks for blocks attributed to this sponsor
       const { data: blocks } = await serviceClient
         .from("resource_blocks")
         .select("id")
         .eq("fanflet_id", fanfletId)
-        .eq("type", "sponsor");
+        .eq("sponsor_account_id", sponsorAccount.id);
 
       if (blocks) {
         for (const block of blocks) {
-          for (let i = 0; i < 5; i++) {
+          for (let i = 0; i < 8; i++) {
             analyticsEvents.push({
               fanflet_id: fanfletId,
               event_type: "resource_click",
               resource_block_id: block.id,
               device_type: Math.random() > 0.3 ? "mobile" : "desktop",
+              visitor_hash: Math.random().toString(36).substring(2),
               created_at: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
             });
           }
@@ -1050,7 +1083,14 @@ export async function seedSponsorDemoEnvironment(
     }
 
     if (analyticsEvents.length > 0) {
-      await serviceClient.from("analytics_events").insert(analyticsEvents);
+      const { data: insertedEvents } = await serviceClient
+        .from("analytics_events")
+        .insert(analyticsEvents)
+        .select("id");
+      
+      if (insertedEvents) {
+        manifest.analytics_event_ids = insertedEvents.map(e => e.id);
+      }
     }
 
     // ── Step 8: Update demo_environments row ──

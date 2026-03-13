@@ -8,6 +8,7 @@ import { hashEmail } from "@/lib/email-hash";
 import { renderAnnouncementEmail } from "@/lib/email-template";
 import { requireAdmin } from "@/lib/admin-auth";
 import { auditAdminAction } from "@/lib/audit";
+import { rewriteTechnicalText, logAiUsage } from "@fanflet/core";
 import { z } from "zod";
 
 const communicationIdSchema = z.string().uuid();
@@ -775,4 +776,52 @@ export async function unarchiveWorklog(worklogFilename: string): Promise<{ error
   revalidatePath("/communications/new");
   revalidatePath("/communications/archived-worklogs");
   return {};
+}
+
+export async function rewriteTextAction(
+  text: string,
+  context?: string
+): Promise<{ text?: string; error?: string }> {
+  let admin: Awaited<ReturnType<typeof requireAdmin>>;
+  try {
+    admin = await requireAdmin();
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { error: "ANTHROPIC_API_KEY not configured" };
+  }
+
+  try {
+    const { text: rewritten, usage } = await rewriteTechnicalText(text, apiKey, context);
+    
+    // Log usage to database
+    const supabase = createServiceClient();
+    await logAiUsage(supabase, {
+      admin_id: admin.user.id,
+      feature_name: "communication_rewrite",
+      ...usage,
+      status: "success",
+      context: { text_length: text.length, context },
+    });
+
+    return { text: rewritten };
+  } catch (err) {
+    console.error("[communications] rewriteTextAction:", err);
+    
+    // Log error to database
+    const supabase = createServiceClient();
+    await logAiUsage(supabase, {
+      admin_id: admin.user.id,
+      feature_name: "communication_rewrite",
+      model: "claude-3-haiku-20240307",
+      status: "error",
+      error_message: (err as Error).message,
+      context: { text_length: text.length, context },
+    });
+
+    return { error: (err as Error).message };
+  }
 }

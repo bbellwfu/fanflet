@@ -23,6 +23,7 @@ import {
   ShieldCheckIcon,
   ScrollTextIcon,
   PlayCircleIcon,
+  CpuIcon,
 } from "lucide-react";
 import { Button } from "@fanflet/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@fanflet/ui/sheet";
@@ -158,6 +159,13 @@ const navSections: NavSection[] = [
         href: "/audit-log",
         label: "Audit Log",
         icon: <ScrollTextIcon className="w-[18px] h-[18px]" />,
+        superAdminOnly: true,
+      },
+      {
+        id: "ai-usage",
+        href: "/ai-usage",
+        label: "AI Utilization",
+        icon: <CpuIcon className="w-[18px] h-[18px]" />,
         superAdminOnly: true,
       },
       {

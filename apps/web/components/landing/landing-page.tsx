@@ -38,6 +38,7 @@ type Speaker = {
     twitter?: string;
     website?: string;
   } | null;
+  is_demo?: boolean;
 };
 
 type ResourceBlock = {
@@ -120,10 +121,10 @@ export function LandingPage({
   const themeVars = getThemeCSSVariables(themeId);
 
   const nonSponsorBlocks = fanflet.resource_blocks.filter(
-    (b) => b.type !== "sponsor" && b.type !== "sponsor_block"
+    (b) => b.type?.toLowerCase() !== "sponsor" && b.type?.toLowerCase() !== "sponsor_block"
   );
   const sponsorBlocks = fanflet.resource_blocks.filter(
-    (b) => b.type === "sponsor" || b.type === "sponsor_block"
+    (b) => b.type?.toLowerCase() === "sponsor" || b.type?.toLowerCase() === "sponsor_block"
   );
 
   const blocksBySection = nonSponsorBlocks.reduce<Record<string, ResourceBlock[]>>(
@@ -284,7 +285,7 @@ export function LandingPage({
               speakerId={speaker.id}
               fanfletId={fanflet.id}
               subscriberCount={subscriberCount}
-              hasSponsorBlocks={fanflet.has_explicit_sponsors || fanflet.resource_blocks.some((b) => b.type === "sponsor" || b.type === "sponsor_block" || b.sponsor_account_id)}
+              hasSponsorBlocks={fanflet.has_explicit_sponsors || fanflet.resource_blocks.some((b) => b.type?.toLowerCase() === "sponsor" || b.type?.toLowerCase() === "sponsor_block" || b.sponsor_account_id)}
             />
           </CardContent>
         </Card>
@@ -300,7 +301,8 @@ export function LandingPage({
             </h3>
 
             {blocks.map((block) => {
-              if (block.type === "text") {
+              const type = block.type?.toLowerCase();
+              if (type === "text") {
                 return (
                   <div
                     key={block.id}
@@ -318,7 +320,7 @@ export function LandingPage({
                 );
               }
 
-              if (block.type === "link" && block.url) {
+              if (type === "link" && block.url) {
                 return (
                   <a
                     key={block.id}
@@ -379,14 +381,14 @@ export function LandingPage({
                 );
               }
 
-              if (block.type === "file" && block.file_path) {
-                const fileUrl = getDownloadUrl(block, fanflet.id);
-                const isLegacy = block.file_path.startsWith("http");
+              if (type === "file" && (block.file_path || speaker.is_demo)) {
+                const fileUrl = block.file_path ? getDownloadUrl(block, fanflet.id) : "#";
+                const isLegacy = block.file_path?.startsWith("http") ?? false;
                 const sizeLabel = block.file_size_bytes
                   ? formatBytes(block.file_size_bytes)
-                  : null;
+                  : speaker.is_demo && !block.file_path ? "6.8 MB" : null;
                 const fileInfo =
-                  [block.file_type, sizeLabel].filter(Boolean).join(" · ") ||
+                  [(block.file_type || (speaker.is_demo && !block.file_path ? "PDF" : null)), sizeLabel].filter(Boolean).join(" · ") ||
                   block.metadata?.file_size ||
                   block.description ||
                   "Download";
@@ -418,7 +420,7 @@ export function LandingPage({
                 );
               }
 
-              if ((block.type === "embed" || block.type === "video") && block.url) {
+              if ((type === "embed" || type === "video") && block.url) {
                 return (
                   <a
                     key={block.id}

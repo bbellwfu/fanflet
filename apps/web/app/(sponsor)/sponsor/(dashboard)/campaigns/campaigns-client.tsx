@@ -11,13 +11,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Loader2, Megaphone, Users, FileText, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { addDays, endOfMonth, addMonths, endOfQuarter, addQuarters, endOfYear, format } from "date-fns";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -378,31 +377,35 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
         </div>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>New campaign</DialogTitle>
-            <DialogDescription>Name your campaign, set the date range, and assign {speakerLabel}s.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5 pl-1 pr-4 py-4 max-h-[60vh] overflow-y-auto shadow-[inset_0_-20px_20px_-20px_rgba(0,0,0,0.1)]">
-            <div>
-              <Label htmlFor="campaign-name" className="block mb-1.5">Campaign name</Label>
+      <Sheet open={createOpen} onOpenChange={setCreateOpen}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>New campaign</SheetTitle>
+            <SheetDescription>Name your campaign, set the date range, and assign {speakerLabel}s.</SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="campaign-name" className="font-medium text-slate-900">Campaign name</Label>
               <Input
                 id="campaign-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Spring Conference Series 2026"
+                className="bg-white border-slate-200"
               />
             </div>
-            <div>
-              <Label htmlFor="campaign-desc" className="block mb-1.5">Description (optional)</Label>
+            <div className="space-y-2">
+              <Label htmlFor="campaign-desc" className="font-medium text-slate-900">Description (optional)</Label>
               <Textarea
                 id="campaign-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                rows={2}
+                rows={4}
+                className="bg-white border-slate-200"
               />
             </div>
+            
             <DateRangeField
               from={startDate}
               to={endDate}
@@ -413,49 +416,51 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
               toLabel="End date (optional)"
               className="mt-1"
             >
-              <div className="mt-2">
+              <div className="mt-2 text-slate-900">
                 <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} baseDate={startDate} />
               </div>
             </DateRangeField>
-            <div>
-              <Label htmlFor="create-status" className="block mb-1.5">Status</Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="create-status" className="font-medium text-slate-900">Status</Label>
               <select
                 id="create-status"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as "draft" | "active" | "ended")}
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
                 <option value="ended">Ended</option>
               </select>
             </div>
-            <div>
-              <Label className="block mb-1.5">Assigned {speakerLabel}s (optional)</Label>
-              <p className="text-xs text-muted-foreground mb-2">Select connected {speakerLabel}s in this campaign.</p>
+
+            <div className="space-y-2">
+              <Label className="font-medium text-slate-900">Assigned {speakerLabel}s (optional)</Label>
+              <p className="text-xs text-muted-foreground">Select connected {speakerLabel}s in this campaign.</p>
               
-              <label className="flex items-center gap-2 cursor-pointer mb-3 p-2 bg-slate-50 border rounded-md">
+              <label className="flex items-center gap-2 cursor-pointer p-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors">
                 <input
                   type="checkbox"
                   checked={assignAllSpeakers}
                   onChange={(e) => setAssignAllSpeakers(e.target.checked)}
-                  className="rounded border-slate-300"
+                  className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                 />
                 <span className="text-sm font-medium">Assign to all current and future connected {speakerLabel}s</span>
               </label>
 
               {!assignAllSpeakers && (
-                <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+                <div className="border bg-white rounded-md p-3 max-h-40 overflow-y-auto space-y-2 text-slate-900">
                   {connectedSpeakers.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No active connections yet.</p>
                   ) : (
                     connectedSpeakers.map((s) => (
-                      <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                      <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
                         <input
                           type="checkbox"
                           checked={selectedSpeakerIds.has(s.id)}
                           onChange={() => toggleSpeaker(s.id)}
-                          className="rounded border-slate-300"
+                          className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
                         />
                         <span className="text-sm">{s.name}</span>
                       </label>
@@ -465,135 +470,153 @@ export function CampaignsClient({ campaigns, connectedSpeakers, speakerLabel = "
               )}
             </div>
           </div>
-          <DialogFooter>
+
+          <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-end gap-3 sticky bottom-0 z-10">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={submitting || !name.trim() || !startDate}>
+            <Button 
+              onClick={handleCreate} 
+              disabled={submitting || !name.trim() || !startDate}
+              className="bg-violet-600 hover:bg-violet-700"
+            >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={!!editingId} onOpenChange={(open) => !open && closeEdit()}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit campaign</DialogTitle>
-            <DialogDescription>Update name, dates, status, and assigned {speakerLabel}s.</DialogDescription>
-          </DialogHeader>
-          {loadingEdit ? (
-            <div className="py-8 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="space-y-5 pl-1 pr-4 py-4 max-h-[60vh] overflow-y-auto shadow-[inset_0_-20px_20px_-20px_rgba(0,0,0,0.1)]">
-              <div>
-                <Label htmlFor="edit-campaign-name" className="block mb-1.5">Campaign name</Label>
-                <Input
-                  id="edit-campaign-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Spring Conference Series 2026"
-                />
+      <Sheet open={!!editingId} onOpenChange={(open) => !open && closeEdit()}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>Edit campaign</SheetTitle>
+            <SheetDescription>Update name, dates, status, and assigned {speakerLabel}s.</SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {loadingEdit ? (
+              <div className="py-8 flex justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-              <div>
-                <Label htmlFor="edit-campaign-desc" className="block mb-1.5">Description (optional)</Label>
-                <Textarea
-                  id="edit-campaign-desc"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={2}
-                />
-              </div>
-              {resourceCount > 0 && (
-                <div className="flex items-center justify-between bg-violet-50/50 border border-violet-100 p-3 rounded-md">
-                  <div className="flex items-center gap-2 text-violet-800">
-                    <FileText className="h-4 w-4" />
-                    <span className="text-sm font-medium">{resourceCount} Linked resource{resourceCount !== 1 && 's'}</span>
-                  </div>
-                  <Button variant="outline" size="sm" asChild className="h-7 text-xs bg-white text-violet-800 border-violet-200 hover:bg-violet-50 hover:text-violet-900">
-                    <Link href={`/sponsor/library?campaign=${editingId}`} target="_blank">
-                      View in Library
-                    </Link>
-                  </Button>
-                </div>
-              )}
-              <DateRangeField
-                from={startDate}
-                to={endDate}
-                onFromChange={handleStartDateChange}
-                onToChange={handleEndDateManualChange}
-                fromId="edit-start-date"
-                toId="edit-end-date"
-                toLabel="End date (optional)"
-                className="mt-1"
-              >
-                <div className="mt-2">
-                  <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} baseDate={startDate} />
-                </div>
-              </DateRangeField>
-              <div>
-                <Label htmlFor="edit-status" className="block mb-1.5">Status</Label>
-                <select
-                  id="edit-status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as "draft" | "active" | "ended")}
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="ended">Ended</option>
-                </select>
-              </div>
-              <div>
-                <Label className="block mb-1.5">Assigned {speakerLabel}s</Label>
-                <p className="text-xs text-muted-foreground mb-2">Select connected {speakerLabel}s in this campaign.</p>
-
-                <label className="flex items-center gap-2 cursor-pointer mb-3 p-2 bg-slate-50 border rounded-md">
-                  <input
-                    type="checkbox"
-                    checked={assignAllSpeakers}
-                    onChange={(e) => setAssignAllSpeakers(e.target.checked)}
-                    className="rounded border-slate-300"
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-campaign-name" className="font-medium text-slate-900">Campaign name</Label>
+                  <Input
+                    id="edit-campaign-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Spring Conference Series 2026"
+                    className="bg-white border-slate-200"
                   />
-                  <span className="text-sm font-medium">Assign to all current and future connected {speakerLabel}s</span>
-                </label>
-
-                {!assignAllSpeakers && (
-                  <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
-                    {connectedSpeakers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No active connections yet.</p>
-                    ) : (
-                      connectedSpeakers.map((s) => (
-                        <label key={s.id} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedSpeakerIds.has(s.id)}
-                            onChange={() => toggleSpeaker(s.id)}
-                            className="rounded border-slate-300"
-                          />
-                          <span className="text-sm">{s.name}</span>
-                        </label>
-                      ))
-                    )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-campaign-desc" className="font-medium text-slate-900">Description (optional)</Label>
+                  <Textarea
+                    id="edit-campaign-desc"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                    className="bg-white border-slate-200"
+                  />
+                </div>
+                {resourceCount > 0 && (
+                  <div className="flex items-center justify-between bg-violet-50/50 border border-violet-100 p-3 rounded-md">
+                    <div className="flex items-center gap-2 text-violet-800">
+                      <FileText className="h-4 w-4" />
+                      <span className="text-sm font-medium">{resourceCount} Linked resource{resourceCount !== 1 && 's'}</span>
+                    </div>
+                    <Button variant="outline" size="sm" asChild className="h-7 text-xs bg-white text-violet-800 border-violet-200 hover:bg-violet-50 hover:text-violet-900">
+                      <Link href={`/sponsor/library?campaign=${editingId}`} target="_blank">
+                        View in Library
+                      </Link>
+                    </Button>
                   </div>
                 )}
+                
+                <DateRangeField
+                  from={startDate}
+                  to={endDate}
+                  onFromChange={handleStartDateChange}
+                  onToChange={handleEndDateManualChange}
+                  fromId="edit-start-date"
+                  toId="edit-end-date"
+                  toLabel="End date (optional)"
+                  className="mt-1"
+                >
+                  <div className="mt-2 text-slate-900">
+                    <EndDatePresets activePreset={endDatePreset} onSelect={selectEndDatePreset} baseDate={startDate} />
+                  </div>
+                </DateRangeField>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-status" className="font-medium text-slate-900">Status</Label>
+                  <select
+                    id="edit-status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as "draft" | "active" | "ended")}
+                    className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="ended">Ended</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="font-medium text-slate-900">Assigned {speakerLabel}s</Label>
+                  <p className="text-xs text-muted-foreground">Select connected {speakerLabel}s in this campaign.</p>
+
+                  <label className="flex items-center gap-2 cursor-pointer p-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={assignAllSpeakers}
+                      onChange={(e) => setAssignAllSpeakers(e.target.checked)}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                    />
+                    <span className="text-sm font-medium">Assign to all current and future connected {speakerLabel}s</span>
+                  </label>
+
+                  {!assignAllSpeakers && (
+                    <div className="border bg-white rounded-md p-3 max-h-40 overflow-y-auto space-y-2 text-slate-900">
+                      {connectedSpeakers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No active connections yet.</p>
+                      ) : (
+                        connectedSpeakers.map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                            <input
+                              type="checkbox"
+                              checked={selectedSpeakerIds.has(s.id)}
+                              onChange={() => toggleSpeaker(s.id)}
+                              className="rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                            />
+                            <span className="text-sm">{s.name}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
           {!loadingEdit && (
-            <DialogFooter>
+            <div className="px-6 py-4 border-t border-border bg-white flex items-center justify-end gap-3 sticky bottom-0 z-10">
               <Button variant="outline" onClick={closeEdit}>
                 Cancel
               </Button>
-              <Button onClick={handleUpdate} disabled={submitting || !name.trim() || !startDate}>
+              <Button 
+                onClick={handleUpdate} 
+                disabled={submitting || !name.trim() || !startDate}
+                className="bg-violet-600 hover:bg-violet-700"
+              >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
               </Button>
-            </DialogFooter>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>

@@ -32,6 +32,7 @@ import {
   sendTestEmail,
   deleteDraft,
   archiveWorklog,
+  rewriteTextAction,
 } from "../actions";
 import Link from "next/link";
 import type { WorklogEntry } from "@/lib/worklog-types";
@@ -124,7 +125,7 @@ function generateEmailHtml(
     parts.push(`<ul ${LIST_STYLE}>`);
     for (const f of checkedFeatures) {
       parts.push(
-        `<li ${LIST_ITEM_STYLE}><strong>${escapeHtml(f.name)}</strong> &mdash; ${escapeHtml(f.description)}</li>`
+        `<li ${LIST_ITEM_STYLE}><strong>${escapeHtml(f.name)}</strong>: ${escapeHtml(f.description)}</li>`
       );
     }
     parts.push(`</ul>`);
@@ -253,6 +254,7 @@ export function NewCommunicationForm({
   const [isWorklogMode, setIsWorklogMode] = useState(false);
   const [showAddWorklogPicker, setShowAddWorklogPicker] = useState(false);
   const [overviewMode, setOverviewMode] = useState<"manual" | "dynamic">("manual");
+  const [rewritingField, setRewritingField] = useState<string | null>(null);
 
   // Step management
   const initialStep: Step = draft ? "compose" : "select";
@@ -597,6 +599,24 @@ export function NewCommunicationForm({
     }
   }, [generatedHtml]);
 
+  async function handleRewrite(text: string, onDone: (revised: string) => void, fieldId: string, context?: string) {
+    if (!text.trim()) return;
+    setRewritingField(fieldId);
+    try {
+      const result = await rewriteTextAction(text, context);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.text) {
+        onDone(result.text);
+        toast.success("Text rewritten");
+      }
+    } catch (err) {
+      toast.error("An error occurred during rewrite");
+    } finally {
+      setRewritingField(null);
+    }
+  }
+
   // Toggle helpers
   const toggleFeature = useCallback((index: number) => {
     setFeatures((prev) =>
@@ -801,6 +821,7 @@ export function NewCommunicationForm({
               {worklogs.slice(0, 6).map((w) => (
                 <button
                   key={w.filename}
+                  type="button"
                   onClick={() => handleSelectWorklog(w)}
                   className="bg-surface rounded-lg border border-border-subtle p-4 text-left hover:border-primary/40 hover:bg-surface-elevated transition-all group"
                 >
@@ -859,6 +880,7 @@ export function NewCommunicationForm({
 
         <button
           onClick={handleComposeFromScratch}
+          type="button"
           className="w-full bg-surface rounded-lg border border-border-subtle border-dashed p-5 text-center hover:border-primary/40 hover:bg-surface-elevated transition-all group"
         >
           <PenLineIcon className="w-5 h-5 text-fg-muted mx-auto mb-2 group-hover:text-primary transition-colors" />
@@ -1100,14 +1122,15 @@ export function NewCommunicationForm({
           <div className="bg-surface rounded-lg border border-border-subtle p-5 space-y-4">
             {/* Title */}
             <div className="space-y-1.5">
-              <Label htmlFor="title" className="text-[13px] font-medium text-fg">
+              <Label htmlFor="comm-title" className="text-[13px] font-medium text-fg">
                 Title
               </Label>
               <Input
-                id="title"
+                id="comm-title"
                 placeholder="e.g. March 2026 Release Notes"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
+                autoComplete="off"
               />
               <p className="text-[11px] text-fg-muted">
                 Internal title for your reference (not sent to recipients).
@@ -1116,14 +1139,15 @@ export function NewCommunicationForm({
 
             {/* Subject */}
             <div className="space-y-1.5">
-              <Label htmlFor="subject" className="text-[13px] font-medium text-fg">
+              <Label htmlFor="comm-subject" className="text-[13px] font-medium text-fg">
                 Email subject
               </Label>
               <Input
-                id="subject"
+                id="comm-subject"
                 placeholder="e.g. What's new on Fanflet — March 2026"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
+                autoComplete="off"
               />
             </div>
           </div>
@@ -1167,6 +1191,30 @@ export function NewCommunicationForm({
                       Edit manually
                     </button>
                   </div>
+                  {overviewMode === "manual" && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[11px] text-primary"
+                      disabled={rewritingField === "overview" || !overview.trim()}
+                      onClick={() => {
+                        const curatedContext = [
+                          speakerFeatures.length > 0 ? `Features:\n${speakerFeatures.map((f) => `- ${f.name}: ${f.description}`).join("\n")}` : "",
+                          speakerBugFixes.length > 0 ? `Bug Fixes:\n${speakerBugFixes.map((b) => `- ${b.text}`).join("\n")}` : "",
+                          speakerInfrastructure.length > 0 ? `Infrastructure:\n${speakerInfrastructure.map((i) => `- ${i.text}`).join("\n")}` : "",
+                        ].filter(Boolean).join("\n\n");
+                        handleRewrite(overview, setOverview, "overview", curatedContext);
+                      }}
+                    >
+                      {rewritingField === "overview" ? (
+                        <Loader2Icon className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <SparklesIcon className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      Rewrite
+                    </Button>
+                  )}
                 </div>
                 {overviewMode === "dynamic" ? (
                   <div className="rounded-md border border-border-subtle bg-surface-elevated/30 px-3 py-2.5">
@@ -1185,6 +1233,7 @@ export function NewCommunicationForm({
                     maxRows={16}
                     className="text-[13px]"
                     placeholder="Executive summary of the release..."
+                    autoComplete="off"
                   />
                 )}
               </div>
@@ -1201,6 +1250,7 @@ export function NewCommunicationForm({
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => toggleAllFeatures(true)}
                         className="text-[11px] text-primary hover:underline"
                       >
@@ -1208,6 +1258,7 @@ export function NewCommunicationForm({
                       </button>
                       <span className="text-fg-muted text-[11px]">/</span>
                       <button
+                        type="button"
                         onClick={() => toggleAllFeatures(false)}
                         className="text-[11px] text-primary hover:underline"
                       >
@@ -1232,11 +1283,12 @@ export function NewCommunicationForm({
                           className="mt-1.5 rounded border-border-subtle text-primary focus:ring-primary/20 shrink-0"
                         />
                         <div className="min-w-0 flex-1 space-y-1.5">
-                          <Input
+                           <Input
                             value={f.name}
                             onChange={(e) => updateFeature(i, { name: e.target.value })}
                             className="text-[13px] font-medium h-8"
                             placeholder="Feature name"
+                            autoComplete="off"
                           />
                           <AutoResizeTextarea
                             value={f.description}
@@ -1245,17 +1297,35 @@ export function NewCommunicationForm({
                             maxRows={10}
                             className="text-[12px] text-fg-muted flex-1 min-w-0"
                             placeholder="Description"
+                            autoComplete="off"
                           />
                         </div>
-                        <label className="flex shrink-0 items-center gap-1.5 pt-1 text-[11px] text-fg-muted cursor-pointer" title="Exclude from speaker/sponsor email">
-                          <input
-                            type="checkbox"
-                            checked={!!f.adminOnly}
-                            onChange={(e) => setFeatureAdminOnly(i, e.target.checked)}
-                            className="rounded border-border-subtle text-primary focus:ring-primary/20"
-                          />
-                          <span>Admin only</span>
-                        </label>
+                        <div className="flex flex-col items-center gap-2 pt-1 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-primary hover:bg-primary/5"
+                            disabled={rewritingField === `feature-${i}` || !f.description.trim()}
+                            onClick={() => handleRewrite(f.description, (rev) => updateFeature(i, { description: rev }), `feature-${i}`)}
+                            title="Rewrite with AI"
+                          >
+                            {rewritingField === `feature-${i}` ? (
+                              <Loader2Icon className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <SparklesIcon className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                          <label className="flex items-center gap-1.5 text-[11px] text-fg-muted cursor-pointer" title="Exclude from speaker/sponsor email">
+                            <input
+                              type="checkbox"
+                              checked={!!f.adminOnly}
+                              onChange={(e) => setFeatureAdminOnly(i, e.target.checked)}
+                              className="rounded border-border-subtle text-primary focus:ring-primary/20"
+                            />
+                            <span>Admin only</span>
+                          </label>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1274,6 +1344,7 @@ export function NewCommunicationForm({
                     </h3>
                     <div className="flex items-center gap-2">
                       <button
+                        type="button"
                         onClick={() => toggleAllBugFixes(true)}
                         className="text-[11px] text-primary hover:underline"
                       >
@@ -1281,6 +1352,7 @@ export function NewCommunicationForm({
                       </button>
                       <span className="text-fg-muted text-[11px]">/</span>
                       <button
+                        type="button"
                         onClick={() => toggleAllBugFixes(false)}
                         className="text-[11px] text-primary hover:underline"
                       >
@@ -1311,16 +1383,34 @@ export function NewCommunicationForm({
                           maxRows={8}
                           className="text-[13px] flex-1 min-w-0 py-1.5"
                           placeholder="Bug fix description"
+                          autoComplete="off"
                         />
-                        <label className="flex shrink-0 items-center gap-1.5 pt-1 text-[11px] text-fg-muted cursor-pointer" title="Exclude from speaker/sponsor email">
-                          <input
-                            type="checkbox"
-                            checked={!!b.adminOnly}
-                            onChange={(e) => setBugFixAdminOnly(i, e.target.checked)}
-                            className="rounded border-border-subtle text-primary focus:ring-primary/20"
-                          />
-                          <span>Admin only</span>
-                        </label>
+                        <div className="flex flex-col items-center gap-2 pt-1.5 shrink-0">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-primary hover:bg-primary/5"
+                            disabled={rewritingField === `bug-${i}` || !b.text.trim()}
+                            onClick={() => handleRewrite(b.text, (rev) => updateBugFixText(i, rev), `bug-${i}`)}
+                            title="Rewrite with AI"
+                          >
+                            {rewritingField === `bug-${i}` ? (
+                              <Loader2Icon className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <SparklesIcon className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                          <label className="flex items-center gap-1.5 text-[11px] text-fg-muted cursor-pointer" title="Exclude from speaker/sponsor email">
+                            <input
+                              type="checkbox"
+                              checked={!!b.adminOnly}
+                              onChange={(e) => setBugFixAdminOnly(i, e.target.checked)}
+                              className="rounded border-border-subtle text-primary focus:ring-primary/20"
+                            />
+                            <span>Admin only</span>
+                          </label>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1492,6 +1582,7 @@ export function NewCommunicationForm({
       <div className="flex items-center gap-3 flex-wrap">
         <Button
           onClick={handleSaveDraft}
+          type="button"
           variant="outline"
           disabled={!canSave || isPending}
         >
@@ -1502,13 +1593,14 @@ export function NewCommunicationForm({
           )}
           {draftId ? "Save draft" : "Create draft"}
         </Button>
-        <Button onClick={handlePreview} disabled={!canSave || isPending}>
+        <Button onClick={handlePreview} type="button" disabled={!canSave || isPending}>
           <EyeIcon className="w-4 h-4 mr-1.5" />
           Preview & send
         </Button>
         {draftId && (
           <Button
             onClick={handleDelete}
+            type="button"
             variant="ghost"
             className="text-error hover:text-error ml-auto"
             disabled={isPending}

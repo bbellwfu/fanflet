@@ -77,10 +77,10 @@ export default async function SponsorAnalyticsPage({
 
   const availableSpeakers = (connectionsRes.data ?? [])
     .filter(c => c.speakers)
-    .map(c => ({
-      id: (c.speakers as any).id,
-      name: (c.speakers as any).name
-    }));
+    .map(c => {
+      const speaker = c.speakers as unknown as { id: string; name: string };
+      return { id: speaker.id, name: speaker.name };
+    });
   const availableCampaigns = campaignsRes.data ?? [];
 
   // 2. Base Fanflet Resolution
@@ -177,7 +177,7 @@ export default async function SponsorAnalyticsPage({
       deviceCounts[dev] = (deviceCounts[dev] || 0) + 1;
 
       let category: string;
-      const src = (e as any).source;
+      const src = e.source;
       if (src === "qr") category = "QR Code";
       else if (src === "portfolio") category = "Portfolio";
       else if (src === "share") category = "Share Link";

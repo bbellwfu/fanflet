@@ -107,6 +107,47 @@ supabase/migrations/   # Idempotent SQL migrations (see migrations/README.md)
 - `const` over `let` wherever possible.
 - Commit format: `type(scope): description` (e.g., `feat(auth): add password reset flow`)
 - Types: `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `perf`, `ci`
+- **Extract testable logic:** Keep API route handlers thin. Extract pure functions (validation, normalization, classification, computation) into `lib/` modules so they can be unit tested without mocking the framework. Examples: `lib/phone.ts`, `lib/referrer.ts`, `lib/expiration.ts`.
+
+## Testing
+
+### Running tests
+
+- `npm test` — runs all workspace tests via Turborepo (`turbo test`)
+- `npm test --workspace=@fanflet/web` — web app tests only
+- `npm test --workspace=@fanflet/core` — core package tests only
+- `npm test --workspace=@fanflet/mcp` — MCP security tests only
+
+### Test framework
+
+- **Vitest** everywhere. Configured in `apps/web/vitest.config.ts` (with `vite-tsconfig-paths` for `@/` alias resolution) and used directly in `packages/core` and `packages/mcp`.
+- **CI enforcement:** The quality job in `.github/workflows/ci.yml` runs tests for web, core, and mcp. Tests must pass to merge.
+
+### Where tests live
+
+Tests use `__tests__/` directories co-located with the code they test:
+
+```
+apps/web/lib/__tests__/              # Pure utility tests (expiration, visitor-hash, etc.)
+apps/web/app/api/__tests__/          # Shared schema validation tests
+apps/web/app/api/sms/__tests__/      # SMS route-specific tests
+apps/web/app/api/track/__tests__/    # Track route-specific tests
+packages/core/src/__tests__/         # Core service function tests (with MockSupabase)
+packages/mcp/src/__tests__/          # MCP security/auth tests
+```
+
+### Test patterns
+
+- **Phase 1 (pure functions):** Direct import, no mocking. Test Zod schemas, normalization, classification, computation. These are fast and high-value.
+- **Phase 2 (API routes):** Mock `@/lib/supabase/server` with `createMockSupabase()` from `packages/core/src/__tests__/mock-supabase.ts`. Test request→response with `NextRequest`/`NextResponse`.
+- **Phase 3 (E2E):** Playwright against running app (not yet implemented).
+
+### When to write tests
+
+- **New `lib/` utility functions:** Always write tests. Pure functions are easy to test and high-value.
+- **New API routes:** Extract validation/business logic into testable `lib/` modules. Write schema tests at minimum; route-level tests when the route has branching logic (rate limiting, conditional paths).
+- **New `packages/core` service functions:** Follow the existing pattern — use `createMockSupabase()` to test success, error, and edge-case paths.
+- **Bug fixes:** Add a regression test that reproduces the bug before fixing it.
 
 ## Security Requirements
 
@@ -156,9 +197,10 @@ The MCP server (`packages/mcp/`) uses **branded Supabase client types** to enfor
 When reviewing PRs, prioritize:
 1. **Security** — RLS policies, auth patterns, key exposure, input validation
 2. **Correctness** — Error handling, edge cases, null checks on Supabase responses
-3. **Architecture** — Server vs. client component boundaries, data fetching patterns
-4. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
-5. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)
+3. **Testing** — New `lib/` functions have tests, bug fixes include regression tests, API route logic is extracted and testable
+4. **Architecture** — Server vs. client component boundaries, data fetching patterns
+5. **Code quality** — TypeScript strictness, naming, DRY without over-abstraction
+6. **Migrations** — New SQL in `supabase/migrations/` must be idempotent (see `supabase/migrations/README.md`)
 
 ## Security & Infrastructure Audits
 
@@ -174,7 +216,8 @@ For security audits, use Supabase and Vercel MCP tools directly (not via agents)
 
 ### CI today
 
-- **Quality job** (`.github/workflows/ci.yml`): Lint, type-check, build (web) on PRs and pushes to `develop`.
+- **Quality job** (`.github/workflows/ci.yml`): Lint, type-check, unit tests (web, core, mcp), build (web) on PRs and pushes to `develop`.
+- **Unit tests:** CI runs `npm test` for `@fanflet/web`, `@fanflet/core`, and `@fanflet/mcp` workspaces. All must pass.
 - **Migration idempotency:** CI runs `.github/scripts/check-migrations-idempotent.sh` when migrations are present; see `supabase/migrations/README.md` for required patterns.
 - **Not yet in CI:** `npm audit` and gitleaks (secrets scanning) are not in the pipeline.
 
@@ -182,7 +225,7 @@ For security audits, use Supabase and Vercel MCP tools directly (not via agents)
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, MCP security tests, build, migration idempotency check, MCP client isolation check |
+| `ci.yml` | PR to main/develop, push to develop | Lint, type-check, unit tests (web/core/mcp), build, migration idempotency check, MCP client isolation check |
 | `migrate.yml` | Push to main/develop when `supabase/migrations/**` or the workflow changes | Applies migrations with `--include-all` to linked Supabase project (dev on develop, prod on main) |
 | `claude.yml` | `@claude` in issue/PR comments or reviews | On-demand Claude via Claude Code GitHub App (CLAUDE_CODE_OAUTH_TOKEN) |
 | `claude-code-review.yml` | Manual (`workflow_dispatch`) | Plugin-based code review using CLAUDE_CODE_OAUTH_TOKEN; invoke manually or via `@claude` |

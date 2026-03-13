@@ -101,7 +101,7 @@ async function getAdminEmailsForEvent(event: AdminNotificationEvent): Promise<st
   return emails;
 }
 
-function buildSubjectAndBody(
+export function buildSubjectAndBody(
   event: AdminNotificationEvent,
   payload: AdminNotificationPayload
 ): { subject: string; html: string } {
@@ -145,7 +145,7 @@ function buildSubjectAndBody(
   }
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

@@ -47,6 +47,12 @@ jobs:
       - name: Test MCP security
         run: npm test --workspace=@fanflet/mcp
 
+      - name: Test Web
+        run: npm test --workspace=@fanflet/web
+
+      - name: Test Core
+        run: npm test --workspace=@fanflet/core
+
       - name: Build Web
         run: npm run build --workspace=@fanflet/web
         env:

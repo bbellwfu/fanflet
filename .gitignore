@@ -52,6 +52,12 @@ marketing_site/
 # Admin worklog index (build artifact)
 apps/admin/generated/
 
+# Test coverage output
+coverage/
+
+# Lint output
+lint-output.txt
+
 # Misc
 *.pptx
 medium_logo_mark.png

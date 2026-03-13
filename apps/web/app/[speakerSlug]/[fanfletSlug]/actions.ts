@@ -19,7 +19,7 @@ export async function subscribeToSpeaker(
       p_fanflet_id: fanfletId,
       p_sponsor_consent: sponsorConsent,
     })
-    .single();
+    .single<{ subscriber_id: string }>();
 
   if (error) {
     console.error("[subscribeToSpeaker] RPC error:", error.code, error.message);

@@ -381,8 +381,10 @@ export function ResourceLibrary({
   // Power the active Sheet edit state
   const editResource = resources.find((r) => r.id === editingId) || null;
 
+  const editFilePath = editResource?.type === "file" ? editResource.file_path : null;
+
   useEffect(() => {
-    if (!editingId || !editResource || editResource.type !== "file" || !editResource.file_path) {
+    if (!editingId || !editFilePath) {
       setEditSignedUrl(null);
       return;
     }
@@ -390,14 +392,14 @@ export function ResourceLibrary({
     const supabase = createClient();
     supabase.storage
       .from(STORAGE_BUCKET)
-      .createSignedUrl(editResource.file_path, 3600)
+      .createSignedUrl(editFilePath, 3600)
       .then(({ data }) => {
         if (!cancelled && data?.signedUrl) setEditSignedUrl(data.signedUrl);
       });
     return () => {
       cancelled = true;
     };
-  }, [editingId, editResource]);
+  }, [editingId, editFilePath]);
 
   const typeIcons: Record<string, React.ElementType> = {
     file: FileDown,

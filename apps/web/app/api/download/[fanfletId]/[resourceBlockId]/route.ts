@@ -62,7 +62,7 @@ export async function GET(
   }
 
   // Handle potential array from join
-  const rawLib = (row as any).resource_library
+  const rawLib = (row as Record<string, unknown>).resource_library
   const lib = Array.isArray(rawLib) ? rawLib[0] : rawLib
   const typedRow = {
     ...row,

@@ -382,24 +382,23 @@ export function ResourceLibrary({
   const editResource = resources.find((r) => r.id === editingId) || null;
 
   const editFilePath = editResource?.type === "file" ? editResource.file_path : null;
+  const shouldFetchSignedUrl = !!editingId && !!editFilePath;
 
   useEffect(() => {
-    if (!editingId || !editFilePath) {
-      setEditSignedUrl(null);
-      return;
-    }
+    if (!shouldFetchSignedUrl) return;
     let cancelled = false;
+    setEditSignedUrl(null);
     const supabase = createClient();
     supabase.storage
       .from(STORAGE_BUCKET)
-      .createSignedUrl(editFilePath, 3600)
+      .createSignedUrl(editFilePath!, 3600)
       .then(({ data }) => {
         if (!cancelled && data?.signedUrl) setEditSignedUrl(data.signedUrl);
       });
     return () => {
       cancelled = true;
     };
-  }, [editingId, editFilePath]);
+  }, [shouldFetchSignedUrl, editFilePath]);
 
   const typeIcons: Record<string, React.ElementType> = {
     file: FileDown,

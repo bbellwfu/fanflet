@@ -23,6 +23,7 @@
 - [Section 10: Developer Experience & Code Quality](#section-10-developer-experience--code-quality)
 - [Section 11: Observability & Monitoring](#section-11-observability--monitoring)
 - [Section 12: Architecture Maturity & When to Split](#section-12-architecture-maturity--when-to-split)
+- [Section 13: Secrets Management, Machine Hygiene & Bus Factor](#section-13-secrets-management-machine-hygiene--bus-factor)
 - [Appendix: Ship Checklists](#appendix-ship-checklists)
 
 ---
@@ -685,6 +686,162 @@ Monitor these endpoints with an external uptime service (UptimeRobot, Checkly, P
 | Database monitoring | Query performance, connections, storage | Your database provider's dashboard |
 | Security monitoring | Failed logins, suspicious activity | Auth provider logs, custom alerts |
 | Log aggregation | Centralized search and alerting | Datadog, Logflare, CloudWatch |
+
+---
+
+## Section 13: Secrets Management, Machine Hygiene & Bus Factor
+
+### Why This Section Exists
+
+A solo founder or small team has a single point of failure: the person who set everything up. If that person's laptop dies, their account gets locked, or they're unavailable, can someone else keep the product running? This section covers secrets management, local machine practices, and operational continuity — the things that don't feel urgent until they are.
+
+### Secrets Management
+
+#### The Hierarchy of Secrets
+
+Not all secrets are equal. Classify them by blast radius:
+
+| Tier | Examples | Compromise Impact | Storage |
+|------|----------|-------------------|---------|
+| **Critical** | Supabase service role key, database password, Supabase JWT secret | Full data access, bypass all RLS | Deployment platform only (Vercel env vars, server-only scope) |
+| **High** | Twilio auth token, Resend API key, Anthropic API key | Can send messages/emails/AI calls as you, incur costs | Deployment platform only |
+| **Medium** | Supabase anon key, `NEXT_PUBLIC_*` vars | Public by design, but scope abuse possible | Deployment platform + `.env.local` |
+| **Low** | GitHub PATs (scoped), MCP OAuth client secrets | Scoped access, revocable | Deployment platform, 1Password/Bitwarden |
+
+#### Rules
+
+1. **Never commit secrets to git.** Even in a private repo. Git history is forever — `git filter-branch` is unreliable and painful. Use `.env.local` (gitignored) for local development, deployment platform env vars for staging/production.
+
+2. **Never put critical secrets in `NEXT_PUBLIC_*` variables.** These are embedded in client-side JavaScript bundles and visible to anyone who opens browser DevTools. Only the Supabase anon key and site URL belong in `NEXT_PUBLIC_*`.
+
+3. **Use a password manager for all credentials.** 1Password, Bitwarden, or equivalent. Every API key, every login, every recovery code. The password manager is your single source of truth — not a `.env` file on your laptop, not a Slack message, not your memory.
+
+4. **Rotate secrets on a schedule.** At minimum: when someone leaves the team, when a secret may have been exposed, and annually for long-lived keys. Document the rotation procedure for each secret (where to generate a new one, where to update it).
+
+5. **Scope API keys to minimum required permissions.** A GitHub PAT should have only the permissions it needs. A Supabase service role key should only exist in server-side code. Twilio keys should be restricted to the specific phone numbers in use.
+
+#### Where Secrets Should Live
+
+| Environment | Secret Storage | Access |
+|-------------|---------------|--------|
+| **Local development** | `.env.local` (gitignored) + password manager | Developer's machine only |
+| **CI (GitHub Actions)** | Repository secrets or environment secrets | Encrypted, injected at runtime |
+| **Staging (Vercel)** | Project environment variables, Preview scope | Vercel dashboard, team members |
+| **Production (Vercel)** | Project environment variables, Production scope | Vercel dashboard, restricted to admins |
+
+#### Secret Inventory
+
+Maintain a living inventory of every secret the platform uses. Store this in your password manager, not in the repo.
+
+| Secret | Provider | Where Used | Rotation URL | Notes |
+|--------|----------|------------|-------------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase | Client + server | Supabase dashboard → Settings → API | Public, non-sensitive |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase | Client + server | Supabase dashboard → Settings → API | Public, RLS-scoped |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Server only (admin ops) | Supabase dashboard → Settings → API | **Critical** — bypasses RLS |
+| `SUPABASE_JWT_SECRET` | Supabase | Server only (MCP auth) | Supabase dashboard → Settings → API | **Critical** — validates JWTs |
+| `TWILIO_ACCOUNT_SID` | Twilio | Server only (SMS) | Twilio console → Account Info | |
+| `TWILIO_AUTH_TOKEN` | Twilio | Server only (SMS) | Twilio console → Account Info | Regeneratable |
+| `TWILIO_PHONE_NUMBER` | Twilio | Server only (SMS) | Twilio console → Phone Numbers | |
+| `RESEND_API_KEY` | Resend | Server only (email) | Resend dashboard → API Keys | |
+| `ANTHROPIC_API_KEY` | Anthropic | Admin server only (demo AI) | Anthropic console → API Keys | |
+| GitHub PATs | GitHub | CI workflows | GitHub → Settings → Developer settings → PATs | Scope to minimum permissions |
+
+### Local Development Machine
+
+#### What's on Your Laptop That Isn't in the Cloud
+
+Your local machine contains things that don't exist anywhere else. Identify and protect them:
+
+| Item | Risk if Lost | Mitigation |
+|------|-------------|------------|
+| **`.env.local` files** | Can't run the app locally until recreated | Store all values in password manager. Document which env vars each app needs in `.env.example`. |
+| **SSH keys** | Lose git push access, server access | Back up private keys to password manager. Or: use per-machine keys and just generate new ones. |
+| **GPG keys** (if signing commits) | Lose verified commit ability | Back up to password manager. Or: use SSH signing instead. |
+| **Browser sessions / cookies** | Lose access to Supabase dashboard, Vercel, GitHub, etc. | All behind password manager + 2FA. Recoverable from any machine. |
+| **Uncommitted code** | Lose work in progress | Push WIP branches frequently. Use `git stash` for quick saves. |
+| **Local database state** | Lose test data | Supabase is remote — local state is just a dev convenience, not critical. |
+| **IDE settings / extensions** | Lose productivity setup | VS Code: Settings Sync. Cursor: exports. Low-priority — recreatable in an hour. |
+
+#### Backup Strategy
+
+| Layer | Tool | What It Covers | Frequency |
+|-------|------|---------------|-----------|
+| **Full machine backup** | Time Machine (macOS) | Everything on disk — code, config, documents, apps | Continuous (hourly) |
+| **Off-site backup** | iCloud Drive, Backblaze, or similar | Recovery from theft, fire, hardware failure | Continuous |
+| **Code** | GitHub | All committed code, branches, PRs, issues | Every push |
+| **Secrets** | 1Password / Bitwarden | API keys, passwords, recovery codes, SSH keys | Synced to cloud automatically |
+| **Database** | Supabase automatic backups | All production data | Daily (Supabase Pro) or point-in-time recovery |
+
+**The test:** If your laptop caught fire right now, could you buy a new one and be fully operational within 4 hours? If yes, your backup strategy is adequate.
+
+Checklist for the "new laptop" scenario:
+1. Install password manager → all credentials restored
+2. Install git, clone repo → all code restored
+3. Copy `.env.local` values from password manager → local dev working
+4. Log into Vercel, Supabase, GitHub via password manager → cloud access restored
+5. Install IDE + extensions → productivity restored
+
+#### macOS-Specific Recommendations
+
+- **FileVault disk encryption:** Enable it. Non-negotiable. A stolen laptop with an unencrypted disk is a full data breach.
+- **Firmware password / Find My Mac:** Enable both. Remote wipe capability if the machine is stolen.
+- **Automatic updates:** Keep macOS and Xcode command line tools updated. Security patches matter.
+- **Don't store secrets in plain text files.** No `passwords.txt` on the desktop. No API keys in Notes.app. Password manager only.
+
+### Bus Factor: Operational Continuity
+
+The "bus factor" is the number of people who, if unavailable, would halt the project. For a solo founder, it's 1. The goal is to make that number irrelevant by ensuring everything is documented and accessible.
+
+#### Access Inventory
+
+Document every system the platform depends on, who has access, and how to grant it to someone new:
+
+| System | Purpose | Access Method | Recovery Path |
+|--------|---------|---------------|---------------|
+| **GitHub** (bbellwfu/fanflet) | Source code, CI, issues | GitHub account + 2FA | Add collaborator via GitHub settings. Org account preferred over personal. |
+| **Vercel** (fanflet project) | Hosting, deployments, env vars | Vercel account + 2FA | Add team member via Vercel dashboard. Use a Vercel Team, not a personal account. |
+| **Supabase** (project: eoihlmxmbtzsixoapgif) | Database, auth, storage, RLS | Supabase account + 2FA | Add team member via Supabase Org settings. Service role key in password manager. |
+| **Domain registrar** | DNS for fanflet.com | Registrar account + 2FA | Transfer or add collaborator. Document the registrar and account. |
+| **Twilio** | SMS sending | Twilio account + 2FA | Add team member via Twilio console. |
+| **Resend** | Email sending | Resend account + 2FA | Add team member via Resend dashboard. |
+| **Apple Developer** (if applicable) | App Store, signing | Apple ID + 2FA | Add to team via App Store Connect. |
+
+#### Critical Actions Someone Else Must Be Able To Do
+
+If you're unavailable, another person must be able to:
+
+| Action | How | Documented Where |
+|--------|-----|-----------------|
+| **Deploy a hotfix** | Push to `develop` → auto-deploys to staging. Merge to `main` → auto-deploys to production. | This memo + CLAUDE.md |
+| **Roll back a broken deploy** | Vercel dashboard → Deployments → promote previous deployment | Vercel docs |
+| **Access production database** | Supabase dashboard → SQL Editor (requires Supabase org access) | Password manager |
+| **Rotate a compromised secret** | Generate new key at provider → update in Vercel env vars → redeploy | Secret inventory above |
+| **Apply a database migration** | Push migration file to `develop` or `main` → `migrate.yml` workflow runs automatically | CLAUDE.md, `supabase/migrations/README.md` |
+| **Access error logs** | Vercel dashboard → Deployments → Runtime Logs; Supabase → Logs | — |
+| **Send a platform communication** | Admin portal → Communications → New | Admin app UI |
+
+#### Recommended Steps (Do These Now)
+
+1. **Use organization accounts, not personal accounts.** Create a Vercel Team, a Supabase Organization, and a GitHub Organization. Personal accounts die with the person (or their email access). Org accounts can have multiple owners.
+
+2. **Add a trusted second person to every critical system.** Even if they're not actively developing, they need the ability to log in and take action. A co-founder, a trusted advisor, or a contracted DevOps person.
+
+3. **Store recovery codes in your password manager.** Every 2FA-enabled account generates recovery codes. If you lose your phone and your laptop simultaneously, recovery codes are the only way back in. They must be in a cloud-synced password manager, not on the devices they're protecting.
+
+4. **Document the "emergency runbook."** A single document (stored in the password manager, not in the repo) that says: "If Brian is unavailable, here's how to keep Fanflet running." Include: account credentials (or paths to them in the password manager), how to deploy, how to roll back, who to contact at each provider for account recovery.
+
+5. **Test the runbook.** Have your second person actually log into each system and perform a non-destructive action (view a deployment, run a read-only SQL query). An untested runbook is a fiction.
+
+#### Password Manager as the Keystone
+
+Everything above converges on one tool: your password manager. It is the single point of recovery for every other system. Protect it accordingly:
+
+- Use a strong, unique master password (20+ characters, memorized, written nowhere digital)
+- Enable 2FA on the password manager itself (TOTP, not SMS)
+- Store the emergency kit / recovery key in a physical location (safe deposit box, sealed envelope with a trusted person)
+- Use the password manager's sharing features to grant access to specific vaults for your second person
+
+If your password manager is secure, accessible, and shared appropriately, every other system is recoverable.
 
 ---
 

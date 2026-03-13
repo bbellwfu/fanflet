@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { loadSponsorEntitlements } from "@fanflet/db";
 import { getStorageQuota } from "@fanflet/db/storage";
 import Link from "next/link";
@@ -44,7 +45,7 @@ export default async function SponsorLibraryPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Library</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Resource Library</h1>
           <p className="text-muted-foreground mt-1">
             Upload and manage content for your connected {speakerLabel}s.
           </p>
@@ -52,7 +53,7 @@ export default async function SponsorLibraryPage() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
           <p className="font-medium text-amber-900">Upgrade to Pro or Enterprise</p>
           <p className="text-sm text-amber-800 mt-1">
-            The Library lets you upload files and links that connected {speakerLabel}s can add to their fanflets. Upgrade your plan to unlock it.
+            The Resource Library lets you upload files and links that connected {speakerLabel}s can add to their fanflets. Upgrade your plan to unlock it.
           </p>
           <Link
             href="/sponsor/settings"
@@ -74,14 +75,16 @@ export default async function SponsorLibraryPage() {
         </p>
       </div>
 
-      <SponsorLibraryClient
-        resources={resources}
-        storageUsedBytes={storageUsedBytes}
-        storageLimitMb={quota.storageMb}
-        maxFileMb={100}
-        campaigns={campaigns}
-        speakerLabel={speakerLabel}
-      />
+      <Suspense fallback={<div className="h-32 flex items-center justify-center text-sm text-muted-foreground">Loading library...</div>}>
+        <SponsorLibraryClient
+          resources={resources}
+          storageUsedBytes={storageUsedBytes}
+          storageLimitMb={quota.storageMb}
+          maxFileMb={100}
+          campaigns={campaigns}
+          speakerLabel={speakerLabel}
+        />
+      </Suspense>
     </div>
   );
 }

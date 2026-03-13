@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const ROLE_ROUTE_MAP: Record<string, string[]> = {
   speaker: ["/dashboard"],
-  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/integrations", "/sponsor/settings"],
+  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/integrations", "/sponsor/settings", "/sponsor/campaigns", "/sponsor/library"],
   audience: ["/my"],
 };
 
@@ -91,6 +91,8 @@ export async function updateSession(request: NextRequest) {
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/sponsor/dashboard") ||
+    pathname.startsWith("/sponsor/campaigns") ||
+    pathname.startsWith("/sponsor/library") ||
     pathname.startsWith("/sponsor/onboarding") ||
     pathname.startsWith("/sponsor/leads") ||
     pathname.startsWith("/sponsor/connections") ||

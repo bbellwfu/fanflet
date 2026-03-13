@@ -148,10 +148,15 @@ interface FanfletEditorProps {
     title: string;
     description: string | null;
     url: string | null;
+    file_path: string | null;
     file_type: string | null;
     file_size_bytes: number | null;
     image_url: string | null;
+    campaign_id: string | null;
+    campaign_name: string | null;
   }[];
+  /** IDs of sponsor library items already placed on this fanflet — used for "already added" state in catalog. */
+  placedSponsorLibraryIds?: Set<string>;
 }
 
 /** Shown when a block's library source was deleted. No edit UI — only remove to avoid error-prone state. */
@@ -218,6 +223,7 @@ export function FanfletEditor({
   connectedSponsors = [],
   endedSponsors = [],
   sponsorCatalogItems = [],
+  placedSponsorLibraryIds = new Set<string>(),
 }: FanfletEditorProps) {
   const router = useRouter();
   const timezone = useTimezone();
@@ -1064,6 +1070,7 @@ export function FanfletEditor({
             allowSponsorVisibility={allowSponsorVisibility}
             connectedSponsors={connectedSponsors}
             sponsorCatalogItems={sponsorCatalogItems}
+            placedSponsorLibraryIds={placedSponsorLibraryIds}
           />
         </div>
       </div>

@@ -548,8 +548,23 @@ export async function addSponsorLibraryBlockToFanflet(
     .single()
 
   if (libError || !libItem) return { error: 'Sponsor resource not found' }
-  if (libItem.status !== 'available' && libItem.status !== 'unpublished') {
+  if (libItem.status !== 'published') {
     return { error: 'This resource is not available for placement' }
+  }
+
+  // Map sponsor library types to the resource_blocks allowed set:
+  //   resource_blocks.type CHECK: ('link', 'file', 'embed', 'text', 'sponsor')
+  //   sponsor_resource_library.type: ('file', 'link', 'video', 'sponsor_block')
+  // Reject unknown types rather than letting the DB surface a raw constraint error.
+  const SPONSOR_TYPE_MAP: Record<string, string> = {
+    file: 'file',
+    link: 'link',
+    video: 'link',          // video resources are URL-based; render as a link block
+    sponsor_block: 'sponsor', // sponsor_block maps to the sponsor block type
+  }
+  const blockType = SPONSOR_TYPE_MAP[libItem.type]
+  if (!blockType) {
+    return { error: `Unsupported sponsor resource type: ${libItem.type}` }
   }
 
   const { data: conn } = await supabase
@@ -573,11 +588,11 @@ export async function addSponsorLibraryBlockToFanflet(
 
   const insertPayload = {
     fanflet_id: fanfletId,
-    type: libItem.type,
+    type: blockType,
     title: libItem.title,
     description: libItem.description,
     url: libItem.url,
-    file_path: libItem.type === 'file' ? null : libItem.file_path,
+    file_path: blockType === 'file' ? null : libItem.file_path,
     image_url: libItem.image_url,
     display_order: nextOrder,
     section_name: 'Resources',
@@ -597,6 +612,7 @@ export async function addSponsorLibraryBlockToFanflet(
   revalidatePath(`/dashboard/fanflets/${fanfletId}`)
   return { success: true, id: block.id }
 }
+
 
 export async function reorderBlock(
   blockId: string,

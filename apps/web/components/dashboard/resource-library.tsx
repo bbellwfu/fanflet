@@ -51,6 +51,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
   requestUploadSlot,
   confirmUpload,
   cancelUploadSlot,
@@ -58,6 +74,9 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { STORAGE_BUCKET, isAllowedFileType, ALLOWED_EXTENSIONS, formatFileSize, extractFilename } from "@fanflet/db/storage";
 import { StorageQuotaBar } from "./storage-quota-bar";
+import { ResourceCardB } from "@/app/(sponsor)/sponsor/(dashboard)/components/ResourceCardB";
+import type { SponsorCatalogResource } from "@/app/dashboard/resources/actions";
+import { addSponsorResourceToFanflet } from "@/app/dashboard/sponsor-connections/actions";
 import { toast } from "sonner";
 import { formatDate } from "@fanflet/db/timezone";
 import { useTimezone } from "@/lib/timezone-context";
@@ -179,6 +198,7 @@ const blockTypes = [
 
 interface ResourceLibraryProps {
   resources: LibraryResource[];
+  sponsorResources?: SponsorCatalogResource[];
   authUserId: string;
   allowSponsorVisibility?: boolean;
   storageUsedBytes: number;
@@ -186,10 +206,90 @@ interface ResourceLibraryProps {
   maxFileMb: number;
   connectedSponsors?: { id: string; company_name: string }[];
   endedSponsors?: { id: string; company_name: string; ended_at: string }[];
+  speakerFanflets?: { id: string; title: string; status: string }[];
+}
+
+function AddToFanfletButton({
+  item,
+  fanflets,
+}: {
+  item: SponsorCatalogResource;
+  fanflets: { id: string; title: string; status: string }[];
+}) {
+  const router = useRouter();
+  const [adding, setAdding] = useState<string | null>(null);
+
+  async function handleAdd(fanfletId: string, fanfletTitle: string) {
+    setAdding(fanfletId);
+    const result = await addSponsorResourceToFanflet(fanfletId, item.id);
+    setAdding(null);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(
+        <span>
+          Added <strong>{item.title || "resource"}</strong> to{" "}
+          <strong>{fanfletTitle}</strong>.
+        </span>
+      );
+      router.refresh();
+    }
+  }
+
+  const isLoading = adding !== null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-none shadow-none font-medium text-[11px] h-8 px-3"
+          disabled={isLoading || fanflets.length === 0}
+        >
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <Plus className="w-3 h-3" />
+              Add to Fanflet
+            </>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>Select Fanflet</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {fanflets.length === 0 ? (
+          <div className="py-2 px-2 text-sm text-slate-500 text-center">
+            No active fanflets found.
+          </div>
+        ) : (
+          fanflets.map((f) => (
+            <DropdownMenuItem
+              key={f.id}
+              onClick={() => handleAdd(f.id, f.title)}
+              className="cursor-pointer"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium text-slate-900 truncate max-w-[180px]">
+                  {f.title}
+                </span>
+                <span className="text-[10px] text-slate-500 uppercase">
+                  {f.status}
+                </span>
+              </div>
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function ResourceLibrary({
   resources,
+  sponsorResources = [],
   authUserId,
   allowSponsorVisibility = true,
   storageUsedBytes,
@@ -197,6 +297,7 @@ export function ResourceLibrary({
   maxFileMb,
   connectedSponsors = [],
   endedSponsors = [],
+  speakerFanflets = [],
 }: ResourceLibraryProps) {
   const resourceTypes = allowSponsorVisibility ? blockTypes : blockTypes.filter((t) => t.type !== "sponsor");
   const timezone = useTimezone();
@@ -208,6 +309,8 @@ export function ResourceLibrary({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; resource: LibraryResource } | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") === "sponsor" ? "sponsor-resources" : "my-resources");
+  const [sponsorFilter, setSponsorFilter] = useState<string>(searchParams.get("sponsorId") || "all");
 
   // Add form state
   const [title, setTitle] = useState("");
@@ -271,10 +374,20 @@ export function ResourceLibrary({
   const [editUrl, setEditUrl] = useState("");
   const [editSectionName, setEditSectionName] = useState("");
   const [editImageUrl, setEditImageUrl] = useState("");
-  const [editMetadata, setEditMetadata] = useState<Record<string, unknown>>({});
   const [editDefaultSponsorId, setEditDefaultSponsorId] = useState<string>("");
+  const [editMetadata, setEditMetadata] = useState<Record<string, unknown> | null>(null);
 
-  const resetForm = useCallback(() => {
+  // Power the active Sheet edit state
+  const editResource = resources.find((r) => r.id === editingId) || null;
+
+  const typeIcons: Record<string, React.ElementType> = {
+    file: FileDown,
+    text: Type,
+    link: Link2,
+    sponsor: Building2,
+  };
+
+  const resetForm = () => {
     setSelectedType(null);
     setTitle("");
     setDescription("");
@@ -288,7 +401,7 @@ export function ResourceLibrary({
     setUploadedLibraryItemId(null);
     setUploadProgress(0);
     setShowAddForm(false);
-  }, []);
+  };
 
   const handleImageUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -502,7 +615,7 @@ export function ResourceLibrary({
       url: editUrl || undefined,
       image_url: editImageUrl || undefined,
       section_name: editSectionName || undefined,
-      metadata: Object.keys(editMetadata).length ? editMetadata : undefined,
+      metadata: editMetadata && Object.keys(editMetadata).length > 0 ? editMetadata : undefined,
       default_sponsor_account_id: editDefaultSponsorId || null,
     });
     setSaving(false);
@@ -563,6 +676,487 @@ export function ResourceLibrary({
 
   return (
     <>
+      <Sheet open={showAddForm} onOpenChange={(open) => {
+        if (!open) {
+          setShowAddForm(false);
+          resetForm();
+        }
+      }}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>Add to Library</SheetTitle>
+            <SheetDescription>
+              {!selectedType ? "Choose a resource type to add." : `Add ${resourceTypes.find((b) => b.type === selectedType)?.label}`}
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {!selectedType ? (
+              <div className="grid grid-cols-2 gap-4">
+                {resourceTypes.map(({ type, label, icon: Icon }) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setSelectedType(type);
+                      if (type === "sponsor") setSectionName("Featured Partners");
+                    }}
+                    className="flex flex-col items-center gap-3 p-6 rounded-xl border border-slate-200 bg-white hover:border-[#3BA5D9] hover:shadow-sm transition-all text-slate-700 hover:text-[#3BA5D9]"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-inherit mb-1">
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <span className="text-sm font-medium text-inherit">{label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {!showFile && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">
+                      {selectedType === "sponsor" ? "Sponsor Name" : "Title"}
+                    </Label>
+                    <Input
+                      id="new-resource-title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={selectedType === "sponsor" ? "Acme Health" : "My Website"}
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {showUrl && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">URL</Label>
+                    <Input
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://..."
+                      type="url"
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {(selectedType === "link" || selectedType === "sponsor") && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Description</Label>
+                    <Input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Optional description"
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {selectedType === "sponsor" && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">CTA Text</Label>
+                    <Input
+                      value={sponsorCta}
+                      onChange={(e) => setSponsorCta(e.target.value)}
+                      placeholder="Learn More"
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {connectedSponsors.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Attribute to a connected sponsor</Label>
+                    <Select
+                      value={defaultSponsorId || "none"}
+                      onValueChange={(v) => setDefaultSponsorId(v === "none" ? "" : v)}
+                    >
+                      <SelectTrigger className="bg-white border-[#e2e8f0]">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {connectedSponsors.filter((s) => s?.id).map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">
+                      When you add this resource to a Fanflet, the block will be attributed to this sponsor by default.
+                    </p>
+                  </div>
+                )}
+
+                {(selectedType === "link" || selectedType === "sponsor") && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">
+                      {selectedType === "sponsor" ? "Logo Image" : "Thumbnail Image"}{" "}
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    {imageUrl ? (
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imageUrl}
+                          alt="Uploaded"
+                          className="h-12 w-auto max-w-[120px] object-contain rounded bg-slate-50"
+                        />
+                        <span className="text-xs text-emerald-600 font-medium flex-1">Uploaded</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setImageUrl("");
+                            if (imageInputRef.current) imageInputRef.current.value = "";
+                          }}
+                          className="text-xs text-muted-foreground hover:bg-slate-100"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="relative rounded-lg border border-slate-200 bg-white p-1">
+                        <Input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, setImageUrl)}
+                          disabled={imageUploading}
+                          className="border-0 shadow-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        />
+                        {imageUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/90 rounded-md">
+                            <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
+                            <span className="text-xs ml-2 text-slate-500">Uploading...</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {showContent && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Content</Label>
+                    <Textarea
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder="Your text content..."
+                      rows={6}
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {showFile && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-baseline mb-1">
+                      <Label className="font-medium">File</Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        Max {maxFileMb} MB. Accepted: PDF, PPTX, DOCX, XLSX, images, ZIP
+                      </p>
+                    </div>
+                    {uploadedLibraryItemId && fileName ? (
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white shadow-sm">
+                        <FileDown className="w-5 h-5 text-[#3BA5D9] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-slate-700 font-medium truncate block">{fileName}</span>
+                          {uploadProgress >= 100 && (
+                            <span className="text-[10px] text-emerald-600 font-medium">Uploaded successfully</span>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setFileName("");
+                            setUploadedLibraryItemId(null);
+                            setUploadProgress(0);
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                          className="text-xs text-muted-foreground hover:bg-slate-100"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="relative rounded-lg border border-slate-200 bg-white p-1">
+                        <Input
+                          ref={fileInputRef}
+                          type="file"
+                          accept={ALLOWED_EXTENSIONS.join(",")}
+                          onChange={handleFileUpload}
+                          disabled={fileUploading}
+                          className="border-0 shadow-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                        />
+                        {fileUploading && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/95 rounded-md gap-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
+                              <span className="text-sm font-medium text-slate-700">
+                                Uploading {fileName}...
+                              </span>
+                            </div>
+                            <div className="w-3/4 max-w-[200px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#3BA5D9] rounded-full transition-all duration-300"
+                                style={{ width: `${Math.max(uploadProgress, 5)}%` }}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCancelUpload}
+                              className="text-xs text-slate-500 hover:text-slate-800"
+                            >
+                              Cancel Upload
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {showFile && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      id="new-resource-title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={fileName || "e.g. Conference Slide Deck"}
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {showFile && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                    <Input
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="e.g. Slides from my talk at..."
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+
+                {!showFile && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">Section Name <span className="text-muted-foreground font-normal">(optional proxy)</span></Label>
+                    <Input
+                      value={sectionName}
+                      onChange={(e) => setSectionName(e.target.value)}
+                      placeholder="Resources"
+                      className="bg-white border-[#e2e8f0]"
+                    />
+                  </div>
+                )}
+                
+              </div>
+            )}
+          </div>
+          
+          <div className="px-6 py-4 border-t border-border bg-white sticky bottom-0 z-10 flex gap-2 justify-between items-center">
+            {selectedType ? (
+               <Button variant="ghost" size="sm" onClick={() => setSelectedType(null)} className="text-slate-500 hover:text-slate-800">
+                 Back
+               </Button>
+            ) : <div/>}
+
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowAddForm(false); resetForm(); }}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAdd}
+                disabled={!selectedType || saving || imageUploading || fileUploading}
+                className="bg-[#1B365D] hover:bg-[#152b4d] min-w-[80px]"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save to Library"}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!editingId && !!editResource} onOpenChange={(open) => { if (!open) setEditingId(null) }}>
+        <SheetContent side="right" className="w-[400px] sm:w-[540px] flex flex-col gap-0 p-0 overflow-hidden bg-slate-50">
+          <SheetHeader className="px-6 py-4 border-b border-border bg-white sticky top-0 z-10">
+            <SheetTitle>Edit Resource</SheetTitle>
+            <SheetDescription>
+              Update the details of your saved resource.
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="bg-white border-[#e2e8f0]"
+              />
+            </div>
+
+            {editResource?.type !== "text" && (
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Optional description"
+                  className="bg-white border-[#e2e8f0]"
+                />
+              </div>
+            )}
+
+            {(editResource?.type === "link" || editResource?.type === "sponsor") && (
+              <div className="space-y-2">
+                <Label>URL</Label>
+                <Input
+                  value={editUrl}
+                  onChange={(e) => setEditUrl(e.target.value)}
+                  placeholder="https://..."
+                  type="url"
+                  className="bg-white border-[#e2e8f0]"
+                />
+              </div>
+            )}
+
+            {editResource?.type === "sponsor" && (
+              <div className="space-y-2">
+                <Label>CTA Text</Label>
+                <Input
+                  value={(editMetadata?.cta_text as string) ?? "Learn More"}
+                  onChange={(e) =>
+                    setEditMetadata({ ...editMetadata, cta_text: e.target.value })
+                  }
+                  placeholder="Learn More"
+                  className="bg-white border-[#e2e8f0]"
+                />
+              </div>
+            )}
+
+            {(connectedSponsors.length > 0 || endedSponsors.length > 0) && (
+              <div className="space-y-2">
+                <Label>Attributed sponsor</Label>
+                {editDefaultSponsorId && endedSponsors.some((s) => s.id === editDefaultSponsorId) && (
+                  <p className="text-sm text-slate-600 rounded-md border border-slate-200 bg-slate-100 p-2">
+                    Connection ended on{" "}
+                    {formatDate(endedSponsors.find((s) => s.id === editDefaultSponsorId)!.ended_at, timezone)};
+                    no new data is sent to them. Choose None below to clear.
+                  </p>
+                )}
+                <Select
+                  value={editDefaultSponsorId || "none"}
+                  onValueChange={(v) => setEditDefaultSponsorId(v === "none" ? "" : v)}
+                >
+                  <SelectTrigger className="bg-white border-[#e2e8f0]">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {connectedSponsors.filter((s) => s?.id).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.company_name}
+                      </SelectItem>
+                    ))}
+                    {endedSponsors.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.company_name} (ended)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {editResource?.type === "text" && (
+              <div className="space-y-2">
+                <Label>Content</Label>
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={4}
+                  className="bg-white border-[#e2e8f0]"
+                />
+              </div>
+            )}
+
+            {(editResource?.type === "link" || editResource?.type === "sponsor") && (
+              <div className="space-y-2">
+                <Label>
+                  {editResource?.type === "sponsor" ? "Logo Image" : "Thumbnail Image"}{" "}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                {editImageUrl ? (
+                  <div className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={editImageUrl}
+                      alt="Uploaded"
+                      className="h-12 w-auto max-w-[120px] object-contain rounded bg-slate-50"
+                    />
+                    <span className="text-xs text-emerald-600 font-medium flex-1">Uploaded</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditImageUrl("")}
+                      className="text-xs text-muted-foreground hover:bg-slate-100"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-slate-200 bg-white p-1">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload(e, setEditImageUrl)}
+                      disabled={imageUploading}
+                      className="border-0 shadow-none file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Section Name <span className="text-muted-foreground font-normal">(optional mapping)</span></Label>
+              <Input
+                value={editSectionName}
+                onChange={(e) => setEditSectionName(e.target.value)}
+                placeholder="Resources"
+                className="bg-white border-[#e2e8f0]"
+              />
+            </div>
+            
+          </div>
+          
+          <div className="px-6 py-4 border-t border-border bg-white sticky bottom-0 z-10 flex gap-2 justify-end">
+            <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveEdit}
+              disabled={saving}
+              className="bg-[#1B365D] hover:bg-[#152b4d] min-w-[80px]"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -612,22 +1206,41 @@ export function ResourceLibrary({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Card className="border-slate-200">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {allowSponsorVisibility && (
+          <div className="flex justify-start mb-6 w-full overflow-x-auto pb-1">
+            <TabsList className="h-10 p-1 bg-white border border-slate-200 shadow-sm rounded-lg shrink-0">
+              <TabsTrigger 
+                value="my-resources" 
+                className="px-6 py-1.5 text-sm font-medium rounded-md data-[state=active]:bg-[#1B365D] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+              >
+                My Resources
+              </TabsTrigger>
+              <TabsTrigger 
+                value="sponsor-resources"
+                className="px-6 py-1.5 text-sm font-medium rounded-md data-[state=active]:bg-[#1B365D] data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+              >
+                Sponsor Resources
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        )}
+
+      <TabsContent value="my-resources" className="m-0 border-none p-0 outline-none">
+        <Card className="border-slate-200">
       <CardHeader className="flex flex-col gap-3 px-4 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-[#1B365D] flex items-center gap-2">
           <BookOpen className="w-5 h-5" />
           Your Resources
         </CardTitle>
-        {!showAddForm && (
-          <Button
-            size="sm"
-            onClick={() => setShowAddForm(true)}
-            className="bg-[#1B365D] hover:bg-[#152b4d]"
-          >
-            <Plus className="w-4 h-4 mr-1" />
-            Add Resource
-          </Button>
-        )}
+        <Button
+          size="sm"
+          onClick={() => setShowAddForm(true)}
+          className="bg-[#1B365D] hover:bg-[#152b4d]"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Add Resource
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4 px-4 sm:px-6">
         {/* Storage Quota Bar */}
@@ -640,494 +1253,18 @@ export function ResourceLibrary({
           </div>
         )}
 
-        {/* Add form */}
-        {showAddForm && !selectedType && (
-          <div className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
-            <div className="flex items-center gap-2 pb-3 border-b border-white/15">
-              <Plus className="w-4 h-4 text-[#3BA5D9]" />
-              <h3 className="text-sm font-semibold text-white">Add to Library</h3>
-            </div>
-            <p className="text-xs text-white/70">Choose a resource type</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {resourceTypes.map(({ type, label, icon: Icon }) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => {
-                    setSelectedType(type);
-                    if (type === "sponsor") setSectionName("Featured Partners");
-                  }}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-white/15 bg-white/10 hover:border-[#3BA5D9] hover:bg-white/15 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-medium text-white">{label}</span>
-                </button>
-              ))}
-            </div>
-            <Button
-              size="sm"
-              onClick={resetForm}
-              className="bg-slate-300 text-slate-700 hover:bg-slate-400 hover:text-slate-800 border-0"
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
-
-        {showAddForm && selectedType && (
-          <div id="resource-add-form" className="p-5 bg-[#1B365D] rounded-lg border border-[#1B365D] space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-white/15">
-              <div className="flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#3BA5D9]" />
-                <h3 className="text-sm font-semibold text-white">
-                  Add {resourceTypes.find((b) => b.type === selectedType)?.label} to Library
-                </h3>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedType(null)}
-                className="h-8 text-white/70 hover:text-white hover:bg-white/10"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {!showFile && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">
-                  {selectedType === "sponsor" ? "Sponsor Name" : "Title"}
-                </Label>
-                <Input
-                  id="new-resource-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={selectedType === "sponsor" ? "Acme Health" : "My Website"}
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {showUrl && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">URL</Label>
-                <Input
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://..."
-                  type="url"
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {(selectedType === "link" || selectedType === "sponsor") && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Description</Label>
-                <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description"
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {selectedType === "sponsor" && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">CTA Text</Label>
-                <Input
-                  value={sponsorCta}
-                  onChange={(e) => setSponsorCta(e.target.value)}
-                  placeholder="Learn More"
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {connectedSponsors.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Attribute to a connected sponsor</Label>
-                <Select
-                  value={defaultSponsorId || "none"}
-                  onValueChange={(v) => setDefaultSponsorId(v === "none" ? "" : v)}
-                >
-                  <SelectTrigger className="bg-white border-white/20">
-                    <SelectValue placeholder="None" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {connectedSponsors.filter((s) => s?.id).map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-white/60">
-                  When you add this resource to a Fanflet, the block will be attributed to this sponsor by default.
-                </p>
-              </div>
-            )}
-
-            {(selectedType === "link" || selectedType === "sponsor") && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">
-                  {selectedType === "sponsor" ? "Logo Image" : "Thumbnail Image"}{" "}
-                  <span className="text-white/50 font-normal">(optional)</span>
-                </Label>
-                {imageUrl ? (
-                  <div className="flex items-center gap-3 p-2 rounded-lg border border-white/20 bg-white/10">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageUrl}
-                      alt="Uploaded"
-                      className="h-12 w-auto max-w-[120px] object-contain rounded"
-                    />
-                    <span className="text-xs text-emerald-400 font-medium flex-1">Uploaded</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setImageUrl("");
-                        if (imageInputRef.current) imageInputRef.current.value = "";
-                      }}
-                      className="text-xs text-white/60 hover:text-white hover:bg-white/10"
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleImageUpload(e, setImageUrl)}
-                      disabled={imageUploading}
-                      className="bg-white border-white/20"
-                    />
-                    {imageUploading && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-md">
-                        <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
-                        <span className="text-xs ml-2 text-muted-foreground">Uploading...</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showContent && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Content</Label>
-                <Textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="Your text content..."
-                  rows={4}
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {showFile && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">File</Label>
-                <p className="text-[11px] text-white/50">
-                  Max {maxFileMb} MB. Accepted: PDF, PPTX, DOCX, XLSX, CSV, images, ZIP
-                </p>
-                {uploadedLibraryItemId && fileName ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 p-3 rounded-lg border border-white/20 bg-white/10">
-                      <FileDown className="w-5 h-5 text-emerald-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs text-emerald-400 font-medium truncate block">{fileName}</span>
-                        {uploadProgress >= 100 && (
-                          <span className="text-[10px] text-white/50">Uploaded successfully</span>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setFileName("");
-                          setUploadedLibraryItemId(null);
-                          setUploadProgress(0);
-                          if (fileInputRef.current) fileInputRef.current.value = "";
-                        }}
-                        className="text-xs text-white/60 hover:text-white hover:bg-white/10"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <Input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={ALLOWED_EXTENSIONS.join(",")}
-                      onChange={handleFileUpload}
-                      disabled={fileUploading}
-                      className="bg-white border-white/20"
-                    />
-                    {fileUploading && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 rounded-md gap-1">
-                        <div className="flex items-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin text-[#3BA5D9]" />
-                          <span className="text-xs text-muted-foreground">
-                            Uploading {fileName}...
-                          </span>
-                        </div>
-                        <div className="w-3/4 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-[#3BA5D9] rounded-full transition-all"
-                            style={{ width: `${Math.max(uploadProgress, 10)}%` }}
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleCancelUpload}
-                          className="text-[10px] text-slate-500 hover:text-slate-700 mt-0.5"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {showFile && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Title (optional)</Label>
-                <Input
-                  id="new-resource-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder={fileName || "e.g. Conference Slide Deck"}
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {showFile && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Description (optional)</Label>
-                <Input
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="e.g. Slides from my talk at..."
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            {!showFile && (
-              <div className="space-y-2">
-                <Label className="text-white/90 font-medium">Section Name</Label>
-                <Input
-                  value={sectionName}
-                  onChange={(e) => setSectionName(e.target.value)}
-                  placeholder="Resources"
-                  className="bg-white border-white/20 placeholder:text-slate-400"
-                />
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              <Button
-                size="sm"
-                onClick={handleAdd}
-                disabled={saving || imageUploading || fileUploading}
-                className="bg-[#3BA5D9] hover:bg-[#3BA5D9]/90 text-white"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save to Library"}
-              </Button>
-              <Button
-                size="sm"
-                onClick={resetForm}
-                className="bg-slate-300 text-slate-700 hover:bg-slate-400 hover:text-slate-800 border-0"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Resource list */}
-        {resources.length === 0 && !showAddForm && (
+        {resources.length === 0 && (
           <div className="text-center py-8 text-muted-foreground text-sm">
             No resources in your library yet. Add one to reuse across your Fanflets.
           </div>
         )}
 
-        {resources.map((r) => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {resources.map((r) => {
           const Icon = r.type === "file" && r.file_type
             ? getFileIcon(r.file_type)
             : typeIcons[r.type] ?? Link2;
-
-          if (editingId === r.id) {
-            return (
-              <div
-                key={r.id}
-                className="p-4 bg-slate-50 rounded-lg border border-[#3BA5D9]/40 space-y-3"
-              >
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="border-[#e2e8f0]"
-                  />
-                </div>
-                {r.type !== "text" && (
-                  <div className="space-y-2">
-                    <Label>Description</Label>
-                    <Input
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      placeholder="Optional description"
-                      className="border-[#e2e8f0]"
-                    />
-                  </div>
-                )}
-                {(r.type === "link" || r.type === "sponsor") && (
-                  <div className="space-y-2">
-                    <Label>URL</Label>
-                    <Input
-                      value={editUrl}
-                      onChange={(e) => setEditUrl(e.target.value)}
-                      placeholder="https://..."
-                      type="url"
-                      className="border-[#e2e8f0]"
-                    />
-                  </div>
-                )}
-                {r.type === "sponsor" && (
-                  <div className="space-y-2">
-                    <Label>CTA Text</Label>
-                    <Input
-                      value={(editMetadata?.cta_text as string) ?? "Learn More"}
-                      onChange={(e) =>
-                        setEditMetadata({ ...editMetadata, cta_text: e.target.value })
-                      }
-                      placeholder="Learn More"
-                      className="border-[#e2e8f0]"
-                    />
-                  </div>
-                )}
-                {(connectedSponsors.length > 0 || endedSponsors.length > 0) && (
-                  <div className="space-y-2">
-                    <Label>Attributed sponsor</Label>
-                    {editDefaultSponsorId && endedSponsors.some((s) => s.id === editDefaultSponsorId) && (
-                      <p className="text-sm text-slate-600 rounded-md border border-slate-200 bg-slate-50 p-2">
-                        Connection ended on{" "}
-                        {formatDate(endedSponsors.find((s) => s.id === editDefaultSponsorId)!.ended_at, timezone)};
-                        no new data is sent to them. Choose None below to clear.
-                      </p>
-                    )}
-                    <Select
-                      value={editDefaultSponsorId || "none"}
-                      onValueChange={(v) => setEditDefaultSponsorId(v === "none" ? "" : v)}
-                    >
-                      <SelectTrigger className="border-[#e2e8f0]">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {connectedSponsors.filter((s) => s?.id).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.company_name}
-                          </SelectItem>
-                        ))}
-                        {endedSponsors.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.company_name} (ended)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {r.type === "text" && (
-                  <div className="space-y-2">
-                    <Label>Content</Label>
-                    <Textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      rows={4}
-                      className="border-[#e2e8f0]"
-                    />
-                  </div>
-                )}
-                {(r.type === "link" || r.type === "sponsor") && (
-                  <div className="space-y-2">
-                    <Label>
-                      {r.type === "sponsor" ? "Logo Image" : "Thumbnail Image"}{" "}
-                      <span className="text-muted-foreground font-normal">(optional)</span>
-                    </Label>
-                    {editImageUrl ? (
-                      <div className="flex items-center gap-3 p-2 rounded-lg border border-slate-200 bg-slate-50">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={editImageUrl}
-                          alt="Uploaded"
-                          className="h-12 w-auto max-w-[120px] object-contain rounded"
-                        />
-                        <span className="text-xs text-emerald-600 font-medium flex-1">Uploaded</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditImageUrl("")}
-                          className="text-xs text-muted-foreground"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ) : (
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageUpload(e, setEditImageUrl)}
-                        disabled={imageUploading}
-                        className="border-[#e2e8f0]"
-                      />
-                    )}
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label>Section Name</Label>
-                  <Input
-                    value={editSectionName}
-                    onChange={(e) => setEditSectionName(e.target.value)}
-                    placeholder="Resources"
-                    className="border-[#e2e8f0]"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveEdit}
-                    disabled={saving}
-                    className="bg-[#1B365D] hover:bg-[#152b4d]"
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            );
-          }
 
           const preview =
             r.type === "text"
@@ -1139,60 +1276,43 @@ export function ResourceLibrary({
                 : r.description ?? r.url ?? "";
 
           return (
-            <div
+            <ResourceCardB
               key={r.id}
-              className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200 group"
-            >
-              {r.type === "file" ? (
-                <FileThumbnail
-                  filePath={r.file_path}
-                  fileType={r.file_type}
-                  title={r.title || "File"}
-                  fallbackIcon={Icon}
-                />
-              ) : r.image_url ? (
-                <div className="w-12 h-12 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={r.image_url}
-                    alt={r.title || "Resource"}
-                    className="w-full h-full object-contain p-0.5"
-                  />
-                </div>
-              ) : (
-                <div className="w-10 h-10 rounded-lg bg-[#1B365D]/10 flex items-center justify-center shrink-0 text-[#1B365D]">
-                  <Icon className="w-5 h-5" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase">
-                    {typeLabels[r.type] ?? r.type}
-                  </span>
-                  {r.section_name && (
-                    <span className="text-[10px] text-slate-400">
-                      &bull; {r.section_name}
-                    </span>
+              title={r.title || "Untitled"}
+              subtitle={preview || undefined}
+              type={r.type === "link" ? "link" : r.type === "video" ? "video" : r.type === "sponsor_block" || r.type === "sponsor" ? "sponsor" : "file"}
+              cornerLabel={r.section_name || typeLabels[r.type] || r.type}
+              thumbnailUrl={r.image_url ?? undefined}
+              fileSize={r.type === "file" ? (r.file_size_bytes ?? undefined) : undefined}
+              actions={[
+                <Button
+                  key="edit"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-none bg-slate-50 hover:bg-slate-100 border-r border-slate-200"
+                  onClick={() => handleStartEdit(r)}
+                  title="Edit"
+                >
+                  <Pencil className="w-4 h-4 text-slate-500" />
+                </Button>,
+                <Button
+                  key="delete"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-none bg-slate-50 hover:bg-red-50"
+                  onClick={() => handleDeleteClick(r.id, r)}
+                  disabled={deleting === r.id}
+                  title="Delete"
+                >
+                  {deleting === r.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 text-slate-500 hover:text-red-500" />
                   )}
-                  {r.file_size_bytes != null && r.file_size_bytes > 0 && (
-                    <span className="text-[10px] text-slate-400">
-                      &bull; {formatFileSize(r.file_size_bytes)}
-                    </span>
-                  )}
-                  {r.created_at && (
-                    <span className="text-[10px] text-slate-400" title="Upload date">
-                      &bull; {formatDate(r.created_at, timezone)}
-                    </span>
-                  )}
-                </div>
-                <p className="font-medium text-sm text-slate-900 truncate">{r.title || "Untitled"}</p>
-                {preview && (
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">
-                    {preview}
-                  </p>
-                )}
-                {/* Usage badges */}
-                <div className="flex items-center gap-3 mt-1.5">
+                </Button>
+              ]}
+              footerNode={
+                <div className="flex items-center gap-3">
                   {r.linked_fanflets_count > 0 ? (
                     <div
                       className="relative"
@@ -1212,7 +1332,7 @@ export function ResourceLibrary({
                         {r.linked_fanflets_count} fanflet{r.linked_fanflets_count !== 1 ? "s" : ""}
                       </button>
                       {openLinkedId === r.id && (r.linked_fanflets ?? []).length > 0 && (
-                        <div className="absolute left-0 top-full z-50 mt-1 min-w-[180px] max-w-[min(180px,calc(100vw-2rem))] rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                        <div className="absolute left-0 bottom-full z-50 mb-1 min-w-[180px] max-w-[min(180px,calc(100vw-2rem))] rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                           <p className="px-2 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
                             Linked to
                           </p>
@@ -1239,37 +1359,78 @@ export function ResourceLibrary({
                     </span>
                   )}
                 </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 opacity-100 transition-opacity shrink-0 sm:opacity-0 sm:group-hover:opacity-100">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleStartEdit(r)}
-                  className="gap-2"
-                >
-                  <Pencil className="w-4 h-4" />
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDeleteClick(r.id, r)}
-                  disabled={deleting === r.id}
-                  className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                >
-                  {deleting === r.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                  Delete
-                </Button>
-              </div>
-            </div>
+              }
+            />
           );
         })}
+        </div>
       </CardContent>
     </Card>
+      </TabsContent>
+
+      <TabsContent value="sponsor-resources" className="m-0 border-none p-0 outline-none">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-[#1B365D]">Sponsor Resources</h2>
+            <p className="text-sm text-slate-500 mt-1">Resources shared by your connected sponsors that you can add to Fanflets.</p>
+          </div>
+          
+          <div className="flex w-full sm:w-64">
+            <Select value={sponsorFilter} onValueChange={setSponsorFilter}>
+              <SelectTrigger className="bg-white border-slate-200">
+                <SelectValue placeholder="All Sponsors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Connected Sponsors</SelectItem>
+                {connectedSponsors.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.company_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {sponsorResources.length === 0 ? (
+          <Card className="border border-slate-200 bg-white shadow-sm flex items-center justify-center p-12 mt-6">
+            <div className="text-center max-w-sm">
+              <div className="w-12 h-12 bg-slate-100/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <BookOpen className="w-6 h-6 text-slate-300" />
+              </div>
+              <h3 className="text-lg font-medium text-slate-800">No resources available</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Your connected sponsors have not published any resources for you to use yet.
+              </p>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {sponsorResources
+              .filter(r => sponsorFilter === "all" || r.sponsor_id === sponsorFilter)
+              .map((resource) => (
+              <ResourceCardB
+                key={resource.id}
+                title={resource.title || "Untitled"}
+                subtitle={resource.campaign_name ? `Campaign: ${resource.campaign_name}` : "General"}
+                status="Published"
+                type={resource.type === "link" ? "link" : resource.type === "video" ? "video" : resource.type === "sponsor_block" ? "sponsor" : "file"}
+                cornerLabel={resource.type === "file" && resource.file_type ? resource.file_type.split("/")[1]?.toUpperCase() : undefined}
+                sponsorPill={resource.sponsor_name}
+                thumbnailUrl={resource.image_url ?? undefined}
+                fileSize={resource.file_size_bytes ?? undefined}
+                actions={[<AddToFanfletButton key="add" item={resource} fanflets={speakerFanflets} />]}
+              />
+            ))}
+            
+            {/* Empty state if filter yields zero results */}
+            {sponsorResources.filter(r => sponsorFilter === "all" || r.sponsor_id === sponsorFilter).length === 0 && (
+              <div className="col-span-1 md:col-span-2 lg:col-span-3 py-10 text-center">
+                <p className="text-slate-500 text-sm">No resources match the selected sponsor filter.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </TabsContent>
+      </Tabs>
     </>
   );
 }

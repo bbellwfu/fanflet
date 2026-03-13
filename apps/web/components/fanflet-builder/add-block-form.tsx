@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft, Info, Library } from "lucide-react";
+import { Link2, FileDown, Type, Building2, Plus, X, BookOpen, Copy, Link as LinkIcon, ArrowLeft, Info, Library, Search, Check } from "lucide-react";
 import { addResourceBlock, addLibraryBlockToFanflet, addSponsorLibraryBlockToFanflet } from "@/app/dashboard/fanflets/[id]/actions";
 import { requestUploadSlot, confirmUpload, cancelUploadSlot } from "@/app/dashboard/resources/upload-actions";
 import { createClient } from "@/lib/supabase/client";
@@ -101,6 +101,8 @@ const libraryTypeIcons: Record<string, typeof Link2> = {
   file: FileDown,
   text: Type,
   sponsor: Building2,
+  sponsor_block: Building2,
+  video: Link2,
 };
 
 const libraryTypeLabels: Record<string, string> = {
@@ -108,6 +110,8 @@ const libraryTypeLabels: Record<string, string> = {
   file: "File",
   text: "Text",
   sponsor: "Sponsor",
+  sponsor_block: "Sponsor Block",
+  video: "Video",
 };
 
 interface ConnectedSponsor {
@@ -134,10 +138,15 @@ interface AddBlockFormProps {
     title: string;
     description: string | null;
     url: string | null;
+    file_path: string | null;
     file_type: string | null;
     file_size_bytes: number | null;
     image_url: string | null;
+    campaign_id: string | null;
+    campaign_name: string | null;
   }[];
+  /** IDs of sponsor library items already placed on this fanflet. */
+  placedSponsorLibraryIds?: Set<string>;
 }
 
 export function AddBlockForm({
@@ -149,6 +158,7 @@ export function AddBlockForm({
   allowSponsorVisibility = true,
   connectedSponsors = [],
   sponsorCatalogItems = [],
+  placedSponsorLibraryIds = new Set(),
 }: AddBlockFormProps) {
   const blockTypes = allowSponsorVisibility
     ? ALL_BLOCK_TYPES
@@ -173,6 +183,14 @@ export function AddBlockForm({
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const sponsorCatalogRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the sponsor catalog panel into view when it opens
+  useEffect(() => {
+    if (showSponsorCatalog && sponsorCatalogRef.current) {
+      sponsorCatalogRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [showSponsorCatalog]);
 
   const reset = () => {
     setSelectedType(null);
@@ -413,71 +431,19 @@ export function AddBlockForm({
     );
   }
 
-  // Sponsor catalog picker view
+  // Sponsor catalog picker view — grouped by sponsor → campaign
   if (showSponsorCatalog && sponsorCatalogItems.length > 0) {
-    const bySponsor = connectedSponsors.map((s) => ({
-      sponsor: s,
-      items: sponsorCatalogItems.filter((i) => i.sponsor_id === s.id),
-    })).filter((g) => g.items.length > 0);
+    const bySponsor = connectedSponsors
+      .map((s) => ({ sponsor: s, items: sponsorCatalogItems.filter((i) => i.sponsor_id === s.id) }))
+      .filter((g) => g.items.length > 0);
     return (
-      <div className="rounded-lg border-2 border-teal-500/30 p-5 bg-[#1B365D] space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-white/15">
-          <div className="flex items-center gap-2">
-            <Library className="w-4 h-4 text-teal-400" />
-            <h3 className="text-sm font-semibold text-white">Sponsor catalog</h3>
-          </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={reset}
-            className="h-8 text-white/70 hover:text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-            Back
-          </Button>
-        </div>
-        <p className="text-sm leading-relaxed text-white/75">
-          Add content from your connected sponsors. These resources are owned by the sponsor and will stay in sync.
-        </p>
-        <div className="space-y-4">
-          {bySponsor.map(({ sponsor, items }) => (
-            <div key={sponsor.id}>
-              <p className="text-xs font-semibold text-white/60 uppercase tracking-wide mb-2">{sponsor.company_name}</p>
-              <div className="space-y-2">
-                {items.map((item) => {
-                  const Icon = libraryTypeIcons[item.type] ?? Link2;
-                  const isAdding = addingFromSponsorCatalog === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-3 p-3 rounded-md border bg-white/10 border-white/15"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-white/70">
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{item.title || "Untitled"}</p>
-                        {(item.description ?? item.url) && (
-                          <p className="text-sm text-white/70 truncate mt-0.5">{item.description ?? item.url ?? ""}</p>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        disabled={isAdding}
-                        onClick={() => handleAddFromSponsorCatalog(item.id)}
-                        className="h-8 text-sm bg-teal-500/80 hover:bg-teal-500 text-white border-0 gap-1.5"
-                      >
-                        {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                        Add
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <SponsorCatalogPicker
+        bySponsor={bySponsor}
+        placedSponsorLibraryIds={placedSponsorLibraryIds}
+        addingId={addingFromSponsorCatalog}
+        onAdd={handleAddFromSponsorCatalog}
+        onBack={reset}
+      />
     );
   }
 
@@ -865,6 +831,255 @@ export function AddBlockForm({
         <Button variant="outline" onClick={reset}>
           Cancel
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// Internal: SponsorCatalogPicker
+// ------------------------------------------------------------------
+
+function SponsorCatalogPicker({
+  bySponsor,
+  placedSponsorLibraryIds,
+  addingId,
+  onAdd,
+  onBack,
+}: {
+  bySponsor: { sponsor: ConnectedSponsor; items: NonNullable<AddBlockFormProps["sponsorCatalogItems"]> }[];
+  placedSponsorLibraryIds: Set<string>;
+  addingId: string | null;
+  onAdd: (id: string) => void;
+  onBack: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+
+  // Derive unique types across all sponsors for the filter chips
+  const allTypes = Array.from(new Set(bySponsor.flatMap(s => s.items.map(i => i.type))));
+
+  return (
+    <div className="rounded-lg border-2 border-teal-500/30 p-5 bg-[#1B365D] space-y-4">
+      <div className="flex items-center justify-between pb-3 border-b border-white/15">
+        <div className="flex items-center gap-2">
+          <Library className="w-4 h-4 text-teal-400" />
+          <h3 className="text-sm font-semibold text-white">Sponsor catalog</h3>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onBack}
+          className="h-8 text-white/70 hover:text-white hover:bg-white/10"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+          Back
+        </Button>
+      </div>
+
+      <p className="text-sm leading-relaxed text-white/75">
+        Add content from your connected sponsors. These resources are owned by the sponsor and will stay in sync.
+      </p>
+
+      {/* Search and Filters */}
+      <div className="space-y-3 pt-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+          <Input
+            placeholder="Search all sponsor resources..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-teal-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {allTypes.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setTypeFilter(null)}
+              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                typeFilter === null ? "bg-teal-500 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
+              }`}
+            >
+              All
+            </button>
+            {allTypes.map(t => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                  typeFilter === t ? "bg-teal-500 text-white" : "bg-white/10 text-white/70 hover:bg-white/20"
+                }`}
+              >
+                {libraryTypeLabels[t] || t}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-6 pt-2">
+        {bySponsor.map(({ sponsor, items }) => {
+          // Filter items by search / type
+          const filteredItems = items.filter(item => {
+            if (typeFilter && item.type !== typeFilter) return false;
+            if (!search) return true;
+            
+            const searchTerms = search.toLowerCase().split(/\s+/).filter(Boolean);
+            const searchableText = [
+              sponsor.company_name,
+              item.title,
+              item.description,
+              item.campaign_name,
+              libraryTypeLabels[item.type] ?? item.type
+            ].filter(Boolean).join(" ").toLowerCase();
+
+            return searchTerms.every(term => searchableText.includes(term));
+          });
+
+          if (filteredItems.length === 0) return null;
+
+          // Group by campaign within this sponsor
+          const byCampaign: Record<string, typeof filteredItems> = {};
+          for (const item of filteredItems) {
+            const cName = item.campaign_name || "General Resources";
+            if (!byCampaign[cName]) byCampaign[cName] = [];
+            byCampaign[cName].push(item);
+          }
+
+          return (
+            <div key={sponsor.id} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-white/40" />
+                <h4 className="text-sm font-bold text-white uppercase tracking-wide">
+                  {sponsor.company_name}
+                </h4>
+              </div>
+
+              <div className="pl-6 space-y-4">
+                {Object.entries(byCampaign).map(([campaignName, campaignItems]) => (
+                  <div key={campaignName} className="space-y-2">
+                    <p className="text-xs font-semibold text-white/60 mb-1 border-b border-white/10 pb-1">
+                      {campaignName}
+                    </p>
+                    <div className="space-y-2">
+                      {campaignItems.map((item) => {
+                        const Icon = libraryTypeIcons[item.type] ?? Link2;
+                        const isAdding = addingId === item.id;
+                        const alreadyAdded = placedSponsorLibraryIds.has(item.id);
+
+                        return (
+                          <div
+                            key={item.id}
+                            className={`flex items-start gap-3 p-3 rounded-md border ${
+                              alreadyAdded ? "bg-white/5 border-white/10 opacity-75" : "bg-white/10 border-white/15 hover:border-white/30 hover:bg-white/15"
+                            } transition-colors`}
+                          >
+                            {item.type === "file" ? (
+                              <LibraryFileThumbnail
+                                filePath={item.file_path || null}
+                                fileType={item.file_type}
+                                title={item.title || "File"}
+                                fallbackIcon={Icon}
+                              />
+                            ) : item.image_url ? (
+                              <div className="w-10 h-10 rounded-lg border border-white/20 bg-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={item.image_url}
+                                  alt={item.title || "Resource"}
+                                  className="w-full h-full object-contain p-0.5"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-white/70">
+                                <Icon className="w-4 h-4" />
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-0.5">
+                                <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                                  {libraryTypeLabels[item.type] ?? item.type}
+                                </span>
+                                {alreadyAdded && (
+                                  <span className="text-[10px] font-medium text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                    <Check className="w-3 h-3" />
+                                    Added
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm font-medium text-white line-clamp-1">{item.title || "Untitled"}</p>
+                              {(item.description ?? item.url) && (
+                                <p className="text-xs text-white/60 line-clamp-1 mt-0.5">{item.description ?? item.url ?? ""}</p>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              disabled={isAdding || alreadyAdded}
+                              onClick={() => onAdd(item.id)}
+                              className={`h-8 text-xs font-semibold gap-1.5 shrink-0 transition-colors ${
+                                alreadyAdded
+                                  ? "bg-white/10 text-white/50 hover:bg-white/10"
+                                  : "bg-teal-500 hover:bg-teal-400 text-white border-0 shadow-sm"
+                              }`}
+                            >
+                              {isAdding ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : alreadyAdded ? (
+                                <Check className="w-3.5 h-3.5" />
+                              ) : (
+                                <Plus className="w-3.5 h-3.5" />
+                              )}
+                              {alreadyAdded ? "Added" : "Add"}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Empty state when filtering */}
+        {bySponsor.every(s => s.items.filter(item => {
+          if (typeFilter && item.type !== typeFilter) return false;
+          if (!search) return true;
+          
+          const searchTerms = search.toLowerCase().split(/\s+/).filter(Boolean);
+          const searchableText = [
+            s.sponsor.company_name,
+            item.title,
+            item.description,
+            item.campaign_name,
+            libraryTypeLabels[item.type] ?? item.type
+          ].filter(Boolean).join(" ").toLowerCase();
+
+          return searchTerms.every(term => searchableText.includes(term));
+        }).length === 0) && (
+          <div className="text-center py-8">
+            <p className="text-sm text-white/50">No resources match your search.</p>
+            <Button
+              variant="link"
+              onClick={() => { setSearch(""); setTypeFilter(null); }}
+              className="text-teal-400 h-auto p-0 mt-2 hover:text-teal-300"
+            >
+              Clear filters
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

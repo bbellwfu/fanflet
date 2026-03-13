@@ -96,15 +96,62 @@ export default async function FanfletEditorPage({
 
   // Sponsor catalog: library items from connected sponsors (RLS filters by availability)
   const connectedSponsorIds = uniqueSponsors.map((s) => s.id);
-  const { data: sponsorCatalogItems } =
+  const catalogItemsRaw =
     connectedSponsorIds.length > 0
-      ? await supabase
+      ? (await supabase
           .from("sponsor_resource_library")
-          .select("id, sponsor_id, type, title, description, url, file_type, file_size_bytes, image_url")
+          .select("id, sponsor_id, type, title, description, url, file_path, file_type, file_size_bytes, image_url")
           .in("sponsor_id", connectedSponsorIds)
-          .eq("status", "available")
-          .order("created_at", { ascending: false })
-      : { data: [] };
+          .eq("status", "published")
+          .order("created_at", { ascending: false })).data ?? []
+      : [];
+
+  // Fetch explicitly assigned campaigns
+  const explicitCampaignIds = connectedSponsorIds.length > 0
+    ? ((await supabase
+        .from("sponsor_campaign_speakers")
+        .select("campaign_id")
+        .eq("speaker_id", speaker.id)).data ?? []).map((r) => r.campaign_id)
+    : [];
+
+  // Fetch campaign names for all connected sponsors
+  const campaignsRaw =
+    connectedSponsorIds.length > 0
+      ? (await supabase
+          .from("sponsor_campaigns")
+          .select("id, sponsor_id, name")
+          .in("sponsor_id", connectedSponsorIds)
+          .eq("status", "active")
+          .or(`all_speakers_assigned.eq.true${explicitCampaignIds.length ? `,id.in.(${explicitCampaignIds.join(",")})` : ""}`)).data ?? []
+      : [];
+  const campaignNameMap: Record<string, { sponsor_id: string; name: string }> = {};
+  for (const c of campaignsRaw) {
+    campaignNameMap[c.id] = { sponsor_id: c.sponsor_id, name: c.name };
+  }
+
+  // Fetch resource→campaign assignments for catalog items
+  const catalogItemIds = catalogItemsRaw.map((r) => r.id);
+  const resourceCampaignsRaw =
+    catalogItemIds.length > 0
+      ? (await supabase
+          .from("sponsor_resource_campaigns")
+          .select("resource_id, campaign_id")
+          .in("resource_id", catalogItemIds)).data ?? []
+      : [];
+  // resource_id → first campaign_id (a resource can be in multiple; use first active match)
+  const resourceCampaignMap: Record<string, string> = {};
+  for (const rc of resourceCampaignsRaw) {
+    if (!resourceCampaignMap[rc.resource_id] && campaignNameMap[rc.campaign_id]) {
+      resourceCampaignMap[rc.resource_id] = rc.campaign_id;
+    }
+  }
+
+  // Collect sponsor_library_item_ids already placed on this fanflet
+  const placedSponsorLibraryIds = new Set<string>(
+    (resourceBlocks ?? [])
+      .map((b) => (b as Record<string, unknown>).sponsor_library_item_id as string | null)
+      .filter(Boolean) as string[]
+  );
 
   const baseUrl = getSiteUrl();
   const publicUrl =
@@ -129,17 +176,25 @@ export default async function FanfletEditorPage({
       authUserId={user.id}
       surveyQuestions={surveyQuestions ?? []}
       libraryItems={libraryItems ?? []}
-      sponsorCatalogItems={(sponsorCatalogItems ?? []).map((r) => ({
-        id: r.id,
-        sponsor_id: r.sponsor_id,
-        type: r.type,
-        title: r.title,
-        description: r.description ?? null,
-        url: r.url ?? null,
-        file_type: r.file_type ?? null,
-        file_size_bytes: r.file_size_bytes ?? null,
-        image_url: r.image_url ?? null,
-      }))}
+      sponsorCatalogItems={catalogItemsRaw.map((r) => {
+        const campaignId = resourceCampaignMap[r.id] ?? null;
+        const campaign = campaignId ? campaignNameMap[campaignId] : null;
+        return {
+          id: r.id,
+          sponsor_id: r.sponsor_id,
+          type: r.type,
+          title: r.title,
+          description: r.description ?? null,
+          url: r.url ?? null,
+          file_path: r.file_path ?? null,
+          file_type: r.file_type ?? null,
+          file_size_bytes: r.file_size_bytes ?? null,
+          image_url: r.image_url ?? null,
+          campaign_id: campaignId,
+          campaign_name: campaign?.name ?? null,
+        };
+      })}
+      placedSponsorLibraryIds={placedSponsorLibraryIds}
       allowMultipleThemes={allowMultipleThemes}
       hasSurveys={hasSurveys}
       allowCustomExpiration={allowCustomExpiration}

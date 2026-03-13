@@ -40,7 +40,7 @@ export interface SponsorLibraryResource {
   file_type: string | null;
   image_url: string | null;
   media_metadata: Record<string, unknown> | null;
-  campaign_id: string | null;
+  campaign_ids: string[];
   availability: string;
   available_to: string[];
   status: string;
@@ -62,7 +62,7 @@ export async function listSponsorLibraryResources(): Promise<{
 
   const { data: items, error } = await supabase
     .from("sponsor_resource_library")
-    .select("id, sponsor_id, type, title, description, url, file_path, file_size_bytes, file_type, image_url, media_metadata, campaign_id, availability, available_to, status, created_at, updated_at")
+    .select("id, sponsor_id, type, title, description, url, file_path, file_size_bytes, file_type, image_url, media_metadata, availability, available_to, status, created_at, updated_at")
     .eq("sponsor_id", sponsorId)
     .order("created_at", { ascending: false });
 
@@ -70,14 +70,26 @@ export async function listSponsorLibraryResources(): Promise<{
 
   const ids = (items ?? []).map((r) => r.id);
   const placementCounts: Record<string, number> = {};
+  const campaignMap: Record<string, string[]> = {};
   if (ids.length > 0) {
-    const { data: blocks } = await supabase
-      .from("resource_blocks")
-      .select("sponsor_library_item_id")
-      .in("sponsor_library_item_id", ids);
-    for (const b of blocks ?? []) {
+    const [blocksRes, campaignsRes] = await Promise.all([
+      supabase
+        .from("resource_blocks")
+        .select("sponsor_library_item_id")
+        .in("sponsor_library_item_id", ids),
+      supabase
+        .from("sponsor_resource_campaigns")
+        .select("resource_id, campaign_id")
+        .in("resource_id", ids),
+    ]);
+    for (const b of blocksRes.data ?? []) {
       const id = (b as { sponsor_library_item_id: string | null }).sponsor_library_item_id;
       if (id) placementCounts[id] = (placementCounts[id] ?? 0) + 1;
+    }
+    for (const rc of campaignsRes.data ?? []) {
+      const row = rc as { resource_id: string; campaign_id: string };
+      if (!campaignMap[row.resource_id]) campaignMap[row.resource_id] = [];
+      campaignMap[row.resource_id].push(row.campaign_id);
     }
   }
 
@@ -85,6 +97,7 @@ export async function listSponsorLibraryResources(): Promise<{
     ...r,
     available_to: Array.isArray(r.available_to) ? r.available_to : [],
     media_metadata: (r.media_metadata as Record<string, unknown>) ?? null,
+    campaign_ids: campaignMap[r.id] ?? [],
     placement_count: placementCounts[r.id] ?? 0,
   }));
   return { data };
@@ -151,17 +164,15 @@ export async function updateSponsorLibraryResource(
     description?: string;
     url?: string;
     image_url?: string;
-    availability?: "all" | "specific" | "draft";
-    available_to?: string[];
-    status?: "draft" | "available" | "unpublished";
-    campaign_id?: string | null;
+    status?: "draft" | "published" | "archived";
+    campaign_ids?: string[];
   }
 ): Promise<{ error?: string }> {
   const { supabase, sponsorId, user } = await requireSponsor();
 
   const { data: existing } = await supabase
     .from("sponsor_resource_library")
-    .select("id, status, availability")
+    .select("id, status")
     .eq("id", id)
     .eq("sponsor_id", sponsorId)
     .single();
@@ -174,22 +185,16 @@ export async function updateSponsorLibraryResource(
   if (params.title !== undefined) update.title = params.title.trim();
   if (params.description !== undefined) update.description = params.description?.trim() ?? null;
   if (params.url !== undefined) update.url = params.url ? ensureUrl(params.url) : null;
-  if (params.image_url !== undefined) update.image_url = params.image_url ?? null;
-  if (params.availability !== undefined) update.availability = params.availability;
-  if (params.available_to !== undefined) update.available_to = params.available_to ?? [];
-  if (params.campaign_id !== undefined) update.campaign_id = params.campaign_id ?? null;
   if (params.status !== undefined) {
-    if (!["draft", "available", "unpublished"].includes(params.status)) {
+    if (!["draft", "published", "archived"].includes(params.status)) {
       return { error: "Invalid status." };
     }
     update.status = params.status;
-    // When making a resource "available", ensure it is visible in the speaker catalog:
-    // RLS requires status = 'available' AND (availability = 'all' OR availability = 'specific').
-    // If availability is still 'draft', set to 'all' so connected speakers see it.
-    if (params.status === "available" && params.availability === undefined && existing.availability === "draft") {
+    // When publishing, ensure availability is set so connected speakers can see it
+    if (params.status === "published") {
       update.availability = "all";
     }
-    const eventType = params.status === "available" ? "published" : params.status === "unpublished" ? "unpublished" : null;
+    const eventType = params.status === "published" ? "published" : params.status === "archived" ? "archived" : null;
     if (eventType) {
       await insertSponsorResourceEvent(supabase, sponsorId, user.id, id, eventType, null);
     }
@@ -202,6 +207,22 @@ export async function updateSponsorLibraryResource(
     .eq("sponsor_id", sponsorId);
 
   if (error) return { error: error.message };
+
+  // Sync campaign assignments via junction table
+  if (params.campaign_ids !== undefined) {
+    await supabase
+      .from("sponsor_resource_campaigns")
+      .delete()
+      .eq("resource_id", id);
+    const campaignIds = params.campaign_ids.filter(Boolean);
+    if (campaignIds.length > 0) {
+      const { error: insertErr } = await supabase
+        .from("sponsor_resource_campaigns")
+        .insert(campaignIds.map((campaign_id) => ({ resource_id: id, campaign_id })));
+      if (insertErr) return { error: insertErr.message };
+    }
+  }
+
   revalidatePath("/sponsor/library");
   return {};
 }
@@ -225,7 +246,7 @@ async function insertSponsorResourceEvent(
 
 export async function setSponsorLibraryStatus(
   id: string,
-  status: "available" | "unpublished"
+  status: "published" | "archived"
 ): Promise<{ error?: string }> {
   return updateSponsorLibraryResource(id, { status });
 }

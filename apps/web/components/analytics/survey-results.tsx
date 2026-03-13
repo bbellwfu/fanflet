@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Star, MessageSquare } from "lucide-react";
+import { Star, MessageSquare, ChevronDown, ChevronRight } from "lucide-react";
 
 export type SurveyResultData = {
   fanflet_id: string;
@@ -36,13 +36,62 @@ interface SurveyResultsProps {
   fanflets: FanfletOption[];
 }
 
+// ─── Aggregate by question_id ───────────────────────────────────────────────
+type AggregateRow = {
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  /** All responses pooled across every fanflet that uses this question */
+  responses: string[];
+  /** Individual per-fanflet data for the breakdown accordion */
+  byFanflet: Array<{
+    fanflet_id: string;
+    fanflet_title: string;
+    responses: string[];
+  }>;
+};
+
+function aggregateByQuestion(results: SurveyResultData[]): AggregateRow[] {
+  const map = new Map<string, AggregateRow>();
+  for (const r of results) {
+    const existing = map.get(r.question_id);
+    if (existing) {
+      existing.responses.push(...r.responses);
+      existing.byFanflet.push({
+        fanflet_id: r.fanflet_id,
+        fanflet_title: r.fanflet_title,
+        responses: r.responses,
+      });
+    } else {
+      map.set(r.question_id, {
+        question_id: r.question_id,
+        question_text: r.question_text,
+        question_type: r.question_type,
+        responses: [...r.responses],
+        byFanflet: [
+          {
+            fanflet_id: r.fanflet_id,
+            fanflet_title: r.fanflet_title,
+            responses: r.responses,
+          },
+        ],
+      });
+    }
+  }
+  return Array.from(map.values());
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 export function SurveyResults({ results, fanflets }: SurveyResultsProps) {
   const [selectedFanflet, setSelectedFanflet] = useState("all");
 
-  const filtered =
-    selectedFanflet === "all"
-      ? results
-      : results.filter((r) => r.fanflet_id === selectedFanflet);
+  const isAggregate = selectedFanflet === "all";
+
+  const filteredResults = isAggregate
+    ? results
+    : results.filter((r) => r.fanflet_id === selectedFanflet);
+
+  const aggregateRows = aggregateByQuestion(filteredResults);
 
   return (
     <Card>
@@ -72,8 +121,9 @@ export function SurveyResults({ results, fanflets }: SurveyResultsProps) {
           </Select>
         </div>
       </CardHeader>
+
       <CardContent>
-        {filtered.length === 0 ? (
+        {aggregateRows.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
             {results.length === 0
               ? "No survey responses yet. Attach a feedback question to a Fanflet to start collecting data."
@@ -81,31 +131,12 @@ export function SurveyResults({ results, fanflets }: SurveyResultsProps) {
           </div>
         ) : (
           <div className="space-y-6">
-            {filtered.map((r) => (
-              <div
-                key={`${r.fanflet_id}-${r.question_id}`}
-                className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3"
-              >
-                <div>
-                  <p className="font-medium text-sm text-slate-900">
-                    {r.question_text}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {r.fanflet_title} &middot; {r.responses.length}{" "}
-                    {r.responses.length === 1 ? "response" : "responses"}
-                  </p>
-                </div>
-
-                {r.question_type === "nps" && (
-                  <NpsVisualization responses={r.responses} />
-                )}
-                {r.question_type === "yes_no" && (
-                  <YesNoVisualization responses={r.responses} />
-                )}
-                {r.question_type === "rating" && (
-                  <RatingVisualization responses={r.responses} />
-                )}
-              </div>
+            {aggregateRows.map((row) => (
+              <AggregateQuestionCard
+                key={row.question_id}
+                row={row}
+                isAggregate={isAggregate}
+              />
             ))}
           </div>
         )}
@@ -114,7 +145,111 @@ export function SurveyResults({ results, fanflets }: SurveyResultsProps) {
   );
 }
 
-function NpsVisualization({ responses }: { responses: string[] }) {
+// ─── Aggregate question card with optional per-fanflet accordion ─────────────
+function AggregateQuestionCard({
+  row,
+  isAggregate,
+}: {
+  row: AggregateRow;
+  isAggregate: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const totalResponses = row.responses.length;
+  const fanfletCount = row.byFanflet.length;
+  const showBreakdown = isAggregate && fanfletCount > 1;
+
+  return (
+    <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+      {/* Question header */}
+      <div>
+        <p className="font-medium text-sm text-slate-900">{row.question_text}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {isAggregate
+            ? `${totalResponses} ${totalResponses === 1 ? "response" : "responses"} across ${fanfletCount} ${fanfletCount === 1 ? "Fanflet" : "Fanflets"}`
+            : `${row.byFanflet[0]?.fanflet_title} · ${totalResponses} ${totalResponses === 1 ? "response" : "responses"}`}
+        </p>
+      </div>
+
+      {/* Aggregate visualization */}
+      <Visualization questionType={row.question_type} responses={row.responses} />
+
+      {/* Per-fanflet accordion (only when aggregate & multiple fanflets) */}
+      {showBreakdown && (
+        <div className="pt-1">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-slate-700 transition-colors"
+          >
+            {expanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
+            {expanded ? "Hide" : "Show"} breakdown by Fanflet
+          </button>
+
+          {expanded && (
+            <div className="mt-3 space-y-3">
+              {row.byFanflet.map((f) => (
+                <div
+                  key={f.fanflet_id}
+                  className="pl-3 border-l-2 border-slate-200 space-y-2"
+                >
+                  <p className="text-xs font-medium text-slate-700">
+                    {f.fanflet_title}
+                    <span className="font-normal text-muted-foreground ml-1.5">
+                      · {f.responses.length}{" "}
+                      {f.responses.length === 1 ? "response" : "responses"}
+                    </span>
+                  </p>
+                  {f.responses.length > 0 ? (
+                    <Visualization
+                      questionType={row.question_type}
+                      responses={f.responses}
+                      compact
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">
+                      No responses yet
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Shared dispatcher ────────────────────────────────────────────────────────
+function Visualization({
+  questionType,
+  responses,
+  compact = false,
+}: {
+  questionType: string;
+  responses: string[];
+  compact?: boolean;
+}) {
+  if (questionType === "nps")
+    return <NpsVisualization responses={responses} compact={compact} />;
+  if (questionType === "yes_no")
+    return <YesNoVisualization responses={responses} />;
+  if (questionType === "rating")
+    return <RatingVisualization responses={responses} compact={compact} />;
+  return null;
+}
+
+// ─── NPS ─────────────────────────────────────────────────────────────────────
+function NpsVisualization({
+  responses,
+  compact = false,
+}: {
+  responses: string[];
+  compact?: boolean;
+}) {
   const values = responses.map(Number).filter((n) => !isNaN(n));
   if (values.length === 0) return null;
 
@@ -123,9 +258,7 @@ function NpsVisualization({ responses }: { responses: string[] }) {
   const promoters = values.filter((v) => v >= 9).length;
 
   const total = values.length;
-  const npsScore = Math.round(
-    ((promoters - detractors) / total) * 100
-  );
+  const npsScore = Math.round(((promoters - detractors) / total) * 100);
 
   const detractorPct = Math.round((detractors / total) * 100);
   const passivePct = Math.round((passives / total) * 100);
@@ -134,7 +267,9 @@ function NpsVisualization({ responses }: { responses: string[] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <span className="text-3xl font-bold text-slate-900">{npsScore}</span>
+        <span className={`font-bold text-slate-900 ${compact ? "text-xl" : "text-3xl"}`}>
+          {npsScore}
+        </span>
         <span className="text-sm text-muted-foreground">NPS Score</span>
       </div>
       {/* Stacked bar */}
@@ -185,20 +320,18 @@ function NpsVisualization({ responses }: { responses: string[] }) {
   );
 }
 
+// ─── Yes / No ─────────────────────────────────────────────────────────────────
 function YesNoVisualization({ responses }: { responses: string[] }) {
   const total = responses.length;
   if (total === 0) return null;
 
-  const yesCount = responses.filter(
-    (r) => r.toLowerCase() === "yes"
-  ).length;
+  const yesCount = responses.filter((r) => r.toLowerCase() === "yes").length;
   const noCount = total - yesCount;
   const yesPct = Math.round((yesCount / total) * 100);
   const noPct = 100 - yesPct;
 
   return (
     <div className="space-y-2">
-      {/* Stacked bar */}
       <div className="flex h-8 rounded-full overflow-hidden">
         {yesPct > 0 && (
           <div
@@ -229,7 +362,14 @@ function YesNoVisualization({ responses }: { responses: string[] }) {
   );
 }
 
-function RatingVisualization({ responses }: { responses: string[] }) {
+// ─── Rating ───────────────────────────────────────────────────────────────────
+function RatingVisualization({
+  responses,
+  compact = false,
+}: {
+  responses: string[];
+  compact?: boolean;
+}) {
   const values = responses.map(Number).filter((n) => n >= 1 && n <= 5);
   if (values.length === 0) return null;
 
@@ -242,7 +382,7 @@ function RatingVisualization({ responses }: { responses: string[] }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <span className="text-3xl font-bold text-slate-900">
+        <span className={`font-bold text-slate-900 ${compact ? "text-xl" : "text-3xl"}`}>
           {avg.toFixed(1)}
         </span>
         <div className="flex gap-0.5">
@@ -261,30 +401,31 @@ function RatingVisualization({ responses }: { responses: string[] }) {
           ({values.length})
         </span>
       </div>
-      {/* Distribution bars */}
-      <div className="space-y-1">
-        {[5, 4, 3, 2, 1].map((star) => {
-          const count = distribution[star - 1];
-          const pct = Math.round((count / maxCount) * 100);
-          return (
-            <div key={star} className="flex items-center gap-2 text-xs">
-              <span className="w-3 text-right text-muted-foreground">
-                {star}
-              </span>
-              <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-              <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-amber-400 rounded-full"
-                  style={{ width: `${pct}%` }}
-                />
+      {!compact && (
+        <div className="space-y-1">
+          {[5, 4, 3, 2, 1].map((star) => {
+            const count = distribution[star - 1];
+            const pct = Math.round((count / maxCount) * 100);
+            return (
+              <div key={star} className="flex items-center gap-2 text-xs">
+                <span className="w-3 text-right text-muted-foreground">
+                  {star}
+                </span>
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-400 rounded-full"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="w-6 text-right text-muted-foreground">
+                  {count}
+                </span>
               </div>
-              <span className="w-6 text-right text-muted-foreground">
-                {count}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

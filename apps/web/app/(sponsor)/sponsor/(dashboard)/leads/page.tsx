@@ -17,7 +17,7 @@ export default async function SponsorLeadsPage() {
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
-  let leadsQuery = supabase
+  const leadsQuery = supabase
     .from("sponsor_leads")
     .select(`
       id, resource_title, engagement_type, created_at,

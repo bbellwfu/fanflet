@@ -1,12 +1,11 @@
 'use server'
 
 import { requireSponsor } from '@/lib/auth-context'
-import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function exportSponsorLeadsCsv(): Promise<{ error?: string; csv?: string }> {
   const { sponsorId, supabase } = await requireSponsor()
 
-  let leadsQuery = supabase
+  const leadsQuery = supabase
     .from('sponsor_leads')
     .select(`
       id, engagement_type, resource_title, created_at, fanflet_id,

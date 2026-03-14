@@ -19,7 +19,7 @@ export default async function SponsorConnectionsPage() {
 
   const speakerLabel = sponsor.speaker_label ?? "speaker";
 
-  let connectionsQuery = supabase
+  const connectionsQuery = supabase
     .from("sponsor_connections")
     .select(`
       id, status, initiated_by, message, created_at, responded_at, ended_at,

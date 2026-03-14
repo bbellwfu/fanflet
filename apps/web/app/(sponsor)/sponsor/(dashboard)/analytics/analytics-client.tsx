@@ -5,6 +5,7 @@ import { BarChart3, TrendingUp, Users, Globe2, Link2, Filter, Loader2, Download,
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
+import { useImpParam } from "@/lib/use-imp-param";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +54,7 @@ export function SponsorAnalyticsClient({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const imp = useImpParam();
   const [isPending, startTransition] = useTransition();
 
   const currentSpeakerId = searchParams.get("speakerId") || "all";
@@ -64,6 +66,7 @@ export function SponsorAnalyticsClient({
   const updateFilters = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
+    if (imp) params.set("__imp", imp);
     startTransition(() => {
       router.push(`/sponsor/analytics?${params.toString()}`);
     });

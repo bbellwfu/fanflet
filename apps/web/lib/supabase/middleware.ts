@@ -1,9 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getCookiesForSupabase,
+  getSupabaseAuthCookiePrefix,
+} from "@/lib/impersonation-cookie";
+import { getImpersonationSessionPayload } from "@/lib/impersonation-session";
+import type { User } from "@supabase/supabase-js";
 
 const ROLE_ROUTE_MAP: Record<string, string[]> = {
   speaker: ["/dashboard"],
-  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/integrations", "/sponsor/settings", "/sponsor/campaigns", "/sponsor/library"],
+  sponsor: ["/sponsor/dashboard", "/sponsor/leads", "/sponsor/connections", "/sponsor/integrations", "/sponsor/settings", "/sponsor/campaigns", "/sponsor/library", "/sponsor/analytics"],
   audience: ["/my"],
 };
 
@@ -14,6 +20,15 @@ const ROLE_HOME: Record<string, string> = {
 };
 
 const CONSENT_EXEMPT_COUNTRIES = new Set(["US", "CA"]);
+const IMP_SESSION_HEADER = "x-impersonation-session-id";
+const IMP_TARGET_ROLE_HEADER = "x-impersonation-target-role";
+
+/** Preserve __imp in redirect URL when present in request. */
+function redirectWithImp(nextUrl: URL, request: NextRequest): URL {
+  const imp = request.nextUrl.searchParams.get("__imp");
+  if (imp) nextUrl.searchParams.set("__imp", imp);
+  return nextUrl;
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -21,7 +36,6 @@ export async function updateSession(request: NextRequest) {
   });
 
   // Set geo-based cookie consent flag for GTM.
-  // Vercel provides x-vercel-ip-country on deployed environments.
   const country = request.headers.get("x-vercel-ip-country") ?? "US";
   const needsConsent = !CONSENT_EXEMPT_COUNTRIES.has(country);
   supabaseResponse.headers.set("x-user-country", country);
@@ -35,34 +49,78 @@ export async function updateSession(request: NextRequest) {
     });
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const pathname = request.nextUrl.pathname;
+  const impSessionId = request.nextUrl.searchParams.get("__imp");
+
+  let user: User | null = null;
+
+  if (impSessionId) {
+    let result = await getImpersonationSessionPayload(impSessionId);
+    // Retry once after a short delay — handles read-replica replication lag
+    // when navigating immediately after session creation.
+    if (!result) {
+      await new Promise((r) => setTimeout(r, 500));
+      result = await getImpersonationSessionPayload(impSessionId);
+    }
+    if (result) {
+      // Construct user directly from the DB-backed session payload instead of
+      // calling getUser() against GoTrue. The custom-signed impersonation JWT
+      // is not a real GoTrue session, so getUser() rejects it. The payload
+      // already contains all fields middleware needs (id, app_metadata, etc.).
+      const payloadUser = result.payload.user;
+      user = {
+        id: payloadUser.id,
+        aud: payloadUser.aud ?? "authenticated",
+        role: payloadUser.role ?? "authenticated",
+        email: payloadUser.email ?? "",
+        app_metadata: payloadUser.app_metadata ?? {},
+        user_metadata: payloadUser.user_metadata ?? {},
+        created_at: "",
+      } as User;
+      request.headers.set(IMP_SESSION_HEADER, impSessionId);
+      request.headers.set(IMP_TARGET_ROLE_HEADER, result.targetRole);
+      supabaseResponse = NextResponse.next({ request });
+    }
+    // __imp in URL but session invalid/missing: redirect to stop so we never show another user's content.
+    // Skip when we're already on /api/impersonate/* so the stop route can run (avoid redirect loop).
+    if (!user && !pathname.startsWith("/api/impersonate/")) {
+      const stopUrl = new URL("/api/impersonate/stop", request.url);
+      stopUrl.searchParams.set("__imp", impSessionId);
+      return NextResponse.redirect(stopUrl);
+    }
+  }
+
+  if (!user) {
+    const supabasePrefix = getSupabaseAuthCookiePrefix();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return getCookiesForSupabase(
+              () => request.cookies.getAll().map((c) => ({ name: c.name, value: c.value })),
+              supabasePrefix
+            );
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            supabaseResponse = NextResponse.next({
+              request,
+            });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
+    const { data } = await supabase.auth.getUser();
+    user = data?.user ?? null;
+  }
+
 
   if (!user && request.cookies.get("active_role")) {
     supabaseResponse.cookies.delete("active_role");
@@ -73,18 +131,22 @@ export async function updateSession(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Check for expired impersonation session and auto-redirect to stop
-  const impersonationMeta = request.cookies.get("impersonation_meta")?.value;
-  if (impersonationMeta) {
-    try {
-      const meta = JSON.parse(impersonationMeta);
-      if (new Date(meta.expiresAt) < new Date()) {
-        return NextResponse.redirect(
-          new URL("/api/impersonate/stop", request.url)
-        );
+  // Check for expired cookie-only impersonation (no __imp in URL).
+  // When __imp IS present, the first block above already validates the session
+  // and redirects to stop if invalid/expired — no need to check again.
+  if (!impSessionId) {
+    const impersonationMeta = request.cookies.get("impersonation_meta")?.value;
+    if (impersonationMeta) {
+      try {
+        const meta = JSON.parse(impersonationMeta);
+        if (new Date(meta.expiresAt) < new Date()) {
+          return NextResponse.redirect(
+            new URL("/api/impersonate/stop", request.url)
+          );
+        }
+      } catch {
+        // Malformed cookie — continue normally
       }
-    } catch {
-      // Malformed cookie — continue normally
     }
   }
 
@@ -98,26 +160,25 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/sponsor/connections") ||
     pathname.startsWith("/sponsor/integrations") ||
     pathname.startsWith("/sponsor/settings") ||
+    pathname.startsWith("/sponsor/analytics") ||
     pathname.startsWith("/my") ||
     pathname.startsWith("/become-speaker");
 
   if (!user && isProtected) {
     const hadSession = request.cookies.getAll().some(c => c.name.startsWith("sb-") && c.name.includes("auth-token"));
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    const url = new URL("/login", request.url);
     url.searchParams.set("redirect", pathname);
     if (hadSession) {
       url.searchParams.set("reason", "session_expired");
     }
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(redirectWithImp(url, request));
   }
 
   if (user && (pathname === "/login" || pathname === "/signup")) {
     const roles = resolveRoles(user);
     const activeRole = resolveActiveRole(request, roles);
-    const url = request.nextUrl.clone();
-    url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
-    return NextResponse.redirect(url);
+    const url = new URL(ROLE_HOME[activeRole] ?? "/dashboard", request.url);
+    return NextResponse.redirect(redirectWithImp(url, request));
   }
 
   if (user && isProtected) {
@@ -130,9 +191,8 @@ export async function updateSession(request: NextRequest) {
       const isSponsorSignup = signupRole === "sponsor";
       const hasSponsorRole = roles.includes("sponsor");
       if (!isSponsorSignup && !hasSponsorRole) {
-        const url = request.nextUrl.clone();
-        url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
-        return NextResponse.redirect(url);
+        const url = new URL(ROLE_HOME[activeRole] ?? "/dashboard", request.url);
+        return NextResponse.redirect(redirectWithImp(url, request));
       }
       return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
     }
@@ -140,9 +200,8 @@ export async function updateSession(request: NextRequest) {
     // Become-speaker: only for users who don't already have the speaker role
     if (pathname.startsWith("/become-speaker")) {
       if (roles.includes("speaker")) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
+        const url = new URL("/dashboard", request.url);
+        return NextResponse.redirect(redirectWithImp(url, request));
       }
       return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
     }
@@ -154,28 +213,8 @@ export async function updateSession(request: NextRequest) {
     );
 
     if (!routeAllowed) {
-      // Check if ANY of the user's roles would allow this route
-      const correctRole = roles.find((role) => {
-        const prefixes = ROLE_ROUTE_MAP[role] ?? [];
-        return prefixes.some((prefix) => pathname.startsWith(prefix));
-      });
-
-      if (correctRole) {
-        // Switch to the correct role and allow the request
-        const response = NextResponse.redirect(request.nextUrl);
-        response.cookies.set("active_role", correctRole, {
-          httpOnly: true,
-          sameSite: "strict",
-          path: "/",
-          secure: process.env.NODE_ENV === "production",
-        });
-        return response;
-      }
-
-      // User doesn't have any role that allows this route
-      const url = request.nextUrl.clone();
-      url.pathname = ROLE_HOME[activeRole] ?? "/dashboard";
-      return NextResponse.redirect(url);
+      const url = new URL(ROLE_HOME[activeRole] ?? "/dashboard", request.url);
+      return NextResponse.redirect(redirectWithImp(url, request));
     }
 
     return maybeSetActiveRoleCookie(supabaseResponse, request, activeRole);
@@ -236,10 +275,52 @@ function resolveRoles(user: { app_metadata?: Record<string, unknown>; user_metad
 }
 
 function resolveActiveRole(request: NextRequest, roles: string[]): string {
+  const pathname = request.nextUrl.pathname;
+
+  // 1. __imp session: role from header (set by middleware when loading session from DB)
+  const impRole = request.headers.get(IMP_TARGET_ROLE_HEADER);
+  if (impRole && (impRole === "speaker" || impRole === "sponsor")) {
+    return impRole;
+  }
+
+  // 2. Cookie-based impersonation
+  const impersonationCookie = request.cookies.get("impersonation_meta")?.value;
+  if (impersonationCookie) {
+    try {
+      const meta = JSON.parse(impersonationCookie);
+      if (meta.targetRole && roles.includes(meta.targetRole)) {
+        return meta.targetRole;
+      }
+    } catch {
+      // Ignore JSON parse errors for malformed cookies
+    }
+  }
+
+  // 3. Path-based detection (prioritize the path they are trying to visit)
+  if (pathname.startsWith("/sponsor/") && roles.includes("sponsor")) {
+    return "sponsor";
+  }
+  if ((pathname.startsWith("/dashboard") || pathname.startsWith("/become-speaker")) && roles.includes("speaker")) {
+    return "speaker";
+  }
+  if (pathname.startsWith("/my") && roles.includes("audience")) {
+    return "audience";
+  }
+
+  for (const role of roles) {
+    const prefixes = ROLE_ROUTE_MAP[role] ?? [];
+    if (prefixes.some((prefix) => pathname.startsWith(prefix))) {
+      return role;
+    }
+  }
+
+  // 4. Fallback to cookie (e.g., when visiting /login or root /)
   const cookieRole = request.cookies.get("active_role")?.value;
   if (cookieRole && roles.includes(cookieRole)) {
     return cookieRole;
   }
+
+  // 5. Ultimate fallback
   return roles[0] ?? "speaker";
 }
 

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useState, useRef, useEffect } from "react";
+import { useImpParam } from "@/lib/use-imp-param";
 import { Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { DateRangeField } from "../ui/date-range-field";
@@ -32,16 +33,18 @@ export function DateRangeSelector({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+  const imp = useImpParam();
+
   const currentRange = searchParams.get("range") ?? defaultValue;
   const [showCustom, setShowCustom] = useState(false);
   const [customFrom, setCustomFrom] = useState(searchParams.get("from") || "");
   const [customTo, setCustomTo] = useState(searchParams.get("to") || "");
 
   const updateUrl = useCallback((params: URLSearchParams) => {
+    if (imp) params.set("__imp", imp);
     const qs = params.toString();
     router.push(`${pathname}${qs ? `?${qs}` : ""}`);
-  }, [router, pathname]);
+  }, [router, pathname, imp]);
 
   const handleChange = useCallback(
     (value: string) => {

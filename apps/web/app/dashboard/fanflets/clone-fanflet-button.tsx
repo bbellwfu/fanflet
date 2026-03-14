@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Copy, Loader2 } from "lucide-react";
 import { cloneFanflet } from "./actions";
 import { toast } from "sonner";
+import { useImpParam, withImp } from "@/lib/use-imp-param";
 
 interface CloneFanfletButtonProps {
   fanfletId: string;
@@ -13,6 +14,7 @@ interface CloneFanfletButtonProps {
 
 export function CloneFanfletButton({ fanfletId }: CloneFanfletButtonProps) {
   const router = useRouter();
+  const imp = useImpParam();
   const [pending, setPending] = useState(false);
 
   const handleClone = async () => {
@@ -25,7 +27,7 @@ export function CloneFanfletButton({ fanfletId }: CloneFanfletButtonProps) {
       }
       if (result.newFanfletId) {
         toast.success("Fanflet cloned");
-        router.push(`/dashboard/fanflets/${result.newFanfletId}`);
+        router.push(withImp(`/dashboard/fanflets/${result.newFanfletId}`, imp));
       }
     } finally {
       setPending(false);

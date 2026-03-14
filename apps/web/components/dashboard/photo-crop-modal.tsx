@@ -206,7 +206,7 @@ export function PhotoCropModal({
       });
 
       const result = await updateSpeakerPhoto(photoUrlToSave, photoFrame);
-      if (result.error) {
+      if ("error" in result) {
         toast.error(result.error);
         return;
       }

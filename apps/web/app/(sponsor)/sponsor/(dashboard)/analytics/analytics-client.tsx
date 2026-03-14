@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp, Users, Globe2, Link2, Filter, Loader2, Download, Eye, MousePointer2, HelpCircle } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Globe2, Link2, Filter, Loader2, Download, Eye, MousePointer2, HelpCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -141,6 +141,11 @@ export function SponsorAnalyticsClient({
           <p className="text-muted-foreground mt-1">Detailed insights into your content performance and audience.</p>
         </div>
         <DateRangeSelector />
+      </div>
+
+      <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 flex items-center gap-2 text-xs text-emerald-800">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-600" />
+        Showing only your engagement data. Other sponsors cannot see this information.
       </div>
 
       {/* Filter Row: Campaign + KOL + Export */}

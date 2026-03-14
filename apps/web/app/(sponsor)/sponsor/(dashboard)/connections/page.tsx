@@ -29,19 +29,6 @@ export default async function SponsorConnectionsPage() {
     .or("hidden_by_sponsor.is.null,hidden_by_sponsor.eq.false")
     .order("created_at", { ascending: false });
 
-  if (sponsor.demo_environment_id) {
-    const { data: speakersInDemo } = await supabase
-      .from("speakers")
-      .select("id")
-      .eq("demo_environment_id", sponsor.demo_environment_id);
-    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
-    if (speakerIds.length > 0) {
-      connectionsQuery = connectionsQuery.in("speaker_id", speakerIds);
-    } else {
-      connectionsQuery = connectionsQuery.eq("speaker_id", "00000000-0000-0000-0000-000000000000");
-    }
-  }
-
   const { data: connections } = await connectionsQuery;
 
   const list = (connections ?? []).map((c) => {

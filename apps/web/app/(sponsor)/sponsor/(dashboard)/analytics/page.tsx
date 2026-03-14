@@ -37,7 +37,6 @@ export default async function SponsorAnalyticsPage({
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
-  const demoEnvId = sponsor.demo_environment_id ?? null;
   const rawLabel = (sponsor as { speaker_label?: string }).speaker_label || "Speaker";
   const singularLabel = rawLabel.replace(/s$/i, '');
   const speakerLabel = singularLabel ? singularLabel.charAt(0).toUpperCase() + singularLabel.slice(1) : "Speaker";
@@ -85,31 +84,22 @@ export default async function SponsorAnalyticsPage({
 
   // 2. Base Fanflet Resolution
   let fanfletIdsInScope: string[] = [];
-  if (demoEnvId) {
-    const { data: speakersInDemo } = await supabase.from("speakers").select("id").eq("demo_environment_id", demoEnvId);
-    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
-    if (speakerIds.length > 0) {
-      const { data: fanfletsInDemo } = await supabase.from("fanflets").select("id").in("speaker_id", speakerIds);
-      fanfletIdsInScope = (fanfletsInDemo ?? []).map((f) => f.id);
+  let baseSpeakerIds = availableSpeakers.map(s => s.id);
+  if (campaignIdFilter !== "all") {
+    const selectedCampaign = availableCampaigns.find(c => c.id === campaignIdFilter);
+    if (selectedCampaign?.all_speakers_assigned !== true) {
+      const { data: kolRes } = await supabase.from("sponsor_campaign_speakers").select("speaker_id").eq("campaign_id", campaignIdFilter);
+      const campaignKOLs = (kolRes ?? []).map(k => k.speaker_id);
+      baseSpeakerIds = baseSpeakerIds.filter(id => campaignKOLs.includes(id));
     }
-  } else {
-    let baseSpeakerIds = availableSpeakers.map(s => s.id);
-    if (campaignIdFilter !== "all") {
-      const selectedCampaign = availableCampaigns.find(c => c.id === campaignIdFilter);
-      if (selectedCampaign?.all_speakers_assigned !== true) {
-        const { data: kolRes } = await supabase.from("sponsor_campaign_kols").select("speaker_id").eq("campaign_id", campaignIdFilter);
-        const campaignKOLs = (kolRes ?? []).map(k => k.speaker_id);
-        baseSpeakerIds = baseSpeakerIds.filter(id => campaignKOLs.includes(id));
-      }
-      if (baseSpeakerIds.length === 0) fanfletIdsInScope = [];
-    }
-    if (speakerIdFilter !== "all") {
-      baseSpeakerIds = baseSpeakerIds.includes(speakerIdFilter) ? [speakerIdFilter] : [];
-    }
-    if (baseSpeakerIds.length > 0) {
-      const { data: fanfletsRes } = await supabase.from("fanflets").select("id").in("speaker_id", baseSpeakerIds);
-      fanfletIdsInScope = (fanfletsRes ?? []).map(f => f.id);
-    }
+    if (baseSpeakerIds.length === 0) fanfletIdsInScope = [];
+  }
+  if (speakerIdFilter !== "all") {
+    baseSpeakerIds = baseSpeakerIds.includes(speakerIdFilter) ? [speakerIdFilter] : [];
+  }
+  if (baseSpeakerIds.length > 0) {
+    const { data: fanfletsRes } = await supabase.from("fanflets").select("id").in("speaker_id", baseSpeakerIds);
+    fanfletIdsInScope = (fanfletsRes ?? []).map(f => f.id);
   }
 
   // 3. Resolve which Resource Blocks we care about
@@ -121,7 +111,7 @@ export default async function SponsorAnalyticsPage({
       .eq("sponsor_account_id", sponsor.id)
       .in("fanflet_id", fanfletIdsInScope);
      
-     if (campaignIdFilter !== "all" && !demoEnvId) {
+     if (campaignIdFilter !== "all") {
        const { data: resourceCampaigns } = await supabase.from("sponsor_resource_campaigns").select("resource_id").eq("campaign_id", campaignIdFilter);
        const libIds = (resourceCampaigns ?? []).map(rc => rc.resource_id);
        if (libIds.length > 0) blockQuery = blockQuery.in("sponsor_library_item_id", libIds);
@@ -131,7 +121,7 @@ export default async function SponsorAnalyticsPage({
      blockIdsInScope = (blocks ?? []).map(b => b.id);
   }
 
-  if (fanfletIdsInScope.length === 0 || blockIdsInScope.length === 0) {
+  if (fanfletIdsInScope.length === 0) {
     return (
       <SponsorAnalyticsClient
         speakerLabel={speakerLabel}
@@ -150,17 +140,31 @@ export default async function SponsorAnalyticsPage({
     );
   }
 
+  const eventsQuery = blockIdsInScope.length > 0
+    ? supabase
+        .from("analytics_events")
+        .select("event_type, resource_block_id, fanflet_id, device_type, referrer, source")
+        .gte("created_at", fromDate.toISOString())
+        .lte("created_at", toDate.toISOString())
+        .or(`and(event_type.eq.resource_click,resource_block_id.in.(${blockIdsInScope.join(",")})),and(event_type.eq.page_view,fanflet_id.in.(${fanfletIdsInScope.join(",")}))`)
+    : supabase
+        .from("analytics_events")
+        .select("event_type, resource_block_id, fanflet_id, device_type, referrer, source")
+        .gte("created_at", fromDate.toISOString())
+        .lte("created_at", toDate.toISOString())
+        .eq("event_type", "page_view")
+        .in("fanflet_id", fanfletIdsInScope);
+
+  const resourceTypePerfPromise = blockIdsInScope.length > 0
+    ? getSponsorResourceTypePerformance(supabase, sponsor.id, blockIdsInScope, dateRange)
+    : Promise.resolve({ data: [] as { type: string; totalClicks: number; avgClicksPerBlock: number; blockCount: number }[] });
+
   // 4. Fetch rich analytics from Core
   const [kpiRes, fanfletPerfRes, resourceTypePerfRes, eventsRes] = await Promise.all([
     getSponsorKPIs(supabase, sponsor.id, fanfletIdsInScope, blockIdsInScope, dateRange),
     getSponsorFanfletPerformance(supabase, sponsor.id, fanfletIdsInScope, blockIdsInScope, dateRange),
-    getSponsorResourceTypePerformance(supabase, sponsor.id, blockIdsInScope, dateRange),
-    supabase
-      .from("analytics_events")
-      .select("event_type, resource_block_id, fanflet_id, device_type, referrer, source")
-      .gte("created_at", fromDate.toISOString())
-      .lte("created_at", toDate.toISOString())
-      .or(`and(event_type.eq.resource_click,resource_block_id.in.(${blockIdsInScope.join(",")})),and(event_type.eq.page_view,fanflet_id.in.(${fanfletIdsInScope.join(",")}))`)
+    resourceTypePerfPromise,
+    eventsQuery,
   ]);
 
   const analyticsEvents = eventsRes.data ?? [];
@@ -229,7 +233,7 @@ export default async function SponsorAnalyticsPage({
       kpiData={kpiData}
       fanfletStats={fanfletStats}
       resourceTypeStats={resourceTypeStats}
-      hasData={analyticsEvents.length > 0}
+      hasData={analyticsEvents.length > 0 || kpiData.totalLeads > 0}
       fanfletIds={fanfletIdsInScope}
       blockIds={blockIdsInScope}
     />

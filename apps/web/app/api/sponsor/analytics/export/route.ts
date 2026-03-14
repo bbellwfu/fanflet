@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   if (campaignIdFilter !== "all") {
     const selectedCampaign = availableCampaigns.find(c => c.id === campaignIdFilter);
     if (selectedCampaign && !selectedCampaign.all_speakers_assigned) {
-      const { data: kolRes } = await supabase.from("sponsor_campaign_kols").select("speaker_id").eq("campaign_id", campaignIdFilter);
+      const { data: kolRes } = await supabase.from("sponsor_campaign_speakers").select("speaker_id").eq("campaign_id", campaignIdFilter);
       const campaignKOLs = (kolRes ?? []).map(k => k.speaker_id);
       availableSpeakerIds = availableSpeakerIds.filter(id => campaignKOLs.includes(id));
     }

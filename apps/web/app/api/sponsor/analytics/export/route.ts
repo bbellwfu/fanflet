@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   const { data: sponsor } = await supabase
     .from("sponsor_accounts")
-    .select("id")
+    .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
     .single();
 
@@ -36,6 +36,15 @@ export async function GET(request: Request) {
 
   let availableSpeakerIds = (connectionsRes.data ?? []).map(c => c.speaker_id);
   const availableCampaigns = campaignsRes.data ?? [];
+
+  if (sponsor.demo_environment_id) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", sponsor.demo_environment_id);
+    const demoSpeakerIds = new Set((speakersInDemo ?? []).map((s) => s.id));
+    availableSpeakerIds = availableSpeakerIds.filter((id) => demoSpeakerIds.has(id));
+  }
 
   if (campaignIdFilter !== "all") {
     const selectedCampaign = availableCampaigns.find(c => c.id === campaignIdFilter);

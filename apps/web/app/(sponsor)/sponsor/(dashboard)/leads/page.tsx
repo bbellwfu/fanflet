@@ -17,7 +17,7 @@ export default async function SponsorLeadsPage() {
 
   if (!sponsor) redirect("/sponsor/onboarding");
 
-  const leadsQuery = supabase
+  let leadsQuery = supabase
     .from("sponsor_leads")
     .select(`
       id, resource_title, engagement_type, created_at,
@@ -26,6 +26,28 @@ export default async function SponsorLeadsPage() {
     `)
     .eq("sponsor_id", sponsor.id)
     .order("created_at", { ascending: false });
+
+  if (sponsor.demo_environment_id) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", sponsor.demo_environment_id);
+    const speakerIds = (speakersInDemo ?? []).map((s) => s.id);
+    if (speakerIds.length > 0) {
+      const { data: fanfletsInDemo } = await supabase
+        .from("fanflets")
+        .select("id")
+        .in("speaker_id", speakerIds);
+      const fanfletIds = (fanfletsInDemo ?? []).map((f) => f.id);
+      if (fanfletIds.length > 0) {
+        leadsQuery = leadsQuery.in("fanflet_id", fanfletIds);
+      } else {
+        leadsQuery = leadsQuery.eq("fanflet_id", "00000000-0000-0000-0000-000000000000");
+      }
+    } else {
+      leadsQuery = leadsQuery.eq("fanflet_id", "00000000-0000-0000-0000-000000000000");
+    }
+  }
 
   const [leadsResult, hiddenConnectionsResult] = await Promise.all([
     leadsQuery,

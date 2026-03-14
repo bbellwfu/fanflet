@@ -36,6 +36,7 @@ export default async function SponsorAnalyticsPage({
     .single();
 
   if (!sponsor) redirect("/sponsor/onboarding");
+  const demoEnvId = sponsor.demo_environment_id ?? null;
 
   const rawLabel = (sponsor as { speaker_label?: string }).speaker_label || "Speaker";
   const singularLabel = rawLabel.replace(/s$/i, '');
@@ -74,12 +75,22 @@ export default async function SponsorAnalyticsPage({
     supabase.from("sponsor_campaigns").select("id, name, all_speakers_assigned").eq("sponsor_id", sponsor.id).order("created_at", { ascending: false }),
   ]);
 
+  let demoSpeakerIdSet: Set<string> | null = null;
+  if (demoEnvId) {
+    const { data: speakersInDemo } = await supabase
+      .from("speakers")
+      .select("id")
+      .eq("demo_environment_id", demoEnvId);
+    demoSpeakerIdSet = new Set((speakersInDemo ?? []).map((s) => s.id));
+  }
+
   const availableSpeakers = (connectionsRes.data ?? [])
     .filter(c => c.speakers)
     .map(c => {
       const speaker = c.speakers as unknown as { id: string; name: string };
       return { id: speaker.id, name: speaker.name };
-    });
+    })
+    .filter((s) => !demoSpeakerIdSet || demoSpeakerIdSet.has(s.id));
   const availableCampaigns = campaignsRes.data ?? [];
 
   // 2. Base Fanflet Resolution

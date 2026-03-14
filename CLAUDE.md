@@ -176,6 +176,16 @@ The MCP server (`packages/mcp/`) uses **branded Supabase client types** to enfor
 - `.github/scripts/check-mcp-client-isolation.sh` — static check that non-admin tool files don't reference `serviceClient`
 - `packages/mcp/src/__tests__/auth-rls-isolation.test.ts` — 7 tests verifying each role gets the correct client type
 
+### Impersonation security
+
+Admin impersonation stores the session in a **dedicated cookie** (`fanflet_impersonation_auth`) on the web app so the admin app's auth cookie is never overwritten. Security is preserved:
+
+- **No cookie forgery:** The cookie value contains a JWT signed with `SUPABASE_JWT_SECRET` (server-only, never exposed). An attacker cannot create a valid token without that secret; Supabase validates the JWT on every request and rejects invalid or forged tokens.
+- **One-time handoff:** Impersonation is started only via admin `/api/impersonate/start` (admin auth + platform_admin required), then the user is redirected to web `/api/impersonate/establish?token=...`. The token is a one-time, DB-backed handoff with short TTL; you cannot "just set a cookie" to enter an account without going through that flow.
+- **Hardening:** The impersonation cookie is `httpOnly` (XSS cannot read it), `sameSite: lax`, and `secure` in production. See `apps/web/lib/impersonation-cookie.ts` and the establish route.
+
+Do not expose `SUPABASE_JWT_SECRET` or weaken the establish flow (e.g. accepting unsigned or client-supplied tokens).
+
 ## Common Anti-Patterns to Flag
 
 - Using `any` type instead of proper typing

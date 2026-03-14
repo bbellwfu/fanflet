@@ -53,7 +53,10 @@ export function ImpersonateButton({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error ?? "Failed to start impersonation");
+        const message = data.details
+          ? `${data.error ?? "Failed to start impersonation"}: ${data.details}`
+          : (data.error ?? "Failed to start impersonation");
+        toast.error(message);
         return;
       }
 

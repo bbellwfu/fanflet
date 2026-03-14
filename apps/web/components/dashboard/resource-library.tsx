@@ -1506,6 +1506,49 @@ export function ResourceLibrary({
                 thumbnailUrl={resource.image_url ?? undefined}
                 fileSize={resource.file_size_bytes ?? undefined}
                 actions={[<AddToFanfletButton key="add" item={resource} fanflets={speakerFanflets} />]}
+                footerNode={
+                  <div className="flex items-center gap-3">
+                    {resource.linked_fanflets_count > 0 ? (
+                      <div
+                        className="relative"
+                        ref={(el) => {
+                          if (openLinkedId === resource.id)
+                            (linkedPopoverRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenLinkedId(openLinkedId === resource.id ? null : resource.id)}
+                          className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3BA5D9] hover:underline cursor-pointer"
+                          aria-expanded={openLinkedId === resource.id}
+                          aria-haspopup="true"
+                        >
+                          <LinkIcon className="w-3 h-3" />
+                          {resource.linked_fanflets_count} fanflet{resource.linked_fanflets_count !== 1 ? "s" : ""}
+                        </button>
+                        {openLinkedId === resource.id && (resource.linked_fanflets ?? []).length > 0 && (
+                          <div className="absolute left-0 bottom-full z-50 mb-1 min-w-[180px] max-w-[min(180px,calc(100vw-2rem))] rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                            <p className="px-2 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+                              Linked to
+                            </p>
+                            {resource.linked_fanflets.map((f) => (
+                              <Link
+                                key={f.id}
+                                href={`/dashboard/fanflets/${f.id}`}
+                                className="block px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 truncate"
+                                onClick={() => setOpenLinkedId(null)}
+                              >
+                                {f.title || "Untitled"}
+                              </Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400">Unused</span>
+                    )}
+                  </div>
+                }
               />
             ))}
             

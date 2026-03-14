@@ -897,7 +897,7 @@ export async function seedSponsorDemoEnvironment(
           event_name: demoSpeaker.fanflet.event_name,
           event_date: demoSpeaker.fanflet.event_date || null,
           slug: fanfletSlug,
-          status: "draft",
+          status: "published",
           theme_config: themeConfig,
           show_event_name: true,
         })

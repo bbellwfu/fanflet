@@ -64,7 +64,8 @@ export async function requestSponsorConnection(
   message: string | null,
   mode: 'id' | 'slug' = 'slug'
 ): Promise<{ error?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, demoEnvironmentId, supabase } = await requireSpeaker()
 
   try {
@@ -157,7 +158,8 @@ export async function requestSponsorConnection(
 export async function rescindSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   try {
@@ -191,7 +193,8 @@ export async function rescindSponsorConnection(
 export async function endSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   try {
@@ -225,7 +228,8 @@ export async function endSponsorConnection(
 export async function hideSponsorConnectionFromView(
   connectionId: string
 ): Promise<{ error?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   try {
@@ -262,7 +266,8 @@ export async function addSponsorResourceToFanflet(
   fanfletId: string,
   sponsorResourceItemId: string
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId } = await requireSpeaker()
 
   try {

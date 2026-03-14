@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { CookieConsent } from "@/components/cookie-consent";
 import { Analytics } from "@vercel/analytics/next";
+import { getImpersonationDisplayBySessionId } from "@/lib/impersonation-session";
 import "./globals.css";
+
+const IMP_SESSION_HEADER = "x-impersonation-session-id";
 
 const GTM_ID = process.env.NEXT_PUBLIC_GTM_ID;
 
@@ -39,24 +42,44 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const impersonationRaw = cookieStore.get("impersonation_display")?.value;
+  const headersList = await headers();
+  const impSessionId = headersList.get(IMP_SESSION_HEADER);
+
   let impersonation: {
     targetName: string;
     targetEmail: string;
     targetRole: "speaker" | "sponsor";
     writeEnabled: boolean;
     expiresAt: string;
+    sessionId?: string;
   } | null = null;
 
-  if (impersonationRaw) {
-    try {
-      const parsed = JSON.parse(impersonationRaw);
-      if (new Date(parsed.expiresAt) > new Date()) {
-        impersonation = parsed;
+  if (impSessionId) {
+    const display = await getImpersonationDisplayBySessionId(impSessionId);
+    if (display) {
+      impersonation = {
+        targetName: display.targetName,
+        targetEmail: display.targetEmail,
+        targetRole: display.targetRole,
+        writeEnabled: display.writeEnabled,
+        expiresAt: display.expiresAt,
+        sessionId: display.sessionId,
+      };
+    }
+  }
+
+  if (!impersonation) {
+    const cookieStore = await cookies();
+    const impersonationRaw = cookieStore.get("impersonation_display")?.value;
+    if (impersonationRaw) {
+      try {
+        const parsed = JSON.parse(impersonationRaw);
+        if (new Date(parsed.expiresAt) > new Date()) {
+          impersonation = parsed;
+        }
+      } catch {
+        // Ignore malformed cookie
       }
-    } catch {
-      // Ignore malformed cookie
     }
   }
 
@@ -81,6 +104,7 @@ export default async function RootLayout({
             writeEnabled={impersonation.writeEnabled}
             expiresAt={impersonation.expiresAt}
             adminUrl={adminUrl}
+            impSessionId={"sessionId" in impersonation ? impersonation.sessionId : undefined}
           />
         )}
         <div style={{ paddingTop: "var(--banner-height)" }}>{children}</div>

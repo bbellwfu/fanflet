@@ -32,7 +32,8 @@ export async function listSubscribers(): Promise<{
 export async function deleteSubscriber(
   subscriberId: string
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { supabase, speakerId } = await requireSpeaker()
 
   const result = await coreDeleteSubscriber(supabase, speakerId, subscriberId)
@@ -51,7 +52,8 @@ export async function deleteSubscriber(
 export async function deleteSubscribers(
   subscriberIds: string[]
 ): Promise<{ error?: string; success?: boolean; deletedCount?: number }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { supabase, speakerId } = await requireSpeaker()
 
   const result = await coreDeleteSubscribers(supabase, speakerId, subscriberIds)

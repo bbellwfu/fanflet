@@ -132,7 +132,8 @@ export async function createLibraryResource(data: {
   metadata?: Record<string, unknown>
   default_sponsor_account_id?: string | null
 }): Promise<{ error?: string; success?: boolean; id?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { supabase, speakerId } = await requireSpeaker()
 
   if (!data.title?.trim()) return { error: 'Title is required' }
@@ -196,7 +197,8 @@ export async function updateLibraryResource(
     default_sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { supabase, speakerId } = await requireSpeaker()
 
   if (data.default_sponsor_account_id) {
@@ -243,7 +245,8 @@ export async function deleteLibraryResource(
   id: string,
   options?: DeleteLibraryResourceOptions
 ): Promise<{ error?: string; success?: boolean; needsChoice?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { supabase, speakerId } = await requireSpeaker()
 
   // Fetch the full library item (for storage cleanup and for convert_to_static)
@@ -331,6 +334,8 @@ export type SponsorCatalogResource = {
   file_type: string | null
   file_size_bytes: number | null
   image_url: string | null
+  linked_fanflets_count: number
+  linked_fanflets: LinkedFanflet[]
 }
 
 export async function listSponsorResourcesForSpeaker(): Promise<{
@@ -395,15 +400,31 @@ export async function listSponsorResourcesForSpeaker(): Promise<{
 
   // Find out which campaigns the resources belong to
   const catalogItemIds = catalogItemsRaw.map((r) => r.id)
-  const { data: resourceCampaignsRaw } = await supabase
-    .from('sponsor_resource_campaigns')
-    .select('resource_id, campaign_id')
-    .in('resource_id', catalogItemIds)
+  const [resourceCampaignsResult, resourceBlocksResult] = await Promise.all([
+    supabase
+      .from('sponsor_resource_campaigns')
+      .select('resource_id, campaign_id')
+      .in('resource_id', catalogItemIds),
+    supabase
+      .from('resource_blocks')
+      .select('sponsor_library_item_id, fanflet_id, fanflets(id, title)')
+      .in('sponsor_library_item_id', catalogItemIds)
+      .not('fanflets', 'is', null) // Only count if fanflet still exists
+  ])
 
   const resourceCampaigns: Record<string, string[]> = {}
-  for (const rc of resourceCampaignsRaw ?? []) {
+  for (const rc of resourceCampaignsResult.data ?? []) {
     if (!resourceCampaigns[rc.resource_id]) resourceCampaigns[rc.resource_id] = []
     resourceCampaigns[rc.resource_id].push(rc.campaign_id)
+  }
+
+  const resourceUsage: Record<string, Map<string, string>> = {}
+  for (const block of resourceBlocksResult.data ?? []) {
+    const resId = block.sponsor_library_item_id
+    if (!resId) continue
+    if (!resourceUsage[resId]) resourceUsage[resId] = new Map()
+    const f = block.fanflets as unknown as { id: string; title: string } | null
+    if (f) resourceUsage[resId].set(f.id, f.title || 'Untitled')
   }
 
   const results: SponsorCatalogResource[] = []
@@ -422,6 +443,11 @@ export async function listSponsorResourcesForSpeaker(): Promise<{
       finalCampaignName = campaignMap[validCampaignId].name
     }
 
+    const linkedFanfletsMap = resourceUsage[item.id] || new Map()
+    const linkedFanflets: LinkedFanflet[] = Array.from(linkedFanfletsMap.entries()).map(
+      ([id, title]) => ({ id, title })
+    )
+
     results.push({
       id: item.id,
       sponsor_id: item.sponsor_id,
@@ -436,6 +462,8 @@ export async function listSponsorResourcesForSpeaker(): Promise<{
       file_type: item.file_type,
       file_size_bytes: item.file_size_bytes,
       image_url: item.image_url,
+      linked_fanflets_count: linkedFanflets.length,
+      linked_fanflets: linkedFanflets,
     })
   }
 

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { loadSponsorEntitlements } from "@fanflet/db";
 import { SponsorAnalyticsClient } from "./analytics-client";
 import {
   getSponsorKPIs,
@@ -42,6 +43,10 @@ export default async function SponsorAnalyticsPage({
   const singularLabel = rawLabel.replace(/s$/i, '');
   const speakerLabel = singularLabel ? singularLabel.charAt(0).toUpperCase() + singularLabel.slice(1) : "Speaker";
 
+  const entitlements = await loadSponsorEntitlements(supabase, sponsor.id);
+  const retentionDays = entitlements.limits.analytics_retention_days;
+  const hasRetentionLimit = typeof retentionDays === "number" && retentionDays > 0;
+
   const params = await searchParams;
   const range = params.range || "30";
   const fromParam = params.from;
@@ -53,19 +58,35 @@ export default async function SponsorAnalyticsPage({
   let dateRange;
   const fromDate = new Date();
   const toDate = new Date();
+
+  // Earliest allowed date based on retention window
+  const earliestAllowed = hasRetentionLimit
+    ? new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+    : null;
+
   if (range === "custom" && fromParam) {
     fromDate.setTime(new Date(fromParam).getTime());
     if (toParam) {
       toDate.setTime(new Date(toParam).getTime());
       if (!toParam.includes("T")) toDate.setHours(23, 59, 59, 999);
     }
+    // Clamp custom from-date to retention window
+    if (earliestAllowed && fromDate < earliestAllowed) {
+      fromDate.setTime(earliestAllowed.getTime());
+    }
     dateRange = { from: fromDate.toISOString(), to: toDate.toISOString() };
   } else if (range !== "all") {
     const days = parseInt(range, 10);
-    fromDate.setDate(fromDate.getDate() - days);
+    // Clamp preset range to retention limit
+    const clampedDays = hasRetentionLimit ? Math.min(days, retentionDays) : days;
+    fromDate.setDate(fromDate.getDate() - clampedDays);
     dateRange = { from: fromDate.toISOString(), to: toDate.toISOString() };
   } else { // range === "all"
-    fromDate.setFullYear(2025, 0, 1); // Set to a very early date
+    if (earliestAllowed) {
+      fromDate.setTime(earliestAllowed.getTime());
+    } else {
+      fromDate.setFullYear(2025, 0, 1); // Set to a very early date
+    }
     dateRange = { from: fromDate.toISOString(), to: toDate.toISOString() };
   }
 
@@ -147,6 +168,7 @@ export default async function SponsorAnalyticsPage({
         hasData={false}
         fanfletIds={[]}
         blockIds={[]}
+        analyticsRetentionDays={hasRetentionLimit ? retentionDays : undefined}
       />
     );
   }
@@ -247,6 +269,7 @@ export default async function SponsorAnalyticsPage({
       hasData={analyticsEvents.length > 0 || kpiData.totalLeads > 0}
       fanfletIds={fanfletIdsInScope}
       blockIds={blockIdsInScope}
+      analyticsRetentionDays={hasRetentionLimit ? retentionDays : undefined}
     />
   );
 }

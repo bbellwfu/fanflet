@@ -9,6 +9,7 @@ interface DateRangeFieldProps {
   to: string;
   onFromChange: (val: string) => void;
   onToChange: (val: string) => void;
+  minDate?: string;
   maxDate?: string;
   fromLabel?: string;
   toLabel?: string;
@@ -29,6 +30,7 @@ export function DateRangeField({
   to,
   onFromChange,
   onToChange,
+  minDate,
   maxDate,
   fromLabel = "Start Date",
   toLabel = "End Date",
@@ -61,6 +63,7 @@ export function DateRangeField({
           id={fromId}
           type="date"
           value={from}
+          min={minDate}
           max={maxDate}
           onChange={handleFromChange}
           required={required}

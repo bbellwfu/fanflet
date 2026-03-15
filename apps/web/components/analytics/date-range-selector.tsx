@@ -23,12 +23,23 @@ const DEFAULT_RANGES: RangeOption[] = [
 interface DateRangeSelectorProps {
   ranges?: RangeOption[];
   defaultValue?: string;
+  /** Max lookback in days. -1 or undefined = unlimited. Filters preset options and clamps custom min date. */
+  maxDays?: number;
 }
 
-export function DateRangeSelector({ 
+export function DateRangeSelector({
   ranges = DEFAULT_RANGES,
-  defaultValue = "30" 
+  defaultValue = "30",
+  maxDays,
 }: DateRangeSelectorProps) {
+  const hasRetentionLimit = typeof maxDays === "number" && maxDays > 0;
+  const filteredRanges = hasRetentionLimit
+    ? ranges.filter((r) => {
+        if (r.value === "all") return false;
+        const days = parseInt(r.value, 10);
+        return !isNaN(days) && days <= maxDays;
+      })
+    : ranges;
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -102,11 +113,14 @@ export function DateRangeSelector({
   }, []);
 
   const today = new Date().toISOString().split('T')[0];
+  const minDate = hasRetentionLimit
+    ? new Date(Date.now() - maxDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    : undefined;
 
   return (
     <div className="relative inline-flex items-center gap-2" ref={dropdownRef}>
       <div className="inline-flex items-center rounded-lg border bg-white p-0.5 text-sm shadow-sm">
-        {ranges.map((r) => {
+        {filteredRanges.map((r) => {
           const active = currentRange === r.value;
           return (
             <button
@@ -144,6 +158,7 @@ export function DateRangeSelector({
               to={customTo}
               onFromChange={setCustomFrom}
               onToChange={setCustomTo}
+              minDate={minDate}
               maxDate={today}
               stackInMobile={false}
               className="gap-3"

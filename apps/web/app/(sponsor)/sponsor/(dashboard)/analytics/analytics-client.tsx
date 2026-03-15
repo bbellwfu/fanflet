@@ -35,6 +35,7 @@ interface SponsorAnalyticsClientProps {
   hasData: boolean;
   fanfletIds: string[];
   blockIds: string[];
+  analyticsRetentionDays?: number;
 }
 
 export function SponsorAnalyticsClient({
@@ -49,7 +50,8 @@ export function SponsorAnalyticsClient({
   resourceTypeStats,
   hasData,
   fanfletIds,
-  blockIds
+  blockIds,
+  analyticsRetentionDays,
 }: SponsorAnalyticsClientProps) {
 
   const router = useRouter();
@@ -143,7 +145,15 @@ export function SponsorAnalyticsClient({
           </h1>
           <p className="text-muted-foreground mt-1">Detailed insights into your content performance and audience.</p>
         </div>
-        <DateRangeSelector />
+        <div className="flex items-center gap-3">
+          {analyticsRetentionDays && (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1 whitespace-nowrap">
+              Last {analyticsRetentionDays} days
+              <Link href="/sponsor/billing" className="ml-1 underline font-medium">Upgrade</Link>
+            </span>
+          )}
+          <DateRangeSelector maxDays={analyticsRetentionDays} />
+        </div>
       </div>
 
       <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 flex items-center gap-2 text-xs text-emerald-800">

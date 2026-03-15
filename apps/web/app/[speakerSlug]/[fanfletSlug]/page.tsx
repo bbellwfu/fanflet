@@ -241,10 +241,18 @@ export default async function AudienceLandingPage({ params }: Props) {
     .select("*", { count: "exact", head: true })
     .eq("fanflet_id", fanflet.id);
 
+  const { count: activeSponsorConnectionCount } = await supabase
+    .from("sponsor_connections")
+    .select("*", { count: "exact", head: true })
+    .eq("speaker_id", speaker.id)
+    .eq("status", "active")
+    .is("ended_at", null);
+
   const fanfletWithBlocks = {
     ...fanflet,
     resource_blocks: resourceBlocks,
     has_explicit_sponsors: (explicitSponsorCount ?? 0) > 0,
+    has_active_sponsor_connections: (activeSponsorConnectionCount ?? 0) > 0,
   };
 
   const themeId = resolveThemeId(fanflet.theme_config as Record<string, unknown> | null);

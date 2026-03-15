@@ -41,10 +41,7 @@ export default async function SponsorDashboardPage() {
       leadsCount = 0;
       pendingCount = 0;
     } else {
-      const [
-        { count: connCount },
-        { count: pendCount },
-      ] = await Promise.all([
+      const [{ count: connCount }, { count: pendCount }] = await Promise.all([
         supabase
           .from("sponsor_connections")
           .select("*", { count: "exact", head: true })
@@ -96,11 +93,7 @@ export default async function SponsorDashboardPage() {
       }
     }
   } else {
-    const [
-      { count: connCount },
-      { count: leadCount },
-      { count: pendCount },
-    ] = await Promise.all([
+    const [{ count: connCount }, { count: leadCount }, { count: pendCount }] = await Promise.all([
       supabase
         .from("sponsor_connections")
         .select("*", { count: "exact", head: true })

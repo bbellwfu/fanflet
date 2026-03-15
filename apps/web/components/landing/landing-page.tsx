@@ -73,6 +73,7 @@ type Fanflet = {
   expiration_date?: string | null;
   show_expiration_notice?: boolean;
   has_explicit_sponsors?: boolean;
+  has_active_sponsor_connections?: boolean;
 };
 
 type LandingPageProps = {
@@ -285,7 +286,16 @@ export function LandingPage({
               speakerId={speaker.id}
               fanfletId={fanflet.id}
               subscriberCount={subscriberCount}
-              hasSponsorBlocks={fanflet.has_explicit_sponsors || fanflet.resource_blocks.some((b) => b.type?.toLowerCase() === "sponsor" || b.type?.toLowerCase() === "sponsor_block" || b.sponsor_account_id)}
+              hasSponsorBlocks={
+                fanflet.has_explicit_sponsors ||
+                fanflet.has_active_sponsor_connections ||
+                fanflet.resource_blocks.some(
+                  (b) =>
+                    b.type?.toLowerCase() === "sponsor" ||
+                    b.type?.toLowerCase() === "sponsor_block" ||
+                    b.sponsor_account_id
+                )
+              }
             />
           </CardContent>
         </Card>

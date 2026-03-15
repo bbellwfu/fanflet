@@ -174,13 +174,12 @@ $$;
 -- 4. UPDATE RLS POLICIES — sponsor_accounts
 -- ---------------------------------------------------------------------------
 
+-- Use sponsor_ids_for_user() (SECURITY DEFINER) to avoid infinite RLS recursion
+-- between sponsor_accounts and sponsor_team_members policies.
 DROP POLICY IF EXISTS "Sponsors can manage own account" ON public.sponsor_accounts;
 CREATE POLICY "Sponsors can manage own account"
   ON public.sponsor_accounts FOR ALL TO authenticated
-  USING (
-    auth_user_id = (SELECT auth.uid())
-    OR id IN (SELECT sponsor_id FROM public.sponsor_team_members WHERE auth_user_id = (SELECT auth.uid()))
-  )
+  USING (id IN (SELECT public.sponsor_ids_for_user((SELECT auth.uid()))))
   WITH CHECK (auth_user_id = (SELECT auth.uid()));
 
 DROP POLICY IF EXISTS "Authenticated can read verified sponsors" ON public.sponsor_accounts;
@@ -188,8 +187,7 @@ CREATE POLICY "Authenticated can read verified sponsors"
   ON public.sponsor_accounts FOR SELECT TO authenticated
   USING (
     is_verified = true
-    OR auth_user_id = (SELECT auth.uid())
-    OR id IN (SELECT sponsor_id FROM public.sponsor_team_members WHERE auth_user_id = (SELECT auth.uid()))
+    OR id IN (SELECT public.sponsor_ids_for_user((SELECT auth.uid())))
   );
 
 -- ---------------------------------------------------------------------------

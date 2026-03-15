@@ -1,43 +1,81 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@fanflet/db/service";
 import { cookies } from "next/headers";
+import {
+  getImpersonationAuthCookieName,
+} from "@/lib/impersonation-cookie";
 
-export async function POST(request: NextRequest) {
-  try {
-    const cookieStore = await cookies();
+/** Shared stop logic: clear session, return redirect response. */
+async function performStop(request: NextRequest): Promise<NextResponse> {
+  const cookieStore = await cookies();
+  const impSessionId = request.nextUrl.searchParams.get("__imp");
     const metaRaw = cookieStore.get("impersonation_meta")?.value;
+
+    let sessionId: string | null = impSessionId ?? null;
     let returnPath: string | null = null;
     let savedAuthCookies: Record<string, string> | null = null;
+    let hasSiblings = false;
 
-    if (metaRaw) {
+    if (!sessionId && metaRaw) {
       try {
         const meta = JSON.parse(metaRaw);
-        returnPath = meta.returnPath || null;
-        const supabase = createServiceClient();
-
-        // Fetch the saved admin auth cookies from the DB
-        const { data: sessionRow } = await supabase
-          .from("impersonation_sessions")
-          .select("saved_auth_cookies")
-          .eq("id", meta.sessionId)
-          .single();
-
-        if (sessionRow?.saved_auth_cookies) {
-          savedAuthCookies = sessionRow.saved_auth_cookies as Record<string, string>;
-        }
-
-        await supabase
-          .from("impersonation_sessions")
-          .update({ ended_at: new Date().toISOString(), saved_auth_cookies: null })
-          .eq("id", meta.sessionId);
-
-        await supabase.from("impersonation_actions").insert({
-          session_id: meta.sessionId,
-          action_type: "session_ended",
-          action_details: { ended_by: "admin_exit" },
-        });
+        sessionId = meta.sessionId ?? null;
       } catch {
-        // Best-effort cleanup
+        // Ignore
+      }
+    }
+
+    if (sessionId) {
+      const supabase = createServiceClient();
+
+      // Fetch session row including return_path and saved_auth_cookies
+      const { data: sessionRow } = await supabase
+        .from("impersonation_sessions")
+        .select("saved_auth_cookies, return_path, admin_id")
+        .eq("id", sessionId)
+        .single();
+
+      if (sessionRow?.saved_auth_cookies) {
+        savedAuthCookies = sessionRow.saved_auth_cookies as Record<string, string>;
+      }
+
+      // Read return_path from DB (preferred) or fall back to cookie
+      returnPath = (sessionRow?.return_path as string) ?? null;
+      if (!returnPath && metaRaw) {
+        try {
+          const meta = JSON.parse(metaRaw);
+          returnPath = meta.returnPath || null;
+        } catch {
+          // Ignore
+        }
+      }
+
+      // End this specific session
+      await supabase
+        .from("impersonation_sessions")
+        .update({
+          ended_at: new Date().toISOString(),
+          saved_auth_cookies: null,
+          session_payload: null,
+        })
+        .eq("id", sessionId);
+
+      await supabase.from("impersonation_actions").insert({
+        session_id: sessionId,
+        action_type: "session_ended",
+        action_details: { ended_by: "admin_exit" },
+      });
+
+      // Check for sibling sessions (other active sessions by the same admin)
+      if (sessionRow?.admin_id) {
+        const { count } = await supabase
+          .from("impersonation_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("admin_id", sessionRow.admin_id)
+          .is("ended_at", null)
+          .gt("expires_at", new Date().toISOString())
+          .neq("id", sessionId);
+        hasSiblings = (count ?? 0) > 0;
       }
     }
 
@@ -48,20 +86,19 @@ export async function POST(request: NextRequest) {
       : new URL(adminUrl);
     const response = NextResponse.redirect(redirectTo);
 
-    // Clear impersonation cookies
-    response.cookies.set("impersonation_meta", "", { path: "/", maxAge: 0 });
-    response.cookies.set("impersonation_display", "", { path: "/", maxAge: 0 });
-    response.cookies.set("active_role", "", { path: "/", maxAge: 0 });
+    // Only clear cookies if no other impersonation tabs are active
+    if (!hasSiblings) {
+      response.cookies.set("impersonation_meta", "", { path: "/", maxAge: 0 });
+      response.cookies.set("impersonation_display", "", { path: "/", maxAge: 0 });
+      response.cookies.set("active_role", "", { path: "/", maxAge: 0 });
 
-    // Clear the impersonation auth cookies
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-    const projectRef = supabaseUrl
-      ? new URL(supabaseUrl).hostname.split(".")[0]
-      : "";
-    const cookiePrefix = `sb-${projectRef}-auth-token`;
-    for (const cookie of cookieStore.getAll()) {
-      if (cookie.name.startsWith(cookiePrefix)) {
-        response.cookies.set(cookie.name, "", { path: "/", maxAge: 0 });
+      // Clear the dedicated impersonation auth cookie (and any chunks)
+      const impName = getImpersonationAuthCookieName();
+      response.cookies.set(impName, "", { path: "/", maxAge: 0 });
+      for (const cookie of cookieStore.getAll()) {
+        if (cookie.name.startsWith(impName + ".")) {
+          response.cookies.set(cookie.name, "", { path: "/", maxAge: 0 });
+        }
       }
     }
 
@@ -78,7 +115,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return response;
+  return response;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    return await performStop(request);
+  } catch (err) {
+    console.error("Impersonation stop error:", err);
+    const adminUrl =
+      process.env.NEXT_PUBLIC_ADMIN_URL ?? "http://localhost:3001";
+    return NextResponse.redirect(new URL(adminUrl));
+  }
+}
+
+/** GET allowed so middleware can redirect expired __imp sessions to stop. */
+export async function GET(request: NextRequest) {
+  try {
+    return await performStop(request);
   } catch (err) {
     console.error("Impersonation stop error:", err);
     const adminUrl =

@@ -10,41 +10,53 @@ import {
 } from "lucide-react";
 
 export default async function ImpersonationLogPage() {
-  const supabase = createServiceClient();
-
   const authSupabase = await createClient();
   const { data: { user } } = await authSupabase.auth.getUser();
-  const { data: adminPrefs } = await supabase
+  if (!user) {
+    return null;
+  }
+
+  const { data: adminPrefs } = await authSupabase
     .from("admin_notification_preferences")
     .select("timezone")
-    .eq("admin_user_id", user!.id)
+    .eq("admin_user_id", user.id)
     .maybeSingle();
   const adminTimezone = adminPrefs?.timezone ?? null;
 
-  const { data: sessions } = await supabase
+  const { data: sessions, error: sessionsError } = await authSupabase
     .from("impersonation_sessions")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(100);
 
   const allSessions = sessions ?? [];
+  if (sessionsError) {
+    console.error("[impersonation-log] Failed to load sessions:", sessionsError);
+  }
 
   const adminIds = [...new Set(allSessions.map((s) => s.admin_id))];
   const targetIds = [...new Set(allSessions.map((s) => s.target_user_id))];
-  const allUserIds = [...new Set([...adminIds, ...targetIds])];
+  const allUserIds = [...new Set([...adminIds, ...targetIds])].filter(
+    (id): id is string => typeof id === "string" && id.length > 0
+  );
 
   const userMap = new Map<string, { email: string; name: string }>();
-  for (const userId of allUserIds) {
-    const { data } = await supabase.auth.admin.getUserById(userId);
-    if (data?.user) {
-      userMap.set(userId, {
-        email: data.user.email ?? "unknown",
-        name:
-          (data.user.user_metadata?.name as string) ??
-          data.user.email ??
-          "Unknown",
-      });
+  try {
+    const serviceClient = createServiceClient();
+    for (const userId of allUserIds) {
+      const { data } = await serviceClient.auth.admin.getUserById(userId);
+      if (data?.user) {
+        userMap.set(userId, {
+          email: data.user.email ?? "unknown",
+          name:
+            (data.user.user_metadata?.name as string) ??
+            data.user.email ??
+            "Unknown",
+        });
+      }
     }
+  } catch (e) {
+    console.error("[impersonation-log] Failed to resolve user names:", e);
   }
 
   const activeSessions = allSessions.filter(
@@ -64,6 +76,13 @@ export default async function ImpersonationLogPage() {
           Audit trail of all admin impersonation sessions
         </p>
       </div>
+
+      {sessionsError && (
+        <div className="bg-warning/10 border border-warning/30 rounded-lg px-4 py-3 text-sm text-fg-secondary">
+          Could not load sessions. You may need the database migration that
+          allows admins to read the impersonation log.
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">

@@ -31,7 +31,8 @@ export async function updateFanfletDetails(
   id: string,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(id)
@@ -140,7 +141,8 @@ export async function updateFanfletDetails(
 }
 
 export async function publishFanflet(id: string): Promise<{ error?: string; success?: boolean; firstPublished?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(id)
@@ -196,7 +198,8 @@ export async function publishFanflet(id: string): Promise<{ error?: string; succ
 }
 
 export async function unpublishFanflet(id: string): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(id)
@@ -231,7 +234,8 @@ export async function addResourceBlock(
     sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(fanfletId)
@@ -335,7 +339,8 @@ export async function updateResourceBlock(
     sponsor_account_id?: string | null
   }
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -387,7 +392,8 @@ export async function updateResourceBlock(
 }
 
 export async function deleteResourceBlock(blockId: string): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -424,7 +430,8 @@ export async function addLibraryBlockToFanflet(
   libraryItemId: string,
   mode: 'static' | 'dynamic'
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(fanfletId)
@@ -532,7 +539,8 @@ export async function addSponsorLibraryBlockToFanflet(
   fanfletId: string,
   sponsorLibraryItemId: string
 ): Promise<{ error?: string; success?: boolean; id?: string }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(fanfletId)
@@ -618,7 +626,8 @@ export async function reorderBlock(
   blockId: string,
   direction: 'up' | 'down'
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const supabase = await createClient()
 
   const { data: block } = await supabase
@@ -681,7 +690,8 @@ export async function updateFanfletEmailConfig(
   fanfletId: string,
   config: { enabled?: boolean; body?: string } | null
 ): Promise<{ error?: string; success?: boolean }> {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   let ctx: Awaited<ReturnType<typeof requireFanfletOwner>>
   try {
     ctx = await requireFanfletOwner(fanfletId)

@@ -251,7 +251,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
     if (!photoUrl) return;
     setRemovingPhoto(true);
     const result = await removeSpeakerPhoto();
-    if (result.error) {
+    if ("error" in result) {
       toast.error(result.error);
       setRemovingPhoto(false);
       return;
@@ -296,7 +296,7 @@ export function SettingsForm({ speaker, authUserId, userEmail, allowMultipleThem
 
     const result = await updateSpeakerProfile(formData);
 
-    if (result.error) {
+    if ("error" in result) {
       toast.error(result.error);
       setSaving(false);
       return;

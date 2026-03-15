@@ -11,7 +11,8 @@ import { blockImpersonationWrites, logImpersonationAction } from '@/lib/imperson
 import { isValidTimezone } from '@fanflet/db/timezone'
 
 export async function updateSpeakerProfile(formData: FormData) {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   const name = formData.get('name') as string
@@ -146,7 +147,8 @@ export async function checkSlugAvailability(slug: string) {
 }
 
 export async function removeSpeakerPhoto() {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   const { data: currentSpeaker } = await supabase
@@ -175,7 +177,8 @@ export async function removeSpeakerPhoto() {
 }
 
 export async function updateSpeakerPhoto(photoUrl: string, photoFrame?: PhotoFrame | null) {
-  await blockImpersonationWrites()
+  const impError = await blockImpersonationWrites()
+  if (impError) return impError
   const { speakerId, supabase } = await requireSpeaker()
 
   const { data: currentSpeaker } = await supabase

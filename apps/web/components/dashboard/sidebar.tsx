@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, LayoutDashboard, FileText, BarChart3, MessageSquare, BookOpen, Users, Link2, CreditCard, Settings, LogOut } from "lucide-react";
@@ -57,7 +57,10 @@ interface SidebarContentProps {
   items: SidebarItem[];
 }
 
-function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials, roles, activeRole, items }: SidebarContentProps) {
+function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFrame, initials, roles, activeRole, items, impParam }: SidebarContentProps & { impParam: string | null }) {
+  const hrefWithImp = (href: string) =>
+    impParam ? `${href}${href.includes("?") ? "&" : "?"}__imp=${impParam}` : href;
+
   return (
     <div className="h-full flex flex-col bg-slate-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -71,7 +74,7 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={hrefWithImp(item.href)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
                 isActive ? "bg-secondary text-slate-900" : "text-slate-400 hover:text-white hover:bg-white/5"
               }`}
@@ -102,7 +105,7 @@ function SidebarContent({ pathname, displayName, displayEmail, photoUrl, photoFr
           </div>
         </div>
         {roles && activeRole && (
-          <RoleSwitcher roles={roles} activeRole={activeRole} />
+          <RoleSwitcher roles={roles} activeRole={activeRole} impParam={impParam} />
         )}
         <form action="/auth/signout" method="POST" className="w-full">
           <Button
@@ -158,6 +161,8 @@ export function Sidebar({
   children,
 }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const impParam = searchParams.get("__imp");
 
   const displayName = speaker?.name ?? user.user_metadata?.full_name ?? user.email?.split("@")[0] ?? "User";
   const displayEmail = speaker?.email ?? user.email ?? "";
@@ -189,7 +194,7 @@ export function Sidebar({
     <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 fixed top-[var(--banner-height,0px)] bottom-0 left-0 z-50">
-        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} />
+        <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} impParam={impParam} />
       </aside>
 
       {/* Main Content */}
@@ -207,7 +212,7 @@ export function Sidebar({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 border-r-slate-800 bg-slate-900 w-64 text-white">
-              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} />
+              <SidebarContent pathname={pathname} displayName={displayName} displayEmail={displayEmail} photoUrl={photoUrl} photoFrame={photoFrame} initials={initials} roles={roles} activeRole={resolvedActiveRole} items={sidebarItems} impParam={impParam} />
             </SheetContent>
           </Sheet>
         </header>

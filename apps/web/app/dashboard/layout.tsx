@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { hasStoredDefaultThemePreset, isOnboardingNotificationSent } from "@/lib/speaker-preferences";
@@ -29,6 +29,13 @@ export default async function DashboardLayout({
     .single();
 
   if (!speaker) {
+    // If we're in a speaker impersonation session, never redirect to sponsor (avoid wrong portal + wrong banner).
+    const headersList = await headers();
+    const impTargetRole = headersList.get("x-impersonation-target-role");
+    const impSessionId = headersList.get("x-impersonation-session-id");
+    if (impTargetRole === "speaker" && impSessionId) {
+      redirect(`/dashboard?__imp=${impSessionId}`);
+    }
     const { data: sponsor } = await supabase
       .from("sponsor_accounts")
       .select("id")

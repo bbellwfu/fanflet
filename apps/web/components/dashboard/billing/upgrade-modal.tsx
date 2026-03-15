@@ -41,7 +41,7 @@ export function UpgradeModal({
     setError(null);
     startTransition(async () => {
       const result = await requestPlanChange(targetPlanId);
-      if (result.error) {
+      if ("error" in result) {
         setError(result.error);
       } else {
         setSuccess(true);

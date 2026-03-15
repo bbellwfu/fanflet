@@ -4,6 +4,7 @@ import { SponsorSettingsForm } from "@/components/sponsor/sponsor-settings-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSiteUrl } from "@/lib/config";
 import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
+import { ShieldCheck } from "lucide-react";
 
 export default async function SponsorSettingsPage() {
   const supabase = await createClient();
@@ -65,6 +66,28 @@ export default async function SponsorSettingsPage() {
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Plan changes are applied by the Fanflet team. Reach out to your account contact or support to upgrade or modify your subscription.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card id="data-privacy" className="border-zinc-200">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-emerald-600" />
+            <CardTitle className="text-zinc-900">Data Privacy</CardTitle>
+          </div>
+          <CardDescription>
+            How your data is protected on Fanflet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-zinc-700">
+          <p>
+            Your engagement data, leads, and {speakerLabel} connections are fully isolated to your account.
+            Other sponsors connected to the same {speakerLabel}s cannot see your analytics, lead information, or connection activity.
+          </p>
+          <p>
+            This isolation is enforced at the database level using row-level security policies.
+            Each query is scoped to your sponsor account, ensuring that no cross-sponsor data is accessible regardless of shared {speakerLabel} relationships.
           </p>
         </CardContent>
       </Card>

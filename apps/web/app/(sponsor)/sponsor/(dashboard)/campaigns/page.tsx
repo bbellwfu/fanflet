@@ -51,9 +51,9 @@ export default async function SponsorCampaignsPage() {
           </p>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-          <p className="font-medium text-amber-900">Enterprise feature</p>
+          <p className="font-medium text-amber-900">Sponsor Studio feature</p>
           <p className="text-sm text-amber-800 mt-1">
-            Campaigns are available on Sponsor Enterprise. Upgrade to organize activity by initiative and sync with your CRM.
+            Campaigns are available on Sponsor Studio. Upgrade to organize activity by initiative and sync with your CRM.
           </p>
           <Link
             href="/sponsor/settings"

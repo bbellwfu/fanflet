@@ -73,7 +73,7 @@ export async function createSponsorCampaign(params: {
   const { supabase, sponsorId } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
-    return { error: "Upgrade to Enterprise to create campaigns." };
+    return { error: "Upgrade to Sponsor Studio to create campaigns." };
   }
 
   if (!params.name?.trim()) return { error: "Campaign name is required." };
@@ -164,7 +164,7 @@ export async function updateSponsorCampaign(
   const { supabase, sponsorId } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
-    return { error: "Upgrade to Enterprise to manage campaigns." };
+    return { error: "Upgrade to Sponsor Studio to manage campaigns." };
   }
 
   const { data: existing } = await supabase
@@ -216,7 +216,7 @@ export async function deleteSponsorCampaign(campaignId: string): Promise<{ error
   const { supabase, sponsorId } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
-    return { error: "Upgrade to Enterprise to manage campaigns." };
+    return { error: "Upgrade to Sponsor Studio to manage campaigns." };
   }
 
   const { data: existing } = await supabase

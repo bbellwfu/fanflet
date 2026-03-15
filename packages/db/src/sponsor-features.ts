@@ -16,7 +16,7 @@ const EMPTY_ENTITLEMENTS: SponsorEntitlements = {
   planDisplayName: null,
 };
 
-const SPONSOR_FREE_PLAN_NAME = "sponsor_free";
+const SPONSOR_FREE_PLAN_NAME = "sponsor_connect";
 
 /**
  * Framework-agnostic entitlement loader for sponsors. Works in any context:
@@ -25,7 +25,7 @@ const SPONSOR_FREE_PLAN_NAME = "sponsor_free";
  * Resolution:
  * 1. Subscription row (plan limits + features from sponsor_plan_features)
  * 2. Global feature flags (everyone gets these)
- * 3. Fallback to sponsor_free plan defaults
+ * 3. Fallback to sponsor_connect plan defaults
  */
 export async function loadSponsorEntitlements(
   supabase: SupabaseClient,

@@ -621,11 +621,11 @@ export async function seedSponsorDemoEnvironment(
     manifest.sponsor_account_id = sponsorAccount.id;
     manifest.sponsor_slug = sponsorSlug;
 
-    // ── Step 3: Assign Sponsor Enterprise plan (Library + Campaigns unlocked) ──
+    // ── Step 3: Assign Sponsor Studio plan (Library + Campaigns unlocked) ──
     const { data: sponsorEnterprisePlan } = await serviceClient
       .from("sponsor_plans")
       .select("id, limits")
-      .eq("name", "sponsor_enterprise")
+      .eq("name", "sponsor_studio")
       .maybeSingle();
 
     if (sponsorEnterprisePlan) {

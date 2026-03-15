@@ -62,7 +62,7 @@ export default async function SponsorSettingsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm font-medium text-zinc-900">
-            {planDisplayName ?? "Sponsor Free"}
+            {planDisplayName ?? "Sponsor Connect"}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Plan changes are applied by the Fanflet team. Reach out to your account contact or support to upgrade or modify your subscription.

@@ -133,7 +133,7 @@ export function ContentPerformanceSection({
           <CardDescription>
             {placementCount > 0
               ? `You have ${placementCount} resource${placementCount !== 1 ? "s" : ""} placed — upgrade to see which content and which ${speakerLabel}s drive the most engagement.`
-              : `Upgrade to Pro to see per-resource performance — which content and which ${speakerLabel}s drive the most engagement.`}
+              : `Upgrade to Sponsor Connect to see per-resource performance — which content and which ${speakerLabel}s drive the most engagement.`}
           </CardDescription>
         </CardHeader>
         <CardContent>

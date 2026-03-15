@@ -3,13 +3,14 @@
 import { requireSponsor } from '@/lib/auth-context'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 import { loadSponsorEntitlements } from '@fanflet/db'
+import { logSponsorAudit } from '@/lib/sponsor-audit'
 
 export async function respondToConnection(
   connectionId: string,
   accept: boolean
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites()
-  const { sponsorId, supabase } = await requireSponsor()
+  const { sponsorId, supabase, user } = await requireSponsor()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
@@ -50,6 +51,7 @@ export async function respondToConnection(
 
   if (error) return { error: error.message }
   await logImpersonationAction('mutation', '/sponsor/dashboard/connections', { action: 'respondToConnection', connectionId, sponsorId })
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: accept ? 'accept_connection' : 'decline_connection', category: 'connections', targetType: 'connection', targetId: connectionId })
   return {}
 }
 
@@ -57,7 +59,7 @@ export async function endSponsorConnection(
   connectionId: string
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites()
-  const { sponsorId, supabase } = await requireSponsor()
+  const { sponsorId, supabase, user } = await requireSponsor()
 
   const { data: conn } = await supabase
     .from('sponsor_connections')
@@ -77,6 +79,7 @@ export async function endSponsorConnection(
 
   if (error) return { error: error.message }
   await logImpersonationAction('mutation', '/sponsor/dashboard/connections', { action: 'endSponsorConnection', connectionId, sponsorId })
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: 'end_connection', category: 'connections', targetType: 'connection', targetId: connectionId })
   return {}
 }
 

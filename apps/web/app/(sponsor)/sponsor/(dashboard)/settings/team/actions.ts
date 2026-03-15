@@ -4,6 +4,7 @@ import { requireSponsor } from "@/lib/auth-context";
 import { loadSponsorEntitlements } from "@fanflet/db";
 import { blockImpersonationWrites } from "@/lib/impersonation";
 import { revalidatePath } from "next/cache";
+import { logSponsorAudit } from "@/lib/sponsor-audit";
 
 export async function inviteTeamMember(params: {
   email: string;
@@ -64,13 +65,14 @@ export async function inviteTeamMember(params: {
     });
 
   if (error) return { error: error.message };
+  await logSponsorAudit(supabase, { sponsorId, actorId: user!.id, action: "invite_team_member", category: "team", targetType: "invitation", details: { email, role: params.role } });
   revalidatePath("/sponsor/settings/team");
   return {};
 }
 
 export async function removeTeamMember(memberId: string): Promise<{ error?: string }> {
   await blockImpersonationWrites();
-  const { supabase, sponsorId, teamRole } = await requireSponsor();
+  const { supabase, sponsorId, teamRole, user } = await requireSponsor();
 
   if (teamRole !== "owner" && teamRole !== "admin") {
     return { error: "Only admins can remove team members." };
@@ -83,6 +85,7 @@ export async function removeTeamMember(memberId: string): Promise<{ error?: stri
     .eq("sponsor_id", sponsorId);
 
   if (error) return { error: error.message };
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "remove_team_member", category: "team", targetType: "team_member", targetId: memberId });
   revalidatePath("/sponsor/settings/team");
   return {};
 }
@@ -92,7 +95,7 @@ export async function updateTeamMemberRole(
   role: "admin" | "campaign_manager" | "viewer"
 ): Promise<{ error?: string }> {
   await blockImpersonationWrites();
-  const { supabase, sponsorId, teamRole } = await requireSponsor();
+  const { supabase, sponsorId, teamRole, user } = await requireSponsor();
 
   if (teamRole !== "owner" && teamRole !== "admin") {
     return { error: "Only admins can change roles." };
@@ -105,13 +108,14 @@ export async function updateTeamMemberRole(
     .eq("sponsor_id", sponsorId);
 
   if (error) return { error: error.message };
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "update_team_member_role", category: "team", targetType: "team_member", targetId: memberId, details: { role } });
   revalidatePath("/sponsor/settings/team");
   return {};
 }
 
 export async function revokeInvitation(invitationId: string): Promise<{ error?: string }> {
   await blockImpersonationWrites();
-  const { supabase, sponsorId, teamRole } = await requireSponsor();
+  const { supabase, sponsorId, teamRole, user } = await requireSponsor();
 
   if (teamRole !== "owner" && teamRole !== "admin") {
     return { error: "Only admins can revoke invitations." };
@@ -125,6 +129,7 @@ export async function revokeInvitation(invitationId: string): Promise<{ error?: 
     .eq("status", "pending");
 
   if (error) return { error: error.message };
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "revoke_invitation", category: "team", targetType: "invitation", targetId: invitationId });
   revalidatePath("/sponsor/settings/team");
   return {};
 }

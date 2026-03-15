@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireSponsor } from "@/lib/auth-context";
 import { loadSponsorEntitlements } from "@fanflet/db";
+import { logSponsorAudit } from "@/lib/sponsor-audit";
 
 export interface SponsorCampaignRow {
   id: string;
@@ -70,7 +71,7 @@ export async function createSponsorCampaign(params: {
   all_speakers_assigned?: boolean;
   speaker_ids?: string[];
 }): Promise<{ error?: string; id?: string }> {
-  const { supabase, sponsorId } = await requireSponsor();
+  const { supabase, sponsorId, user } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
     return { error: "Upgrade to Sponsor Studio to create campaigns." };
@@ -122,6 +123,7 @@ export async function createSponsorCampaign(params: {
     }
   }
 
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "create_campaign", category: "campaigns", targetType: "campaign", targetId: campaign.id, details: { name: params.name } });
   revalidatePath("/sponsor/campaigns");
   return { id: campaign.id };
 }
@@ -175,7 +177,7 @@ export async function updateSponsorCampaign(
     speaker_ids?: string[];
   }
 ): Promise<{ error?: string }> {
-  const { supabase, sponsorId } = await requireSponsor();
+  const { supabase, sponsorId, user } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
     return { error: "Upgrade to Sponsor Studio to manage campaigns." };
@@ -222,12 +224,13 @@ export async function updateSponsorCampaign(
     }
   }
 
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "update_campaign", category: "campaigns", targetType: "campaign", targetId: campaignId });
   revalidatePath("/sponsor/campaigns");
   return {};
 }
 
 export async function deleteSponsorCampaign(campaignId: string): Promise<{ error?: string }> {
-  const { supabase, sponsorId } = await requireSponsor();
+  const { supabase, sponsorId, user } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_campaigns")) {
     return { error: "Upgrade to Sponsor Studio to manage campaigns." };
@@ -250,6 +253,7 @@ export async function deleteSponsorCampaign(campaignId: string): Promise<{ error
     .eq("sponsor_id", sponsorId);
 
   if (error) return { error: error.message };
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "delete_campaign", category: "campaigns", targetType: "campaign", targetId: campaignId });
   revalidatePath("/sponsor/campaigns");
   return {};
 }

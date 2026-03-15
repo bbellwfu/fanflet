@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireSponsor } from "@/lib/auth-context";
 import { blockImpersonationWrites, logImpersonationAction } from "@/lib/impersonation";
 import { isValidTimezone } from "@fanflet/db/timezone";
+import { logSponsorAudit } from "@/lib/sponsor-audit";
 
 export async function updateSponsorProfile(formData: FormData) {
   await blockImpersonationWrites();
-  const { sponsorId, supabase } = await requireSponsor();
+  const { sponsorId, supabase, user } = await requireSponsor();
 
   const companyName = (formData.get("company_name") as string)?.trim();
   const slug = (formData.get("slug") as string)?.trim();
@@ -58,6 +59,7 @@ export async function updateSponsorProfile(formData: FormData) {
     return { error: error.message };
   }
   await logImpersonationAction("mutation", "/sponsor/dashboard/settings", { action: "updateSponsorProfile", sponsorId });
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "update_profile", category: "settings", targetType: "sponsor_account", targetId: sponsorId });
 
   revalidatePath("/sponsor/settings");
   revalidatePath("/sponsor/dashboard");
@@ -81,7 +83,7 @@ export async function checkSponsorSlugAvailability(slug: string) {
 
 export async function updateSponsorLogo(logoUrl: string) {
   await blockImpersonationWrites();
-  const { sponsorId, supabase } = await requireSponsor();
+  const { sponsorId, supabase, user } = await requireSponsor();
 
   const { error } = await supabase
     .from("sponsor_accounts")
@@ -90,6 +92,7 @@ export async function updateSponsorLogo(logoUrl: string) {
 
   if (error) return { error: error.message };
   await logImpersonationAction("mutation", "/sponsor/dashboard/settings", { action: "updateSponsorLogo", sponsorId });
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "update_logo", category: "settings", targetType: "sponsor_account", targetId: sponsorId });
 
   revalidatePath("/sponsor/settings");
   revalidatePath("/sponsor/dashboard");
@@ -98,7 +101,7 @@ export async function updateSponsorLogo(logoUrl: string) {
 
 export async function removeSponsorLogo() {
   await blockImpersonationWrites();
-  const { sponsorId, supabase } = await requireSponsor();
+  const { sponsorId, supabase, user } = await requireSponsor();
 
   const { error } = await supabase
     .from("sponsor_accounts")
@@ -107,6 +110,7 @@ export async function removeSponsorLogo() {
 
   if (error) return { error: error.message };
   await logImpersonationAction("mutation", "/sponsor/dashboard/settings", { action: "removeSponsorLogo", sponsorId });
+  await logSponsorAudit(supabase, { sponsorId, actorId: user.id, action: "remove_logo", category: "settings", targetType: "sponsor_account", targetId: sponsorId });
 
   revalidatePath("/sponsor/settings");
   revalidatePath("/sponsor/dashboard");

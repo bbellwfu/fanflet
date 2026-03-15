@@ -22,6 +22,8 @@ export interface SponsorContext {
   sponsorId: string;
   demoEnvironmentId: string | null;
   supabase: SupabaseClient;
+  /** Team member role, or 'owner' for the account owner */
+  teamRole: "owner" | "admin" | "campaign_manager" | "viewer";
 }
 
 export interface AudienceContext {
@@ -78,22 +80,46 @@ export const requireSponsor = cache(async (): Promise<SponsorContext> => {
     redirect("/login");
   }
 
-  const { data: sponsor } = await supabase
+  // Check direct ownership first
+  const { data: ownedSponsor } = await supabase
     .from("sponsor_accounts")
     .select("id, demo_environment_id")
     .eq("auth_user_id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (!sponsor) {
-    redirect("/sponsor/onboarding");
+  if (ownedSponsor) {
+    return {
+      user,
+      sponsorId: ownedSponsor.id,
+      demoEnvironmentId: ownedSponsor.demo_environment_id ?? null,
+      supabase,
+      teamRole: "owner",
+    };
   }
 
-  return {
-    user,
-    sponsorId: sponsor.id,
-    demoEnvironmentId: sponsor.demo_environment_id ?? null,
-    supabase,
-  };
+  // Check team membership
+  const { data: membership } = await supabase
+    .from("sponsor_team_members")
+    .select("sponsor_id, role, sponsor_accounts(id, demo_environment_id)")
+    .eq("auth_user_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (membership) {
+    const account = membership.sponsor_accounts as unknown as {
+      id: string;
+      demo_environment_id: string | null;
+    } | null;
+    return {
+      user,
+      sponsorId: membership.sponsor_id,
+      demoEnvironmentId: account?.demo_environment_id ?? null,
+      supabase,
+      teamRole: membership.role as SponsorContext["teamRole"],
+    };
+  }
+
+  redirect("/sponsor/onboarding");
 });
 
 /**

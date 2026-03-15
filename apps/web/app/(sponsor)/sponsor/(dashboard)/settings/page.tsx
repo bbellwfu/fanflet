@@ -4,7 +4,7 @@ import { SponsorSettingsForm } from "@/components/sponsor/sponsor-settings-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSiteUrl } from "@/lib/config";
 import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
-import { ShieldCheck, ArrowRight } from "lucide-react";
+import { ShieldCheck, ArrowRight, Users } from "lucide-react";
 import Link from "next/link";
 
 export default async function SponsorSettingsPage() {
@@ -55,6 +55,27 @@ export default async function SponsorSettingsPage() {
             className="inline-flex items-center gap-2 text-sm font-medium text-[#1B365D] hover:underline"
           >
             Go to Billing
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card id="team" className="border-zinc-200">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-slate-600" />
+            <CardTitle className="text-zinc-900">Team</CardTitle>
+          </div>
+          <CardDescription>
+            Invite colleagues to collaborate on your sponsor account with role-based permissions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/sponsor/settings/team"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[#1B365D] hover:underline"
+          >
+            Manage team
             <ArrowRight className="h-4 w-4" />
           </Link>
         </CardContent>

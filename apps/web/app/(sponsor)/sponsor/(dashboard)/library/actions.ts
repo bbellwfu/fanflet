@@ -128,7 +128,7 @@ export async function createSponsorLibraryResource(params: {
   const { supabase, sponsorId } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_resource_library")) {
-    return { error: "Upgrade to Pro or Enterprise to use the Library." };
+    return { error: "Upgrade to Sponsor Connect to use the Library." };
   }
 
   if (!params.title?.trim()) return { error: "Title is required." };
@@ -312,7 +312,7 @@ export async function requestSponsorUploadSlot(params: {
   const { supabase, sponsorId } = await requireSponsor();
   const entitlements = await loadSponsorEntitlements(supabase, sponsorId);
   if (!entitlements.features.has("sponsor_resource_library")) {
-    return { allowed: false, error: "Upgrade to Pro or Enterprise to use the Library." };
+    return { allowed: false, error: "Upgrade to Sponsor Connect to use the Library." };
   }
 
   if (!isAllowedFileType(params.fileName)) {

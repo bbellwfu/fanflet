@@ -51,7 +51,7 @@ export default async function SponsorLibraryPage() {
           </p>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center">
-          <p className="font-medium text-amber-900">Upgrade to Pro or Enterprise</p>
+          <p className="font-medium text-amber-900">Upgrade to Sponsor Connect or Studio</p>
           <p className="text-sm text-amber-800 mt-1">
             The Resource Library lets you upload files and links that connected {speakerLabel}s can add to their fanflets. Upgrade your plan to unlock it.
           </p>

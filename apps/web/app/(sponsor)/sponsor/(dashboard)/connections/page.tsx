@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { loadSponsorEntitlements } from "@fanflet/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
 import { ConnectionsList } from "./connections-list";
 
 export default async function SponsorConnectionsPage() {
@@ -42,7 +44,17 @@ export default async function SponsorConnectionsPage() {
     }
   }
 
-  const { data: connections } = await connectionsQuery;
+  const [{ data: connections }, entitlements] = await Promise.all([
+    connectionsQuery,
+    loadSponsorEntitlements(supabase, sponsor.id),
+  ]);
+
+  const activeCount = (connections ?? []).filter(
+    (c) => (c as Record<string, unknown>).status === "active" && !(c as Record<string, unknown>).ended_at
+  ).length;
+  const maxConnections = entitlements.limits.max_connections;
+  const hasLimit = typeof maxConnections === "number" && maxConnections !== -1;
+  const atLimit = hasLimit && activeCount >= maxConnections;
 
   const list = (connections ?? []).map((c) => {
     const row = c as Record<string, unknown>;
@@ -67,7 +79,17 @@ export default async function SponsorConnectionsPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Connections</h1>
         <p className="text-muted-foreground">
           {speakerLabel[0].toUpperCase() + speakerLabel.slice(1)} connection requests. Accept to allow them to link your company to their fanflets.
+          {hasLimit && (
+            <span className={`ml-2 text-sm font-medium ${atLimit ? "text-amber-600" : "text-muted-foreground"}`}>
+              ({activeCount}/{maxConnections} active)
+            </span>
+          )}
         </p>
+        {atLimit && (
+          <p className="text-sm text-amber-600 mt-1">
+            You&apos;ve reached the connection limit for your plan. <Link href="/sponsor/settings" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited connections.
+          </p>
+        )}
       </div>
       <Card>
         <CardHeader>

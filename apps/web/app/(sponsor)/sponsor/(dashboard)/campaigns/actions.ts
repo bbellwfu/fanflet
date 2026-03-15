@@ -76,6 +76,20 @@ export async function createSponsorCampaign(params: {
     return { error: "Upgrade to Sponsor Studio to create campaigns." };
   }
 
+  const maxCampaigns = entitlements.limits.max_campaigns;
+  if (typeof maxCampaigns === "number" && maxCampaigns !== -1) {
+    const { count, error: countError } = await supabase
+      .from("sponsor_campaigns")
+      .select("id", { count: "exact", head: true })
+      .eq("sponsor_id", sponsorId);
+    if (countError) return { error: "Could not check campaign limit." };
+    if ((count ?? 0) >= maxCampaigns) {
+      return {
+        error: `You've reached the limit of ${maxCampaigns} campaigns on your ${entitlements.planDisplayName ?? "Sponsor Connect"} plan. Upgrade to Sponsor Studio for unlimited campaigns.`,
+      };
+    }
+  }
+
   if (!params.name?.trim()) return { error: "Campaign name is required." };
   if (!params.start_date) return { error: "Start date is required." };
 

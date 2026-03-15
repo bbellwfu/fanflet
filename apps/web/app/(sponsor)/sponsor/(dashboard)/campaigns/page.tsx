@@ -28,6 +28,10 @@ export default async function SponsorCampaignsPage() {
 
   const hasCampaigns = entitlements.features.has("sponsor_campaigns");
   const campaigns = campaignsResult.data ?? [];
+  const maxCampaigns = entitlements.limits.max_campaigns;
+  const campaignCount = campaigns.length;
+  const hasLimit = typeof maxCampaigns === "number" && maxCampaigns !== -1;
+  const atLimit = hasLimit && campaignCount >= maxCampaigns;
 
   const { data: connections } = await supabase
     .from("sponsor_connections")
@@ -72,7 +76,17 @@ export default async function SponsorCampaignsPage() {
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Campaigns</h1>
         <p className="text-muted-foreground mt-1">
           Create campaigns to group {speakerLabel}s and resources and view rollup analytics.
+          {hasLimit && (
+            <span className={`ml-2 text-sm font-medium ${atLimit ? "text-amber-600" : "text-muted-foreground"}`}>
+              ({campaignCount}/{maxCampaigns} used)
+            </span>
+          )}
         </p>
+        {atLimit && (
+          <p className="text-sm text-amber-600 mt-1">
+            You&apos;ve reached the campaign limit for your plan. <Link href="/sponsor/settings" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited campaigns.
+          </p>
+        )}
       </div>
 
       <CampaignsClient

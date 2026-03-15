@@ -304,8 +304,16 @@ export default async function SponsorDashboardPage() {
               <Link2 className="h-4 w-4 text-muted-foreground group-hover:text-[#3BA5D9] transition-colors" />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold">{connectionsCount ?? 0}</p>
+              <p className="text-2xl font-bold">
+                {connectionsCount ?? 0}
+                {typeof entitlements.limits.max_connections === "number" && entitlements.limits.max_connections !== -1 && (
+                  <span className="text-sm font-normal text-muted-foreground">/{entitlements.limits.max_connections}</span>
+                )}
+              </p>
               <p className="text-xs text-muted-foreground">{speakerLabel[0].toUpperCase() + speakerLabel.slice(1)}s you&apos;re connected with</p>
+              {typeof entitlements.limits.max_connections === "number" && entitlements.limits.max_connections !== -1 && (connectionsCount ?? 0) >= entitlements.limits.max_connections && (
+                <p className="text-xs text-amber-600 mt-1 font-medium">Limit reached — upgrade to Studio</p>
+              )}
             </CardContent>
           </Card>
         </Link>

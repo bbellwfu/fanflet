@@ -2,6 +2,7 @@
 
 import { requireSponsor } from '@/lib/auth-context'
 import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
+import { loadSponsorEntitlements } from '@fanflet/db'
 
 export async function respondToConnection(
   connectionId: string,
@@ -18,6 +19,25 @@ export async function respondToConnection(
     .single()
 
   if (!conn || conn.status !== 'pending') return { error: 'Connection not found or already responded.' }
+
+  if (accept) {
+    const entitlements = await loadSponsorEntitlements(supabase, sponsorId)
+    const maxConnections = entitlements.limits.max_connections
+    if (typeof maxConnections === 'number' && maxConnections !== -1) {
+      const { count, error: countError } = await supabase
+        .from('sponsor_connections')
+        .select('id', { count: 'exact', head: true })
+        .eq('sponsor_id', sponsorId)
+        .eq('status', 'active')
+        .is('ended_at', null)
+      if (countError) return { error: 'Could not check connection limit.' }
+      if ((count ?? 0) >= maxConnections) {
+        return {
+          error: `You've reached the limit of ${maxConnections} active connections on your ${entitlements.planDisplayName ?? 'Sponsor Connect'} plan. Upgrade to Sponsor Studio for unlimited connections.`,
+        }
+      }
+    }
+  }
 
   const { error } = await supabase
     .from('sponsor_connections')

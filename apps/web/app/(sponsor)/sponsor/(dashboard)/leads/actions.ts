@@ -1,7 +1,6 @@
 'use server'
 
 import { requireSponsor } from '@/lib/auth-context'
-import { blockImpersonationWrites, logImpersonationAction } from '@/lib/impersonation'
 
 export async function exportSponsorLeadsCsv(): Promise<{ error?: string; csv?: string }> {
   const { sponsorId, demoEnvironmentId, supabase } = await requireSponsor()

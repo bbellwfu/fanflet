@@ -26,6 +26,16 @@ function messageForErrorCode(code: string | null): string | null {
       return "Sign-in didn't complete. Please try again."
     case 'link_required':
       return 'Sign in with your email and password below. You can then link Google in Settings (Sign-in options) so you can use either method next time.'
+    case 'jwt_secret_not_configured':
+      return "Impersonation is not configured for this app. Set SUPABASE_JWT_SECRET in the web app environment (e.g. apps/web/.env.local) using the JWT Secret from Supabase Dashboard > Settings > API."
+    case 'missing_token':
+    case 'invalid_impersonation_token':
+    case 'token_already_used':
+    case 'token_expired':
+    case 'session_not_found':
+    case 'session_expired':
+    case 'impersonation_failed':
+      return "Impersonation could not be started. The link may have expired or already been used. Try starting impersonation again from the admin portal."
     default:
       return 'Sign-in failed. Please try again.'
   }

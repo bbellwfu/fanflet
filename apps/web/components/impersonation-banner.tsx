@@ -10,6 +10,8 @@ interface ImpersonationBannerProps {
   writeEnabled: boolean;
   expiresAt: string;
   adminUrl: string;
+  /** When set (__imp URL mode), exit POSTs to stop with this so the correct session is cleared. */
+  impSessionId?: string;
 }
 
 export function ImpersonationBanner({
@@ -19,6 +21,7 @@ export function ImpersonationBanner({
   writeEnabled,
   expiresAt,
   adminUrl,
+  impSessionId,
 }: ImpersonationBannerProps) {
   const [timeLeft, setTimeLeft] = useState("");
   const [exiting, setExiting] = useState(false);
@@ -49,7 +52,9 @@ export function ImpersonationBanner({
     try {
       const form = document.createElement("form");
       form.method = "POST";
-      form.action = "/api/impersonate/stop";
+      form.action = impSessionId
+        ? `/api/impersonate/stop?__imp=${encodeURIComponent(impSessionId)}`
+        : "/api/impersonate/stop";
       document.body.appendChild(form);
       form.submit();
     } catch {

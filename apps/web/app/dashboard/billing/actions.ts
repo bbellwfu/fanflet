@@ -10,7 +10,8 @@ import { z } from "zod";
 const planIdSchema = z.string().uuid();
 
 export async function requestPlanChange(targetPlanId: string) {
-  await blockImpersonationWrites();
+  const impError = await blockImpersonationWrites();
+  if (impError) return impError;
   const { speakerId } = await requireSpeaker();
 
   const parsed = planIdSchema.safeParse(targetPlanId);
@@ -89,7 +90,8 @@ export async function refreshPlanEntitlements(): Promise<{
   added?: string[];
   removed?: string[];
 }> {
-  await blockImpersonationWrites();
+  const impError = await blockImpersonationWrites();
+  if (impError) return impError;
   const { speakerId } = await requireSpeaker();
 
   const supabase = createServiceClient();

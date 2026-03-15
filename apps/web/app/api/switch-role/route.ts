@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 const SwitchRoleSchema = z.object({
   role: z.enum(['speaker', 'sponsor', 'audience']),
+  __imp: z.string().uuid().optional(),
 })
 
 const ROLE_HOME: Record<string, string> = {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
     }
 
-    const { role } = parsed.data
+    const { role, __imp } = parsed.data
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -34,7 +35,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Role not available' }, { status: 403 })
     }
 
-    const redirectUrl = ROLE_HOME[role] ?? '/dashboard'
+    let redirectUrl = ROLE_HOME[role] ?? '/dashboard'
+    if (__imp) {
+      redirectUrl = redirectUrl.includes('?') ? `${redirectUrl}&__imp=${__imp}` : `${redirectUrl}?__imp=${__imp}`
+    }
     const response = NextResponse.json({ redirect: redirectUrl })
 
     response.cookies.set('active_role', role, {

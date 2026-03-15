@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu, LayoutDashboard, Users, Link2, Plug, Settings, LogOut, Clock, Library, Megaphone, BarChart3 } from "lucide-react";
@@ -36,6 +36,7 @@ interface SidebarContentProps {
   initials: string;
   roles?: string[];
   activeRole?: string;
+  impParam?: string | null;
 }
 
 function SponsorSidebarContent({
@@ -47,7 +48,11 @@ function SponsorSidebarContent({
   initials,
   roles,
   activeRole,
+  impParam = null,
 }: SidebarContentProps) {
+  const hrefWithImp = (href: string) =>
+    impParam ? `${href}${href.includes("?") ? "&" : "?"}__imp=${impParam}` : href;
+
   return (
     <div className="h-full flex flex-col bg-zinc-900 text-white">
       <div className="p-6 flex items-center gap-2">
@@ -63,7 +68,7 @@ function SponsorSidebarContent({
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={hrefWithImp(item.href)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
                 isActive
                   ? "bg-teal-500 text-gray-900"
@@ -106,7 +111,7 @@ function SponsorSidebarContent({
           </div>
         </div>
         {roles && activeRole && (
-          <RoleSwitcher roles={roles} activeRole={activeRole} />
+          <RoleSwitcher roles={roles} activeRole={activeRole} impParam={impParam} />
         )}
         <form action="/auth/signout" method="POST" className="w-full">
           <Button
@@ -145,6 +150,8 @@ interface SponsorSidebarProps {
 
 export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorSidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const impParam = searchParams.get("__imp");
 
   const initials = getCompanyInitials(sponsor.company_name);
   const roles = (Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : []) as string[];
@@ -161,6 +168,7 @@ export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorS
           initials={initials}
           roles={roles}
           activeRole={activeRole}
+          impParam={impParam}
         />
       </aside>
 
@@ -186,6 +194,7 @@ export function SponsorSidebar({ user, sponsor, activeRole, children }: SponsorS
                 initials={initials}
                 roles={roles}
                 activeRole={activeRole}
+                impParam={impParam}
               />
             </SheetContent>
           </Sheet>

@@ -117,13 +117,18 @@ export async function POST(request: NextRequest) {
         expires_at: expiresAt.toISOString(),
         ip_address: ip || null,
         user_agent: userAgent || null,
+        return_path: returnPath || null,
       })
       .select("id")
       .single();
 
     if (sessionError || !session) {
+      const detail = sessionError?.message;
       return NextResponse.json(
-        { error: "Failed to create impersonation session" },
+        {
+          error: "Failed to create impersonation session",
+          ...(detail && { details: detail }),
+        },
         { status: 500 }
       );
     }
@@ -143,8 +148,12 @@ export async function POST(request: NextRequest) {
       });
 
     if (tokenError) {
+      const detail = tokenError.message;
       return NextResponse.json(
-        { error: "Failed to create handoff token" },
+        {
+          error: "Failed to create handoff token",
+          ...(detail && { details: detail }),
+        },
         { status: 500 }
       );
     }
@@ -185,17 +194,25 @@ export async function POST(request: NextRequest) {
     });
 
     if (!auditResult.success) {
+      const detail = auditResult.error;
       return NextResponse.json(
-        { error: "Audit trail required for impersonation — please retry" },
+        {
+          error: "Audit trail required for impersonation — please retry",
+          ...(detail && { details: detail }),
+        },
         { status: 500 }
       );
     }
 
     return NextResponse.json({ redirectUrl: establishUrl });
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("Impersonation start error:", err);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Internal server error",
+        ...(process.env.NODE_ENV === "development" && { details: message }),
+      },
       { status: 500 }
     );
   }

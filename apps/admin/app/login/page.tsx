@@ -22,25 +22,27 @@ export default async function AdminLoginPage({
 
   const supabase = await createClient();
 
-  // If user is signed in but lacks admin access, sign them out to break the redirect loop.
+  // If user is signed in but lacks admin access, redirect to signout so cookies are actually
+  // cleared (Server Component signOut() may not set response cookies). This breaks redirect loops.
   if (errorParam === "admin_required") {
-    await supabase.auth.signOut();
-    return <LoginForm error={errorParam} />;
+    redirect(`/api/auth/signout?next=${encodeURIComponent("/login?error=admin_required")}`);
   }
 
-  // If the user is already signed in as an admin, redirect to the dashboard
+  // If the user is already signed in as an admin, redirect to the dashboard.
+  // Use the same role logic as middleware so we never redirect to / unless middleware would allow.
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const role = (user.app_metadata as Record<string, unknown> | undefined)?.role;
-      if (role === "platform_admin") {
+      const appMetadataRole = (user.app_metadata as Record<string, unknown> | undefined)?.role;
+      if (appMetadataRole === "platform_admin" || appMetadataRole === "super_admin") {
         redirect("/");
       }
       const { data: roleRow } = await supabase
         .from("user_roles")
         .select("role")
         .eq("auth_user_id", user.id)
-        .eq("role", "platform_admin")
+        .in("role", ["super_admin", "platform_admin"])
+        .filter("removed_at", "is", "null")
         .maybeSingle();
       if (roleRow) {
         redirect("/");

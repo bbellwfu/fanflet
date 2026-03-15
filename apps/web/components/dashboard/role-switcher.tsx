@@ -13,9 +13,11 @@ const ROLE_LABELS: Record<string, string> = {
 interface RoleSwitcherProps {
   roles: string[];
   activeRole: string;
+  /** When in impersonation, pass __imp so redirect preserves session. */
+  impParam?: string | null;
 }
 
-export function RoleSwitcher({ roles, activeRole }: RoleSwitcherProps) {
+export function RoleSwitcher({ roles, activeRole, impParam }: RoleSwitcherProps) {
   const router = useRouter();
   const [switching, setSwitching] = useState(false);
 
@@ -30,7 +32,7 @@ export function RoleSwitcher({ roles, activeRole }: RoleSwitcherProps) {
       const res = await fetch("/api/switch-role", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: otherRole }),
+        body: JSON.stringify({ role: otherRole, __imp: impParam ?? undefined }),
       });
       const data = await res.json();
       if (data.redirect) {

@@ -56,15 +56,16 @@ export async function getImpersonationBannerData(): Promise<ImpersonationDisplay
 
 /**
  * Checks if writes should be blocked during this session.
- * Throws an error if impersonating in read-only mode.
+ * Returns an error object if impersonating in read-only mode, otherwise null.
  */
-export async function blockImpersonationWrites(): Promise<void> {
+export async function blockImpersonationWrites(): Promise<{ error: string } | null> {
   const meta = await getImpersonationMeta();
   if (meta && !meta.writeEnabled) {
-    throw new Error(
-      "This action is not available in read-only impersonation mode."
-    );
+    return {
+      error: "This action is not available in read-only impersonation mode.",
+    };
   }
+  return null;
 }
 
 /**

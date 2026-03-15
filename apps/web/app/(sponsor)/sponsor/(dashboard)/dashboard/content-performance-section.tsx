@@ -145,7 +145,7 @@ export function ContentPerformanceSection({
                 Upgrade to see clicks, engagement rate, and leads per resource and per {speakerLabel}.
               </p>
               <Button asChild variant="outline" size="sm" className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100">
-                <Link href="/sponsor/settings">View plans</Link>
+                <Link href="/sponsor/billing">View plans</Link>
               </Button>
             </div>
           </div>

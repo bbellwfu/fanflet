@@ -87,7 +87,7 @@ export default async function SponsorConnectionsPage() {
         </p>
         {atLimit && (
           <p className="text-sm text-amber-600 mt-1">
-            You&apos;ve reached the connection limit for your plan. <Link href="/sponsor/settings" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited connections.
+            You&apos;ve reached the connection limit for your plan. <Link href="/sponsor/billing" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited connections.
           </p>
         )}
       </div>

@@ -56,7 +56,7 @@ export default async function SponsorLibraryPage() {
             The Resource Library lets you upload files and links that connected {speakerLabel}s can add to their fanflets. Upgrade your plan to unlock it.
           </p>
           <Link
-            href="/sponsor/settings"
+            href="/sponsor/billing"
             className="mt-4 inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
           >
             View plans

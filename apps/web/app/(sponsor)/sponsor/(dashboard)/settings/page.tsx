@@ -4,7 +4,8 @@ import { SponsorSettingsForm } from "@/components/sponsor/sponsor-settings-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSiteUrl } from "@/lib/config";
 import { CopyFanfletUrlButton } from "@/app/dashboard/fanflets/copy-fanflet-url-button";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export default async function SponsorSettingsPage() {
   const supabase = await createClient();
@@ -26,18 +27,6 @@ export default async function SponsorSettingsPage() {
 
   const speakerLabel = (sponsor as { speaker_label?: string }).speaker_label ?? "speaker";
 
-  const { data: subscription } = await supabase
-    .from("sponsor_subscriptions")
-    .select("id, status, sponsor_plans(display_name, name)")
-    .eq("sponsor_id", sponsor.id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  const planDisplayName =
-    subscription?.sponsor_plans && !Array.isArray(subscription.sponsor_plans)
-      ? (subscription.sponsor_plans as { display_name: string; name: string }).display_name
-      : null;
-
   const mcpServerUrl = `${getSiteUrl().replace(/\/$/, "")}/api/mcp`;
 
   return (
@@ -55,18 +44,19 @@ export default async function SponsorSettingsPage() {
 
       <Card id="subscription" className="border-zinc-200">
         <CardHeader>
-          <CardTitle className="text-zinc-900">Plan</CardTitle>
+          <CardTitle className="text-zinc-900">Plan &amp; Billing</CardTitle>
           <CardDescription>
-            Your current sponsor plan determines feature access and limits. To change your plan, contact the Fanflet team.
+            View your current plan, usage, and upgrade options.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm font-medium text-zinc-900">
-            {planDisplayName ?? "Sponsor Connect"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Plan changes are applied by the Fanflet team. Reach out to your account contact or support to upgrade or modify your subscription.
-          </p>
+          <Link
+            href="/sponsor/billing"
+            className="inline-flex items-center gap-2 text-sm font-medium text-[#1B365D] hover:underline"
+          >
+            Go to Billing
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </CardContent>
       </Card>
 

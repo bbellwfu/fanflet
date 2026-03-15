@@ -60,7 +60,7 @@ export default async function SponsorCampaignsPage() {
             Campaigns are available on Sponsor Studio. Upgrade to organize activity by initiative and sync with your CRM.
           </p>
           <Link
-            href="/sponsor/settings"
+            href="/sponsor/billing"
             className="mt-4 inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
           >
             View plans
@@ -84,7 +84,7 @@ export default async function SponsorCampaignsPage() {
         </p>
         {atLimit && (
           <p className="text-sm text-amber-600 mt-1">
-            You&apos;ve reached the campaign limit for your plan. <Link href="/sponsor/settings" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited campaigns.
+            You&apos;ve reached the campaign limit for your plan. <Link href="/sponsor/billing" className="underline font-medium">Upgrade to Sponsor Studio</Link> for unlimited campaigns.
           </p>
         )}
       </div>
